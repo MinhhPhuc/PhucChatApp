@@ -391,29 +391,19 @@ function openRoom(roomId, name, avatar, status) {
   emojiPicker.classList.add('hidden');
   
   const btnSettings = document.getElementById('btn-group-settings');
+  const btnChatOptions = document.getElementById('btn-chat-options'); // Lấy nút 3 chấm
+
   if (roomId.startsWith('grp_')) {
-    btnSettings.classList.remove('hidden');
+    if (btnSettings) btnSettings.classList.remove('hidden');
+    if (btnChatOptions) btnChatOptions.classList.add('hidden'); // Ẩn nút 3 chấm 1-1 nếu là nhóm (hoặc bỏ dòng này nếu muốn hiện cả hai)
   } else {
-    btnSettings.classList.add('hidden');
+    if (btnSettings) btnSettings.classList.add('hidden');
+    if (btnChatOptions) btnChatOptions.classList.remove('hidden'); // BẮT BUỘC PHẢI CÓ ĐỂ HIỆN NÚT KHI CHAT 1-1
   }
   
   socket.emit('messages:get', { roomId });
   renderChatList();
 }
-
-socket.on('messages:history', ({ roomId, messages }) => {
-  if (messages.length > 0) {
-    const last = messages[messages.length - 1];
-    state.lastMessages.set(roomId, { content: last.content, timestamp: last.timestamp, senderId: last.sender.id, senderName: last.sender.username, type: last.type });
-  }
-  if (roomId === state.activeRoomId) {
-    const viewport = document.getElementById('messages-viewport');
-    viewport.innerHTML = '';
-    messages.forEach(msg => appendMessage(msg));
-  }
-  renderChatList();
-});
-
 socket.on('message:received', (msg) => {
   state.lastMessages.set(msg.roomId, { content: msg.content, timestamp: msg.timestamp, senderId: msg.sender.id, senderName: msg.sender.username, type: msg.type });
   
