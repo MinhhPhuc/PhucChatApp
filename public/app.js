@@ -556,18 +556,23 @@ window.execGroupAction = function(action, targetId) {
   const currentGroupId = state.activeRoomId;
   socket.emit('group:action', { action, groupId: currentGroupId, targetId });
 
-  const modalGroupSettings = document.getElementById('modal-group-settings');
-  if (modalGroupSettings) {
-    modalGroupSettings.style.display = 'none';
-    modalGroupSettings.classList.add('hidden');
-  }
-
+  // CHỈ ĐÓNG KHI RỜI NHÓM HOẶC GIẢI TÁN NHÓM
   if (action === 'leave' || action === 'delete_group') {
+    const modalGroupSettings = document.getElementById('modal-group-settings');
+    if (modalGroupSettings) {
+      modalGroupSettings.style.display = 'none';
+      modalGroupSettings.classList.add('hidden');
+    }
+
     state.groups = state.groups.filter(g => g.id !== currentGroupId);
     document.getElementById('chat-screen').classList.add('hidden');
     state.activeRoomId = null;
     renderChatList();
     showToast(action === 'leave' ? 'Đã rời nhóm thành công!' : 'Đã giải tán nhóm thành công!');
+  } else {
+    // Với các hành động khác như Mute, Kick, Phong Admin: 
+    // Không đóng modal, chỉ hiển thị thông báo thao tác thành công
+    showToast('Đã thực hiện thao tác thành công!');
   }
 };
 
