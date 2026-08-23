@@ -608,68 +608,45 @@ document.addEventListener('click', (e) => {
   const modalChatSettings = document.getElementById('modal-chat-settings');
   const modalReport = document.getElementById('modal-report');
 
-  // 1. Mở modal cài đặt khi bấm vào nút 3 chấm (hoặc icon bên trong)
-  const btnChatOptions = e.target.closest('#btn-chat-options');
-  if (btnChatOptions) {
-    if (modalChatSettings) {
-      modalChatSettings.classList.remove('hidden');
-      modalChatSettings.style.display = 'flex';
-    }
+  // 1. Mở modal cài đặt khi bấm vào nút 3 chấm
+  if (e.target.closest('#btn-chat-options')) {
+    if (modalChatSettings) modalChatSettings.classList.remove('hidden');
     return;
   }
 
   // 2. Đóng modal cài đặt khi bấm nút X
-  const btnCloseChatSettings = e.target.closest('#btn-close-chat-settings');
-  if (btnCloseChatSettings) {
-    if (modalChatSettings) {
-      modalChatSettings.classList.add('hidden');
-      modalChatSettings.style.display = 'none';
-    }
+  if (e.target.closest('#btn-close-chat-settings')) {
+    if (modalChatSettings) modalChatSettings.classList.add('hidden');
     return;
   }
 
   // 3. Mở bảng Báo cáo từ modal cài đặt
-  const setReport = e.target.closest('#set-report');
-  if (setReport) {
-    if (modalChatSettings && modalReport) {
-      modalChatSettings.classList.add('hidden');
-      modalChatSettings.style.display = 'none';
-      modalReport.classList.remove('hidden');
-      modalReport.style.display = 'flex';
-    }
+  if (e.target.closest('#set-report')) {
+    if (modalChatSettings) modalChatSettings.classList.add('hidden');
+    if (modalReport) modalReport.classList.remove('hidden');
     return;
   }
 
   // 4. Đóng bảng Báo cáo khi bấm nút Hủy
-  const btnCancelReport = e.target.closest('#btn-cancel-report');
-  if (btnCancelReport) {
-    if (modalReport) {
-      modalReport.classList.add('hidden');
-      modalReport.style.display = 'none';
-    }
+  if (e.target.closest('#btn-cancel-report')) {
+    if (modalReport) modalReport.classList.add('hidden');
     return;
   }
 
   // 5. Gửi báo cáo thành công
-  const btnSubmitReport = e.target.closest('#btn-submit-report');
-  if (btnSubmitReport) {
+  if (e.target.closest('#btn-submit-report')) {
     const reasonSelect = document.getElementById('report-reason-select');
     const reason = reasonSelect ? reasonSelect.value : 'Vi phạm';
-    alert("Đã gửi báo cáo thành công với lý do: " + reason);
-    if (modalReport) {
-      modalReport.classList.add('hidden');
-      modalReport.style.display = 'none';
-    }
+    showToast("Đã gửi báo cáo thành công với lý do: " + reason, true);
+    if (modalReport) modalReport.classList.add('hidden');
     return;
   }
 
-  // 6. Đóng modal khi bấm ra vùng nền tối bên ngoài
+  // 6. Đóng modal khi bấm ra vùng nền tối bên ngoài (backdrop)
   if (modalChatSettings && e.target === modalChatSettings) {
     modalChatSettings.classList.add('hidden');
-    modalChatSettings.style.display = 'none';
   }
   if (modalReport && e.target === modalReport) {
     modalReport.classList.add('hidden');
-    modalReport.style.display = 'none';
   }
 });
