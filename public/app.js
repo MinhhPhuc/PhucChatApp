@@ -12,6 +12,7 @@ let state = {
   unreadCounts: new Map(),
   searchQuery: '',
   activeFilter: 'all',
+  nicknames: new Map(),
   selectedRegAvatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=default',
   selectedGroupAvatar: 'https://api.dicebear.com/7.x/identicon/svg?seed=group'
 };
@@ -70,8 +71,83 @@ document.addEventListener('click', (e) => {
     }
 
     renderChatList();
+    return;
   }
-  // ... các sự kiện click khác giữ nguyên ...
+
+  // ==========================================
+  // XỬ LÝ ĐỔI BIỆT DANH
+  // ==========================================
+  const modalChatSettings = document.getElementById('modal-chat-settings');
+  const modalNickname = document.getElementById('modal-nickname');
+
+  const btnSetNickname = e.target.closest('#set-nickname');
+  if (btnSetNickname) {
+    if (modalChatSettings) {
+      modalChatSettings.classList.add('hidden');
+      modalChatSettings.style.display = 'none';
+    }
+
+    if (state.activeRoomId && state.activeRoomId.includes('_DM_')) {
+      const parts = state.activeRoomId.split('_DM_');
+      const targetFriendId = parts.find(id => id !== state.currentUser.id);
+      const friend = state.friends.find(f => f.id === targetFriendId);
+
+      if (friend) {
+        const inputNick = document.getElementById('nickname-input');
+        const titleNick = document.getElementById('nickname-target-name');
+
+        if (titleNick) titleNick.innerText = `Đổi biệt danh cho ${friend.username}`;
+        if (inputNick) inputNick.value = state.nicknames.get(state.activeRoomId) || friend.username;
+
+        if (modalNickname) {
+          modalNickname.classList.remove('hidden');
+          modalNickname.style.display = 'flex';
+          if (inputNick) inputNick.focus();
+        }
+      }
+    }
+    return;
+  }
+
+  // Đóng modal biệt danh
+  if (e.target.closest('#btn-cancel-nickname') || (modalNickname && e.target === modalNickname)) {
+    if (modalNickname) {
+      modalNickname.style.display = 'none';
+      modalNickname.classList.add('hidden');
+    }
+    return;
+  }
+
+  // Lưu biệt danh mới
+  if (e.target.closest('#btn-save-nickname')) {
+    const inputNick = document.getElementById('nickname-input');
+    const newNickname = inputNick ? inputNick.value.trim() : '';
+
+    if (state.activeRoomId && state.activeRoomId.includes('_DM_')) {
+      if (newNickname) {
+        state.nicknames.set(state.activeRoomId, newNickname);
+      } else {
+        state.nicknames.delete(state.activeRoomId);
+      }
+
+      const parts = state.activeRoomId.split('_DM_');
+      const targetFriendId = parts.find(id => id !== state.currentUser.id);
+      const friend = state.friends.find(f => f.id === targetFriendId);
+      
+      const displayName = newNickname || (friend ? friend.username : 'Cuộc trò chuyện');
+      const headerNameEl = document.getElementById('active-chat-name');
+      if (headerNameEl) headerNameEl.innerText = displayName;
+
+      showToast('Đã cập nhật biệt danh thành công!');
+    }
+
+    if (modalNickname) {
+      modalNickname.style.display = 'none';
+      modalNickname.classList.add('hidden');
+    }
+    renderChatList();
+    return;
+  }
 });
 
 // --- QUẢN LÝ THEME ---
@@ -277,6 +353,21 @@ function renderChatList() {
   list.innerHTML = '';
   const query = state.searchQuery;
   const filter = state.activeFilter; // Lấy trạng thái tab hiện tại
+  const dmRoomId = [state.currentUser.id, f.id].sort().join('_DM_');
+  const customNick = state.nicknames.get(dmRoomId);
+  const displayName = customNick || f.username; // Ưu tiên hiển thị biệt danh
+      // ...
+    list.innerHTML += `
+        <div class="chat-item ${unreadCount > 0 ? 'unread' : ''}" onclick="openRoom('${dmRoomId}', '${f.username}', '${f.avatar}', '${f.status === 'online' ? '🟢 Online' : '⚪ Offline'}')">
+          ...
+          <div class="chat-item-info">
+            <div class="chat-item-top">
+              <h4>${displayName}</h4>
+              <span class="chat-time">${timeText}</span>
+            </div>
+          ...
+        </div>
+      `;
 
   // 1. Hiển thị lời mời kết bạn (chỉ hiện ở tab 'all' và khi không tìm kiếm)
   if (state.requests.length > 0 && !query && filter === 'all') {
@@ -456,6 +547,13 @@ function openRoom(roomId, name, avatar, status) {
     }
   }
 
+  let displayName = name;
+  if (roomId.includes('_DM_')) {
+    const customNick = state.nicknames.get(roomId);
+    if (customNick) displayName = customNick;
+  }
+ 
+  document.getElementById('active-chat-name').innerText = displayName;
   document.getElementById('active-chat-name').innerText = name;
   document.getElementById('active-chat-status').innerText = displayStatus;
   document.getElementById('chat-screen').classList.remove('hidden');
