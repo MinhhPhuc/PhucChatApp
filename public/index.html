@@ -64,6 +64,18 @@
   <!-- Toast Thông Báo -->
   <div id="toast-notification">Thành công!</div>
 
+  <!-- MODAL XÁC NHẬN ĐẸP MẮT (Dùng chung) -->
+  <div id="modal-confirm" class="modal hidden" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); align-items: center; justify-content: center; z-index: 1200;">
+    <div class="modal-content" style="background: #ffffff; color: #333; padding: 24px; border-radius: 12px; width: 90%; max-width: 360px; text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.2);">
+      <h3 id="confirm-title" style="margin-top: 0; margin-bottom: 12px; font-size: 18px; color: #2d3748;">Xác nhận</h3>
+      <p id="confirm-message" style="font-size: 14px; color: #4a5568; margin-bottom: 20px;">Bạn có chắc chắn muốn thực hiện hành động này?</p>
+      <div style="display: flex; gap: 10px; justify-content: center;">
+        <button id="btn-confirm-yes" style="flex: 1; padding: 10px; background: #e53e3e; color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer;">Đồng ý</button>
+        <button id="btn-confirm-no" style="flex: 1; padding: 10px; background: #cbd5e0; color: #2d3748; border: none; border-radius: 6px; font-weight: bold; cursor: pointer;">Hủy</button>
+      </div>
+    </div>
+  </div>
+
   <div class="app-container">
     <header class="app-header">
       <div class="header-user">
@@ -226,7 +238,6 @@
       </div>
       
       <div style="display: flex; flex-direction: column; gap: 8px;">
-        <!-- Nút Tạo Nhóm đã khớp ID với code JS -->
         <button id="set-create-group" style="background: #f7fafc; border: 1px solid #e2e8f0; color: #2d3748; text-align: left; padding: 10px 14px; border-radius: 8px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 10px;"><i class="fa-solid fa-users" style="color: #3182ce;"></i> Tạo nhóm cùng bạn này</button>
         <button id="set-nickname" style="background: #f7fafc; border: 1px solid #e2e8f0; color: #2d3748; text-align: left; padding: 10px 14px; border-radius: 8px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 10px;"><i class="fa-solid fa-pen" style="color: #3182ce;"></i> Đổi biệt danh</button>
         <button id="set-theme" style="background: #f7fafc; border: 1px solid #e2e8f0; color: #2d3748; text-align: left; padding: 10px 14px; border-radius: 8px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 10px;"><i class="fa-solid fa-palette" style="color: #3182ce;"></i> Tùy chỉnh chủ đề</button>

@@ -26,6 +26,46 @@ function showToast(message, isSuccess = true) {
   }, 3000);
 }
 
+// --- HÀM HIỂN THỊ MODAL XÁC NHẬN ĐẸP MẮT ---
+let confirmCallback = null;
+function showConfirmModal(title, message, onYes) {
+  const modal = document.getElementById('modal-confirm');
+  const titleEl = document.getElementById('confirm-title');
+  const msgEl = document.getElementById('confirm-message');
+  if (!modal) {
+    // Fallback nếu không tìm thấy modal thì dùng confirm thường
+    if (confirm(message)) onYes();
+    return;
+  }
+  if (titleEl) titleEl.innerText = title;
+  if (msgEl) msgEl.innerText = message;
+  confirmCallback = onYes;
+  modal.classList.remove('hidden');
+  modal.style.display = 'flex';
+}
+
+document.addEventListener('click', (e) => {
+  if (e.target.closest('#btn-confirm-yes')) {
+    const modal = document.getElementById('modal-confirm');
+    if (modal) {
+      modal.classList.add('hidden');
+      modal.style.display = 'none';
+    }
+    if (confirmCallback) {
+      confirmCallback();
+      confirmCallback = null;
+    }
+  }
+  if (e.target.closest('#btn-confirm-no')) {
+    const modal = document.getElementById('modal-confirm');
+    if (modal) {
+      modal.classList.add('hidden');
+      modal.style.display = 'none';
+    }
+    confirmCallback = null;
+  }
+});
+
 // --- QUẢN LÝ THEME ---
 function applyTheme(theme) {
   state.theme = theme;
@@ -411,7 +451,7 @@ function appendMessage(msg) {
 }
 
 // =========================================================
-// CÁC HÀM XỬ LÝ GIAO DIỆN NHÓM
+// CÁC HÀM XỬ LÝ GIAO DIỆN NHÓM & CẬP NHẬT NGAY LẬP TỨC KHÔNG CẦN F5
 // =========================================================
 function renderGroupMembersCheckbox(preSelectedFriendId = null) {
   const container = document.getElementById('group-members-list');
@@ -491,11 +531,34 @@ function renderGroupSettingsModal() {
 }
 
 window.execGroupAction = function(action, targetId) {
-  socket.emit('group:action', { action, groupId: state.activeRoomId, targetId });
+  const currentGroupId = state.activeRoomId;
+  socket.emit('group:action', { action, groupId: currentGroupId, targetId });
+
+  // Xử lý cập nhật ngay lập tức giao diện client mà không cần đợi hoặc F5
+  const modalGroupSettings = document.getElementById('modal-group-settings');
+  if (modalGroupSettings) {
+    modalGroupSettings.style.display = 'none';
+    modalGroupSettings.classList.add('hidden');
+  }
+
+  if (action === 'leave' || action === 'delete_group') {
+    // 1. Lọc bỏ nhóm khỏi danh sách state.groups ngay lập tức
+    state.groups = state.groups.filter(g => g.id !== currentGroupId);
+    
+    // 2. Ẩn khung chat đi và reset activeRoomId
+    document.getElementById('chat-screen').classList.add('hidden');
+    state.activeRoomId = null;
+
+    // 3. Render lại danh sách chat
+    renderChatList();
+
+    // 4. Thông báo cho người dùng
+    showToast(action === 'leave' ? 'Đã rời nhóm thành công!' : 'Đã giải tán nhóm thành công!');
+  }
 };
 
 // =========================================================
-// BỘ ĐIỀU KHIỂN EVENT CLICK DUY NHẤT (ĐÃ GỘP CHUẨN XÁC)
+// BỘ ĐIỀU KHIỂN EVENT CLICK DUY NHẤT
 // =========================================================
 document.addEventListener('click', (e) => {
   const modalGroup = document.getElementById('modal-group');
@@ -528,7 +591,6 @@ document.addEventListener('click', (e) => {
       modalGroup.style.display = 'flex';
     }
 
-    // Tự động tìm ID người bạn đang chat (nếu activeRoomId là dạng DM) để tích chọn sẵn
     let targetFriendId = null;
     if (state.activeRoomId && state.activeRoomId.includes('_DM_')) {
       const parts = state.activeRoomId.split('_DM_');
@@ -627,12 +689,23 @@ document.addEventListener('click', (e) => {
     }
     return;
   }
+
+  // --- SỬA SỰ KIỆN RỜI NHÓM & GIẢI TÁN NHÓM VỚI MODAL XÁC NHẬN ĐẸP MẮT & CẬP NHẬT TRỰC TIẾP ---
   if (e.target.closest('#btn-leave-group')) {
-    if (confirm('Bạn có chắc chắn muốn rời nhóm?')) execGroupAction('leave', null);
+    showConfirmModal(
+      'Xác nhận rời nhóm',
+      'Bạn có chắc chắn muốn rời khỏi nhóm này không?',
+      () => execGroupAction('leave', null)
+    );
     return;
   }
+
   if (e.target.closest('#btn-delete-group')) {
-    if (confirm('Bạn có chắc chắn muốn giải tán nhóm này không?')) execGroupAction('delete_group', null);
+    showConfirmModal(
+      'Xác nhận giải tán nhóm',
+      'Hành động này sẽ xóa vĩnh viễn nhóm đối với tất cả thành viên. Bạn có chắc chắn muốn giải tán?',
+      () => execGroupAction('delete_group', null)
+    );
     return;
   }
 
