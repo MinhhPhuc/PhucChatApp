@@ -1,0 +1,503 @@
+{
+  "accounts": {
+    "dataType": "Map",
+    "value": [
+      [
+        "1",
+        {
+          "id": "usr_x7jd5gpvu",
+          "username": "1",
+          "password": "1",
+          "avatar": "https://api.dicebear.com/7.x/avataaars/svg?seed=default"
+        }
+      ],
+      [
+        "2",
+        {
+          "id": "usr_14ea1fbnf",
+          "username": "2",
+          "password": "2",
+          "avatar": "https://api.dicebear.com/7.x/avataaars/svg?seed=default"
+        }
+      ],
+      [
+        "3",
+        {
+          "id": "usr_egg4gowpb",
+          "username": "3",
+          "password": "3",
+          "avatar": "https://api.dicebear.com/7.x/avataaars/svg?seed=default"
+        }
+      ],
+      [
+        "4",
+        {
+          "id": "usr_av7qhg2hy",
+          "username": "4",
+          "password": "4",
+          "avatar": "https://api.dicebear.com/7.x/avataaars/svg?seed=default"
+        }
+      ],
+      [
+        "5",
+        {
+          "id": "usr_dtbrx4npz",
+          "username": "5",
+          "password": "5",
+          "avatar": "https://api.dicebear.com/7.x/avataaars/svg?seed=default"
+        }
+      ],
+      [
+        "6",
+        {
+          "id": "usr_agmfdfcof",
+          "username": "6",
+          "password": "6",
+          "avatar": "https://api.dicebear.com/7.x/avataaars/svg?seed=default"
+        }
+      ],
+      [
+        "7",
+        {
+          "id": "usr_8ognbnkg2",
+          "username": "7",
+          "password": "7",
+          "avatar": "https://api.dicebear.com/7.x/avataaars/svg?seed=default"
+        }
+      ],
+      [
+        "8",
+        {
+          "id": "usr_c9jyk7scv",
+          "username": "8",
+          "password": "8",
+          "avatar": "https://api.dicebear.com/7.x/avataaars/svg?seed=default"
+        }
+      ]
+    ]
+  },
+  "users": {
+    "dataType": "Map",
+    "value": [
+      [
+        "usr_x7jd5gpvu",
+        {
+          "id": "usr_x7jd5gpvu",
+          "username": "1",
+          "avatar": "https://api.dicebear.com/7.x/avataaars/svg?seed=default",
+          "status": "offline"
+        }
+      ],
+      [
+        "usr_14ea1fbnf",
+        {
+          "id": "usr_14ea1fbnf",
+          "username": "2",
+          "avatar": "https://api.dicebear.com/7.x/avataaars/svg?seed=default",
+          "status": "offline"
+        }
+      ],
+      [
+        "usr_egg4gowpb",
+        {
+          "id": "usr_egg4gowpb",
+          "username": "3",
+          "avatar": "https://api.dicebear.com/7.x/avataaars/svg?seed=default",
+          "status": "offline"
+        }
+      ],
+      [
+        "usr_av7qhg2hy",
+        {
+          "id": "usr_av7qhg2hy",
+          "username": "4",
+          "avatar": "https://api.dicebear.com/7.x/avataaars/svg?seed=default",
+          "status": "offline"
+        }
+      ],
+      [
+        "usr_dtbrx4npz",
+        {
+          "id": "usr_dtbrx4npz",
+          "username": "5",
+          "avatar": "https://api.dicebear.com/7.x/avataaars/svg?seed=default",
+          "status": "offline"
+        }
+      ],
+      [
+        "usr_agmfdfcof",
+        {
+          "id": "usr_agmfdfcof",
+          "username": "6",
+          "avatar": "https://api.dicebear.com/7.x/avataaars/svg?seed=default",
+          "status": "online"
+        }
+      ],
+      [
+        "usr_8ognbnkg2",
+        {
+          "id": "usr_8ognbnkg2",
+          "username": "7",
+          "avatar": "https://api.dicebear.com/7.x/avataaars/svg?seed=default",
+          "status": "offline"
+        }
+      ],
+      [
+        "usr_c9jyk7scv",
+        {
+          "id": "usr_c9jyk7scv",
+          "username": "8",
+          "avatar": "https://api.dicebear.com/7.x/avataaars/svg?seed=default",
+          "status": "offline"
+        }
+      ]
+    ]
+  },
+  "friendRequests": {
+    "dataType": "Map",
+    "value": [
+      [
+        "freq_usr_av7qhg2hy_usr_x7jd5gpvu",
+        {
+          "id": "freq_usr_av7qhg2hy_usr_x7jd5gpvu",
+          "fromUserId": "usr_av7qhg2hy",
+          "fromUsername": "4",
+          "fromAvatar": "https://api.dicebear.com/7.x/avataaars/svg?seed=default",
+          "toUserId": "usr_x7jd5gpvu",
+          "status": "accepted"
+        }
+      ],
+      [
+        "freq_usr_av7qhg2hy_usr_14ea1fbnf",
+        {
+          "id": "freq_usr_av7qhg2hy_usr_14ea1fbnf",
+          "fromUserId": "usr_av7qhg2hy",
+          "fromUsername": "4",
+          "fromAvatar": "https://api.dicebear.com/7.x/avataaars/svg?seed=default",
+          "toUserId": "usr_14ea1fbnf",
+          "status": "accepted"
+        }
+      ],
+      [
+        "freq_usr_av7qhg2hy_usr_egg4gowpb",
+        {
+          "id": "freq_usr_av7qhg2hy_usr_egg4gowpb",
+          "fromUserId": "usr_av7qhg2hy",
+          "fromUsername": "4",
+          "fromAvatar": "https://api.dicebear.com/7.x/avataaars/svg?seed=default",
+          "toUserId": "usr_egg4gowpb",
+          "status": "accepted"
+        }
+      ],
+      [
+        "freq_usr_egg4gowpb_usr_14ea1fbnf",
+        {
+          "id": "freq_usr_egg4gowpb_usr_14ea1fbnf",
+          "fromUserId": "usr_egg4gowpb",
+          "fromUsername": "3",
+          "fromAvatar": "https://api.dicebear.com/7.x/avataaars/svg?seed=default",
+          "toUserId": "usr_14ea1fbnf",
+          "status": "accepted"
+        }
+      ],
+      [
+        "freq_usr_egg4gowpb_usr_x7jd5gpvu",
+        {
+          "id": "freq_usr_egg4gowpb_usr_x7jd5gpvu",
+          "fromUserId": "usr_egg4gowpb",
+          "fromUsername": "3",
+          "fromAvatar": "https://api.dicebear.com/7.x/avataaars/svg?seed=default",
+          "toUserId": "usr_x7jd5gpvu",
+          "status": "accepted"
+        }
+      ],
+      [
+        "freq_usr_14ea1fbnf_usr_x7jd5gpvu",
+        {
+          "id": "freq_usr_14ea1fbnf_usr_x7jd5gpvu",
+          "fromUserId": "usr_14ea1fbnf",
+          "fromUsername": "2",
+          "fromAvatar": "https://api.dicebear.com/7.x/avataaars/svg?seed=default",
+          "toUserId": "usr_x7jd5gpvu",
+          "status": "accepted"
+        }
+      ],
+      [
+        "freq_usr_dtbrx4npz_usr_x7jd5gpvu",
+        {
+          "id": "freq_usr_dtbrx4npz_usr_x7jd5gpvu",
+          "fromUserId": "usr_dtbrx4npz",
+          "fromUsername": "5",
+          "fromAvatar": "https://api.dicebear.com/7.x/avataaars/svg?seed=default",
+          "toUserId": "usr_x7jd5gpvu",
+          "status": "accepted"
+        }
+      ],
+      [
+        "freq_usr_agmfdfcof_usr_x7jd5gpvu",
+        {
+          "id": "freq_usr_agmfdfcof_usr_x7jd5gpvu",
+          "fromUserId": "usr_agmfdfcof",
+          "fromUsername": "6",
+          "fromAvatar": "https://api.dicebear.com/7.x/avataaars/svg?seed=default",
+          "toUserId": "usr_x7jd5gpvu",
+          "status": "accepted"
+        }
+      ],
+      [
+        "freq_usr_8ognbnkg2_usr_x7jd5gpvu",
+        {
+          "id": "freq_usr_8ognbnkg2_usr_x7jd5gpvu",
+          "fromUserId": "usr_8ognbnkg2",
+          "fromUsername": "7",
+          "fromAvatar": "https://api.dicebear.com/7.x/avataaars/svg?seed=default",
+          "toUserId": "usr_x7jd5gpvu",
+          "status": "accepted"
+        }
+      ]
+    ]
+  },
+  "friends": {
+    "dataType": "Map",
+    "value": [
+      [
+        "usr_x7jd5gpvu",
+        {
+          "dataType": "Set",
+          "value": [
+            "usr_av7qhg2hy",
+            "usr_egg4gowpb",
+            "usr_14ea1fbnf",
+            "usr_dtbrx4npz",
+            "usr_agmfdfcof",
+            "usr_8ognbnkg2"
+          ]
+        }
+      ],
+      [
+        "usr_14ea1fbnf",
+        {
+          "dataType": "Set",
+          "value": [
+            "usr_av7qhg2hy",
+            "usr_egg4gowpb",
+            "usr_x7jd5gpvu"
+          ]
+        }
+      ],
+      [
+        "usr_egg4gowpb",
+        {
+          "dataType": "Set",
+          "value": [
+            "usr_av7qhg2hy",
+            "usr_14ea1fbnf",
+            "usr_x7jd5gpvu"
+          ]
+        }
+      ],
+      [
+        "usr_av7qhg2hy",
+        {
+          "dataType": "Set",
+          "value": [
+            "usr_egg4gowpb",
+            "usr_14ea1fbnf",
+            "usr_x7jd5gpvu"
+          ]
+        }
+      ],
+      [
+        "usr_dtbrx4npz",
+        {
+          "dataType": "Set",
+          "value": [
+            "usr_x7jd5gpvu"
+          ]
+        }
+      ],
+      [
+        "usr_agmfdfcof",
+        {
+          "dataType": "Set",
+          "value": [
+            "usr_x7jd5gpvu"
+          ]
+        }
+      ],
+      [
+        "usr_8ognbnkg2",
+        {
+          "dataType": "Set",
+          "value": [
+            "usr_x7jd5gpvu"
+          ]
+        }
+      ],
+      [
+        "usr_c9jyk7scv",
+        {
+          "dataType": "Set",
+          "value": []
+        }
+      ]
+    ]
+  },
+  "messages": {
+    "dataType": "Map",
+    "value": [
+      [
+        "usr_14ea1fbnf_DM_usr_x7jd5gpvu",
+        [
+          {
+            "id": "msg_4y7h5kgtz",
+            "roomId": "usr_14ea1fbnf_DM_usr_x7jd5gpvu",
+            "sender": {
+              "id": "usr_x7jd5gpvu",
+              "username": "1",
+              "avatar": "https://api.dicebear.com/7.x/avataaars/svg?seed=default",
+              "status": "offline"
+            },
+            "content": "123",
+            "type": "text",
+            "timestamp": 1787466541042
+          }
+        ]
+      ],
+      [
+        "usr_dtbrx4npz_DM_usr_x7jd5gpvu",
+        [
+          {
+            "id": "msg_oo90jkaoj",
+            "roomId": "usr_dtbrx4npz_DM_usr_x7jd5gpvu",
+            "sender": {
+              "id": "usr_dtbrx4npz",
+              "username": "5",
+              "avatar": "https://api.dicebear.com/7.x/avataaars/svg?seed=default",
+              "status": "online"
+            },
+            "content": "ggh",
+            "type": "text",
+            "timestamp": 1787468398908
+          },
+          {
+            "id": "msg_jdm7e43qg",
+            "roomId": "usr_dtbrx4npz_DM_usr_x7jd5gpvu",
+            "sender": {
+              "id": "usr_dtbrx4npz",
+              "username": "5",
+              "avatar": "https://api.dicebear.com/7.x/avataaars/svg?seed=default",
+              "status": "offline"
+            },
+            "content": "duueu",
+            "type": "text",
+            "timestamp": 1787469332532
+          }
+        ]
+      ],
+      [
+        "usr_agmfdfcof_DM_usr_x7jd5gpvu",
+        [
+          {
+            "id": "msg_peod3o6xs",
+            "roomId": "usr_agmfdfcof_DM_usr_x7jd5gpvu",
+            "sender": {
+              "id": "usr_agmfdfcof",
+              "username": "6",
+              "avatar": "https://api.dicebear.com/7.x/avataaars/svg?seed=default",
+              "status": "online"
+            },
+            "content": "èwf",
+            "type": "text",
+            "timestamp": 1787469397231
+          },
+          {
+            "id": "msg_gx8r1wrly",
+            "roomId": "usr_agmfdfcof_DM_usr_x7jd5gpvu",
+            "sender": {
+              "id": "usr_agmfdfcof",
+              "username": "6",
+              "avatar": "https://api.dicebear.com/7.x/avataaars/svg?seed=default",
+              "status": "online"
+            },
+            "content": "sdfsf",
+            "type": "text",
+            "timestamp": 1787469727075
+          },
+          {
+            "id": "msg_90ooj2ybu",
+            "roomId": "usr_agmfdfcof_DM_usr_x7jd5gpvu",
+            "sender": {
+              "id": "usr_agmfdfcof",
+              "username": "6",
+              "avatar": "https://api.dicebear.com/7.x/avataaars/svg?seed=default",
+              "status": "online"
+            },
+            "content": "điej",
+            "type": "text",
+            "timestamp": 1787475841669
+          }
+        ]
+      ],
+      [
+        "usr_8ognbnkg2_DM_usr_x7jd5gpvu",
+        [
+          {
+            "id": "msg_e77c2epjv",
+            "roomId": "usr_8ognbnkg2_DM_usr_x7jd5gpvu",
+            "sender": {
+              "id": "usr_x7jd5gpvu",
+              "username": "1",
+              "avatar": "https://api.dicebear.com/7.x/avataaars/svg?seed=default",
+              "status": "online"
+            },
+            "content": "sfsdf",
+            "type": "text",
+            "timestamp": 1787469863779
+          },
+          {
+            "id": "msg_hpgv55oyi",
+            "roomId": "usr_8ognbnkg2_DM_usr_x7jd5gpvu",
+            "sender": {
+              "id": "usr_8ognbnkg2",
+              "username": "7",
+              "avatar": "https://api.dicebear.com/7.x/avataaars/svg?seed=default",
+              "status": "online"
+            },
+            "content": "djjfj",
+            "type": "text",
+            "timestamp": 1787474480763
+          }
+        ]
+      ]
+    ]
+  },
+  "groups": {
+    "dataType": "Map",
+    "value": [
+      [
+        "grp_uy46q8maw",
+        {
+          "id": "grp_uy46q8maw",
+          "name": "12313",
+          "avatar": "https://api.dicebear.com/7.x/identicon/svg?seed=group",
+          "members": {
+            "dataType": "Set",
+            "value": [
+              "usr_x7jd5gpvu",
+              "usr_14ea1fbnf",
+              "usr_egg4gowpb",
+              "usr_av7qhg2hy",
+              "usr_dtbrx4npz"
+            ]
+          },
+          "adminId": "usr_x7jd5gpvu",
+          "muted": {
+            "dataType": "Set",
+            "value": []
+          }
+        }
+      ]
+    ]
+  }
+}

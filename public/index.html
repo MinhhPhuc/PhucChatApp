@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="vi" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Messenger Web Chat Pro</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    /* Toast Notification thành công */
+    #toast-notification {
+      position: fixed;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%) translateY(-100px);
+      background: #38a169;
+      color: white;
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-weight: bold;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      transition: transform 0.3s ease;
+      z-index: 9999;
+    }
+    #toast-notification.show {
+      transform: translateX(-50%) translateY(0);
+    }
+    /* Style nút tạo nhóm và modal nhóm */
+    .create-group-bar {
+      padding: 10px 16px;
+      background: var(--bg-secondary, #2a2f35);
+      border-bottom: 1px solid var(--border-color, #3f444a);
+      display: flex;
+      justify-content: flex-end;
+    }
+    .btn-create-group {
+      background: #3182ce;
+      color: white;
+      border: none;
+      padding: 8px 14px;
+      border-radius: 6px;
+      font-weight: bold;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 14px;
+    }
+    .modal-group-content {
+      background: #ffffff;
+      color: #333;
+      width: 90%;
+      max-width: 420px;
+      padding: 24px;
+      border-radius: 12px;
+      box-shadow: 0 5px 20px rgba(0,0,0,0.2);
+    }
+    .modal-group-content input[type="text"] {
+      width: 100%;
+      padding: 12px;
+      border: 1px solid #cbd5e0;
+      border-radius: 8px;
+      margin-bottom: 14px;
+      font-size: 15px;
+    }
+    .members-checkbox-list {
+      max-height: 150px;
+      overflow-y: auto;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 8px;
+      margin-bottom: 16px;
+    }
+    .member-checkbox-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 6px 0;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Toast Thông Báo -->
+  <div id="toast-notification">Thành công!</div>
+
+  <div class="app-container">
+    <header class="app-header">
+      <div class="header-user">
+        <img id="my-avatar" src="https://api.dicebear.com/7.x/avataaars/svg?seed=default" class="avatar">
+        <h2 id="my-name">Messenger</h2>
+      </div>
+      <div class="header-actions">
+        <button id="btn-toggle-theme" class="icon-btn" title="Đổi giao diện"><i id="theme-icon" class="fa-solid fa-moon"></i></button>
+        <button id="btn-logout" class="icon-btn" title="Đăng xuất"><i class="fa-solid fa-right-from-bracket"></i></button>
+      </div>
+    </header>
+
+    <!-- THANH TÌM KIẾM & TẠO NHÓM -->
+<div class="search-bar-container" style="padding: 14px 16px;">
+  <div class="search-input-wrapper" style="display: flex; align-items: center; background: var(--bg-secondary, #2a2f35); border: 2px solid #3182ce; border-radius: 10px; padding: 4px 12px;">
+    <i class="fa-solid fa-magnifying-glass search-icon" style="font-size: 18px; margin-right: 10px; color: #3182ce;"></i>
+    <input type="text" id="search-input" placeholder="Tìm kiếm bạn bè hoặc người dùng mới..." style="flex: 1; background: transparent; border: none; color: inherit; font-size: 16px; outline: none; padding: 8px 0;">
+    <button id="btn-clear-search" class="clear-btn hidden" style="background: none; border: none; cursor: pointer; font-size: 16px; color: #a0aec0;"><i class="fa-solid fa-xmark"></i></button>
+  </div>
+</div>
+
+<div class="create-group-bar" style="padding: 0 16px 14px 16px; background: transparent; display: flex; justify-content: flex-end;">
+  <button id="btn-open-group-modal" class="btn-create-group" style="background: #3182ce; color: white; border: none; padding: 10px 18px; border-radius: 8px; font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 8px; font-size: 15px; box-shadow: 0 2px 6px rgba(49,130,206,0.3);">
+    <i class="fa-solid fa-users" style="font-size: 16px;"></i> Tạo Nhóm Mới
+  </button>
+</div>
+
+    <!-- DANH SÁCH KHUNG CHAT & BẠN BÈ -->
+    <main class="chat-list" id="chat-list"></main>
+
+    <!-- KHUNG NHẮN TIN OVERLAY -->
+    <section id="chat-screen" class="chat-screen hidden">
+      <header class="chat-header">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <button id="btn-back-list" class="icon-btn"><i class="fa-solid fa-chevron-left"></i></button>
+          <div class="chat-info">
+            <h4 id="active-chat-name">Tên Phòng</h4>
+            <span id="active-chat-status" class="status-text">Đang kết nối...</span>
+          </div>
+        </div>
+        <!-- Nút Cài đặt nhóm mới thêm -->
+        <button id="btn-group-settings" class="icon-btn hidden" title="Cài đặt nhóm"><i class="fa-solid fa-gear"></i></button>
+      </header>
+
+      <div class="messages-viewport" id="messages-viewport"></div>
+
+      <!-- BẢNG EMOJI CONTAINER -->
+      <div id="emoji-picker" class="emoji-picker hidden">
+        <div class="emoji-list">
+          <span>😀</span><span>😁</span><span>😂</span><span>😃</span><span>😄</span><span>😅</span>
+          <span>😆</span><span>😉</span><span>😊</span><span>😋</span><span>😎</span><span>😍</span>
+          <span>😘</span><span>🥰</span><span>😗</span><span>😙</span><span>😚</span><span>🙂</span>
+          <span>🤗</span><span>🤩</span><span>🤔</span><span>🤨</span><span>😐</span><span>😑</span>
+          <span>👍</span><span>👎</span><span>👌</span><span>✌️</span><span>❤️</span><span>🔥</span>
+          <span>✨</span><span>🌟</span><span>⚡</span><span>🎉</span><span>🙏</span><span>💯</span>
+        </div>
+      </div>
+
+      <footer class="chat-input-bar">
+        <button id="btn-emoji-toggle" class="icon-btn" title="Chọn Emoji"><i class="fa-solid fa-face-smile"></i></button>
+        <label for="image-upload-input" class="icon-btn image-upload-btn" title="Gửi ảnh">
+          <i class="fa-solid fa-image"></i>
+        </label>
+        <input type="file" id="image-upload-input" accept="image/*" class="hidden">
+        
+        <input type="text" id="msg-input" placeholder="Nhập tin nhắn...">
+        <button class="icon-btn send-btn" id="btn-send"><i class="fa-solid fa-paper-plane"></i></button>
+      </footer>
+    </section>
+
+    <!-- MODAL TẠO NHÓM -->
+    <div id="modal-group" class="modal hidden" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:1000; justify-content:center; align-items:center;">
+    <div class="modal-group-content" style="background: #ffffff; color: #333; width: 90%; max-width: 420px; padding: 24px; border-radius: 12px; box-shadow: 0 5px 20px rgba(0,0,0,0.2);">
+     <h3 style="margin-top: 0; margin-bottom: 16px; text-align: center; color: #2d3748;">Tạo Nhóm Trò Chuyện</h3>
+      <div style="text-align: center; margin-bottom: 12px;">
+      <img id="group-preview-avatar" src="https://api.dicebear.com/7.x/identicon/svg?seed=group" style="width: 80px; height: 80px; border-radius: 50%; object-fit: cover; border: 2px solid #3182ce; margin-bottom: 6px;"><br>
+        <label for="group-avatar-file" style="cursor: pointer; background: #3182ce; color: white; padding: 6px 12px; border-radius: 6px; font-size: 13px; display: inline-block;">Chọn Ảnh Nhóm</label>
+        <input type="file" id="group-avatar-file" accept="image/*" class="hidden">
+      </div>
+      <label style="font-weight: bold; font-size: 13px; color: #4a5568; display: block; margin-bottom: 4px;">Tên Nhóm</label>
+      <input type="text" id="group-name-input" placeholder="Nhập tên nhóm..." style="width: 100%; padding: 12px; border: 1px solid #cbd5e0; border-radius: 8px; margin-bottom: 14px; font-size: 15px; box-sizing: border-box;">
+        
+      <label style="font-weight: bold; font-size: 13px; color: #4a5568; display: block; margin-bottom: 4px;">Thêm Thành Viên (Từ bạn bè)</label>
+      <div id="group-members-list" class="members-checkbox-list" style="max-height: 150px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px; margin-bottom: 16px;">
+        <!-- Render danh sách bạn bè -->
+      </div>
+
+      <div style="display: flex; gap: 10px;">
+        <button id="btn-submit-group" style="flex:1; background: #38a169; color: white; border: none; padding: 12px; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 15px;">Tạo Nhóm</button>
+        <button id="btn-close-group-modal" style="flex:1; background: #e2e8f0; color: #333; border: none; padding: 12px; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 15px;">Hủy</button>
+      </div>
+     </div>
+    </div>
+
+<!-- MODAL QUẢN LÝ NHÓM -->
+    <div id="modal-group-settings" class="modal hidden" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:1000; justify-content:center; align-items:center;">
+      <div class="modal-group-content" style="background: #ffffff; color: #333; width: 90%; max-width: 450px; padding: 24px; border-radius: 12px; box-shadow: 0 5px 20px rgba(0,0,0,0.2);">
+        <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+          <h3 style="margin: 0;">Quản Lý Nhóm</h3>
+          <button id="btn-close-group-settings" style="background:none; border:none; cursor:pointer; font-size: 18px; color:#a0aec0;"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        
+        <div style="display: flex; gap: 10px; margin-bottom: 16px;" id="group-actions-container">
+          <button id="btn-leave-group" style="flex:1; background: #ed8936; color: white; border: none; padding: 10px; border-radius: 8px; font-weight: bold; cursor: pointer;">Rời Nhóm</button>
+          <button id="btn-delete-group" class="hidden" style="flex:1; background: #e53e3e; color: white; border: none; padding: 10px; border-radius: 8px; font-weight: bold; cursor: pointer;">Giải Tán Nhóm</button>
+        </div>
+
+        ><!-- Tiêu đề và Nút Thêm -->
+        <div style="display:flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e2e8f0; padding-bottom: 5px; margin-bottom: 10px;">
+          <h4 style="margin: 0;">Thành Viên (<span id="setting-member-count">0</span>)</h4>
+          <button id="btn-show-add-member" style="background: #3182ce; color: white; border: none; padding: 4px 10px; border-radius: 4px; font-size: 12px; cursor: pointer; font-weight: bold;">
+            <i class="fa-solid fa-plus"></i> Thêm
+          </button>
+        </div>
+
+        <!-- Khu vực chọn bạn bè để thêm (ẩn mặc định) -->
+        <div id="add-member-section" class="hidden" style="margin-bottom: 15px; padding: 12px; background: #f7fafc; border-radius: 8px; border: 1px solid #e2e8f0;">
+          <div style="font-size: 13px; font-weight: bold; margin-bottom: 10px; color: #2d3748;">Chọn bạn bè để thêm:</div>
+          <div id="add-member-list" style="max-height: 120px; overflow-y: auto; margin-bottom: 10px;">
+            <!-- Danh sách bạn bè được chèn bằng JS -->
+          </div>
+          <div style="display: flex; gap: 8px;">
+             <button id="btn-confirm-add-member" style="flex:1; background: #38a169; color: white; border: none; padding: 8px; border-radius: 4px; font-weight: bold; cursor: pointer;">Xác Nhận</button>
+             <button id="btn-cancel-add-member" style="flex:1; background: #cbd5e0; color: #333; border: none; padding: 8px; border-radius: 4px; font-weight: bold; cursor: pointer;">Hủy</button>
+          </div>
+        </div>
+        <div id="setting-members-list" class="members-checkbox-list" style="max-height: 250px;">
+          <!-- Render danh sách thành viên bằng JS -->
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL XÁC THỰC -->
+    <div id="modal-auth" class="modal">
+      <div class="modal-content" style="background: #ffffff; max-width: 400px; padding: 24px; border-radius: 12px; color: #333;">
+        <div class="auth-tabs" style="display: flex; margin-bottom: 20px; gap: 10px;">
+          <button id="tab-btn-login" class="tab-btn active" style="flex:1; padding: 10px; font-weight: bold; cursor: pointer;">Đăng Nhập</button>
+          <button id="tab-btn-register" class="tab-btn" style="flex:1; padding: 10px; font-weight: bold; cursor: pointer;">Đăng Ký</button>
+        </div>
+        
+        <!-- FORM ĐĂNG NHẬP -->
+        <form id="form-login" class="auth-form" onsubmit="return false;">
+          <input type="text" id="login-username" placeholder="Tên tài khoản..." required autocomplete="username" style="width:100%; padding:12px; margin-bottom:12px; border:1px solid #cbd5e0; border-radius:8px;">
+          <input type="password" id="login-password" placeholder="Mật khẩu..." required autocomplete="current-password" style="width:100%; padding:12px; margin-bottom:12px; border:1px solid #cbd5e0; border-radius:8px;">
+          <button type="submit" class="btn-primary" style="width:100%; background:#3182ce; color:white; border:none; padding:14px; border-radius:8px; font-weight:bold; cursor:pointer;">Đăng Nhập</button>
+        </form>
+
+        <!-- FORM ĐĂNG KÝ (ICON TO HƠN) -->
+        <form id="form-register" class="auth-form hidden" onsubmit="return false;">
+          <div class="avatar-picker-container" style="text-align: center; margin-bottom: 15px;">
+            <img id="reg-preview-avatar" src="https://api.dicebear.com/7.x/avataaars/svg?seed=default" class="avatar preview-avatar" style="width: 90px; height: 90px; border-radius: 50%; object-fit: cover; margin-bottom: 8px; border: 3px solid #3182ce;">
+            <div class="avatar-picker-actions" style="display: flex; gap: 8px; justify-content: center;">
+              <label for="reg-avatar-file" class="btn-action blue" style="cursor:pointer; display:inline-block; padding: 8px 14px; font-size: 14px; background: #3182ce; color: white; border-radius: 6px;">Chọn Ảnh Đại Diện</label>
+              <input type="file" id="reg-avatar-file" accept="image/*" class="hidden">
+              <button type="button" id="reg-random-avatar" class="btn-action green" style="padding: 8px 14px; font-size: 14px; background: #38a169; color: white; border: none; border-radius: 6px; cursor: pointer;">Ngẫu Nhiên</button>
+            </div>
+          </div>
+          <input type="text" id="reg-username" placeholder="Chọn tên tài khoản mới..." required autocomplete="username" style="width:100%; padding:12px; margin-bottom:12px; border:1px solid #cbd5e0; border-radius:8px;">
+          <input type="password" id="reg-password" placeholder="Tạo mật khẩu..." required autocomplete="new-password" style="width:100%; padding:12px; margin-bottom:12px; border:1px solid #cbd5e0; border-radius:8px;">
+          <button type="submit" class="btn-secondary" style="width:100%; background:#38a169; color:white; border:none; padding:14px; border-radius:8px; font-weight:bold; cursor:pointer;">Tạo Tài Khoản</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
