@@ -3,6 +3,7 @@ const http = require('http');
 const { Server } = require('socket.io');
 const path = require('path');
 const fs = require('fs'); // [MỚI] Thêm thư viện quản lý file
+const ngrok = require('ngrok');
 
 const app = express();
 const server = http.createServer(app);
@@ -463,20 +464,19 @@ function syncUserData(socket, userId) {
   });
 }
 
-const { exec } = require('child_process');
+const PORT = process.env.PORT || 3000; // Cloud sẽ tự cấp cổng qua biến môi trường
 
-server.listen(3000, () => {
-  console.log(`[*] Web Chat Engine Online: http://localhost:3000`);
+server.listen(PORT, async () => {
+  console.log(`[*] Web Chat Engine Online on port ${PORT}`);
 
-  // Tự động chạy localtunnel kèm subdomain của bạn
-  const ltProcess = exec('npx localtunnel --port 3000 --subdomain phucchatapp');
-
-  ltProcess.stdout.on('data', (data) => {
-    console.log(`[Tunnel]: ${data}`);
-  });
-
-  ltProcess.stderr.on('data', (data) => {
-    // Localtunnel đôi khi đẩy log ra stderr, in ra để bạn thấy link
-    console.log(`[Tunnel Info]: ${data}`);
-  });
+  // Chỉ bật ngrok tự động khi chạy ở máy tính cá nhân (Local)
+  if (process.env.NODE_ENV !== 'production') {
+    try {
+      const ngrok = require('ngrok');
+      const url = await ngrok.connect({ addr: PORT, authtoken_from_env: true });
+      console.log(`> 🌐 Link Ngrok (Local): ${url}`);
+    } catch (error) {
+      console.log('Không bật ngrok (chạy trên cloud hoặc lỗi token).');
+    }
+  }
 });

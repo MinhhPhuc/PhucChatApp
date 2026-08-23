@@ -70,3 +70,51 @@ body, html { width: 100%; height: 100%; background: var(--bg-main); color: var(-
 .modal-content { background: var(--bg-main); border: 1px solid var(--border); width: 90%; max-width: 400px; padding: 20px; border-radius: 16px; display: flex; flex-direction: column; gap: 12px; }
 .btn-primary { background: var(--bg-bubble-self); color: #fff; border: none; padding: 10px; border-radius: 8px; font-weight: bold; cursor: pointer; }
 .btn-close { background: transparent; color: var(--text-sub); border: none; padding: 8px; cursor: pointer; }
+
+/* Khắc phục lỗi chiều cao trên trình duyệt điện thoại */
+body, html {
+  height: 100%;
+  height: 100dvh; /* Dùng dvh để tự động co giãn theo bàn phím và thanh công cụ mobile */
+}
+
+/* Đảm bảo các nút icon, nút gửi hiển thị đúng bên trong thanh chat */
+.chat-input-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-top: 1px solid var(--border);
+  background: var(--bg-main);
+  flex-shrink: 0; /* Tránh việc thanh chat bị bóp méo khi bàn phím hiện lên */
+}
+
+.chat-input-bar input {
+  flex: 1;
+  background: var(--bg-card);
+  border: none;
+  padding: 10px 16px;
+  border-radius: 20px;
+  color: var(--text-main);
+  outline: none;
+  font-size: 14px; /* Tránh tự động zoom trên iOS khi focus input */
+}
+
+/* Định dạng chuẩn cho các nút icon / nút gửi nằm trong khung chat */
+.chat-input-bar button, 
+.chat-input-bar .icon-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-sub);
+  font-size: 20px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 36px;
+  height: 36px;
+}
+
+/* Nút gửi nổi bật hơn nếu cần */
+.chat-input-bar .send-btn {
+  color: var(--bg-bubble-self);
+}
