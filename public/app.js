@@ -138,60 +138,6 @@ document.getElementById('btn-logout').onclick = () => {
   location.reload();
 };
 
-// Lắng nghe sự kiện click trên toàn bộ tài liệu (đảm bảo 100% bắt được click)
-document.addEventListener('click', (e) => {
-  const modalGroup = document.getElementById('modal-group');
-
-  // 1. Mở modal khi bấm nút "Tạo nhóm"
-  if (e.target.closest('#btn-open-group-modal')) {
-    if (modalGroup) {
-      modalGroup.classList.remove('hidden');
-      modalGroup.style.display = 'flex';
-      renderGroupMembersCheckbox();
-    }
-    return;
-  }
-
-  // 2. Đóng modal khi bấm nút "Đóng" hoặc nút "X"
-  if (e.target.closest('#btn-close-group-modal')) {
-    if (modalGroup) {
-      modalGroup.classList.add('hidden');
-      modalGroup.style.display = 'none';
-    }
-    return;
-  }
-
-  // 3. Xử lý khi bấm nút "Xác nhận tạo nhóm"
-  if (e.target.closest('#btn-submit-group')) {
-    const groupNameInput = document.getElementById('group-name-input');
-    const groupName = groupNameInput ? groupNameInput.value.trim() : '';
-    
-    if (!groupName) {
-      showToast('Vui lòng nhập tên nhóm!', false);
-      if (groupNameInput) groupNameInput.focus();
-      return;
-    }
-
-    const checkboxes = document.querySelectorAll('.group-member-checkbox:checked');
-    const memberIds = Array.from(checkboxes).map(cb => cb.value);
-
-    socket.emit('group:create', {
-      name: groupName,
-      avatar: state.selectedGroupAvatar,
-      memberIds: memberIds
-    });
-
-    if (groupNameInput) groupNameInput.value = '';
-    if (modalGroup) {
-      modalGroup.classList.add('hidden');
-      modalGroup.style.display = 'none';
-    }
-    
-    showToast('Đang tạo nhóm...');
-    return;
-  }
-});
-
 // --- TÌM KIẾM ---
 const searchInput = document.getElementById('search-input');
 const btnClearSearch = document.getElementById('btn-clear-search');
@@ -208,6 +154,7 @@ btnClearSearch.onclick = () => {
   renderChatList();
 };
 
+// --- GỬI TIN NHẮN VÀ EMOJI ---
 const btnEmoji = document.getElementById('btn-emoji-toggle');
 const emojiPicker = document.getElementById('emoji-picker');
 const msgInput = document.getElementById('msg-input');
@@ -217,7 +164,9 @@ document.querySelectorAll('.emoji-list span').forEach(el => {
   el.onclick = () => { msgInput.value += el.innerText; msgInput.focus(); };
 });
 document.onclick = (e) => {
-  if (!emojiPicker.contains(e.target) && e.target !== btnEmoji) emojiPicker.classList.add('hidden');
+  if (emojiPicker && !emojiPicker.contains(e.target) && e.target !== btnEmoji) {
+    emojiPicker.classList.add('hidden');
+  }
 };
 
 const imageUploadInput = document.getElementById('image-upload-input');
@@ -233,6 +182,7 @@ imageUploadInput.onchange = (e) => {
   }
 };
 
+// --- ĐỒNG BỘ DỮ LIỆU TỪ SERVER ---
 socket.on('data:sync', (data) => {
   state.friends = data.friends;
   state.requests = data.requests;
@@ -249,7 +199,7 @@ socket.on('data:sync', (data) => {
   renderChatList();
   
   const modalGroupSettings = document.getElementById('modal-group-settings');
-  if (modalGroupSettings && modalGroupSettings.style.display === 'flex') {
+  if (modalGroupSettings && (modalGroupSettings.style.display === 'flex' || !modalGroupSettings.classList.contains('hidden'))) {
     renderGroupSettingsModal();
   }
 });
@@ -257,7 +207,13 @@ socket.on('data:sync', (data) => {
 socket.on('friend:incoming', () => socket.emit('auth:session', { userId: state.currentUser.id }));
 socket.on('friend:updated', () => socket.emit('auth:session', { userId: state.currentUser.id }));
 socket.on('group:updated', () => socket.emit('auth:session', { userId: state.currentUser.id }));
+socket.on('auth:forced_logout', () => {
+  localStorage.removeItem('chat_session_token');
+  alert('Tài khoản của bạn đã bị quản trị viên xóa!');
+  location.reload();
+});
 
+// --- RENDER DANH SÁCH CHAT ---
 function renderChatList() {
   const list = document.getElementById('chat-list');
   list.innerHTML = '';
@@ -361,7 +317,7 @@ function renderChatList() {
     );
 
     if (strangers.length > 0) {
-      list.innerHTML += `<div class="chat-section-header">NGƯỜI DÙNG KHÁC TRÊN HỆ THỐNG</div>`;
+      list.innerHTML += `<div class="chat-section-header">NGƯỜI DÙNG KHÁC</div>`;
       strangers.forEach(u => {
         list.innerHTML += `
           <div class="chat-item">
@@ -383,6 +339,11 @@ function sendFriendRequest(targetUserId) {
   showToast('Đã gửi lời mời kết bạn!');
 }
 
+function acceptFriend(reqId) { 
+  socket.emit('friend:accept', { reqId }); 
+}
+
+// --- MỞ PHÒNG CHAT ---
 function openRoom(roomId, name, avatar, status) {
   state.activeRoomId = roomId;
   state.unreadCounts.set(roomId, 0);
@@ -390,7 +351,7 @@ function openRoom(roomId, name, avatar, status) {
   document.getElementById('active-chat-name').innerText = name;
   document.getElementById('active-chat-status').innerText = status;
   document.getElementById('chat-screen').classList.remove('hidden');
-  emojiPicker.classList.add('hidden');
+  if(emojiPicker) emojiPicker.classList.add('hidden');
   
   const btnSettings = document.getElementById('btn-group-settings');
   const btnChatOptions = document.getElementById('btn-chat-options');
@@ -407,6 +368,12 @@ function openRoom(roomId, name, avatar, status) {
   renderChatList();
 }
 
+document.getElementById('btn-back-list').onclick = () => {
+  document.getElementById('chat-screen').classList.add('hidden');
+  state.activeRoomId = null;
+};
+
+// --- XỬ LÝ TIN NHẮN ---
 socket.on('message:received', (msg) => {
   state.lastMessages.set(msg.roomId, { content: msg.content, timestamp: msg.timestamp, senderId: msg.sender.id, senderName: msg.sender.username, type: msg.type });
   
@@ -424,7 +391,7 @@ function sendMessage() {
   if (content && state.activeRoomId) {
     socket.emit('message:send', { roomId: state.activeRoomId, content, type: 'text' });
     msgInput.value = '';
-    emojiPicker.classList.add('hidden');
+    if(emojiPicker) emojiPicker.classList.add('hidden');
   }
 }
 
@@ -443,82 +410,17 @@ function appendMessage(msg) {
   viewport.scrollTop = viewport.scrollHeight;
 }
 
-function acceptFriend(reqId) { socket.emit('friend:accept', { reqId }); }
-
-document.getElementById('btn-back-list').onclick = () => {
-  document.getElementById('chat-screen').classList.add('hidden');
-  state.activeRoomId = null;
-};
-
-socket.on('auth:forced_logout', () => {
-  localStorage.removeItem('chat_session_token');
-  alert('Tài khoản của bạn đã bị quản trị viên xóa!');
-  location.reload();
-});
-
-// --- XỬ LÝ SỰ KIỆN MODAL CÀI ĐẶT CHAT 1-1 & BÁO CÁO (DÙNG EVENT DELEGATION) ---
-document.addEventListener('click', (e) => {
-  const modalChatSettings = document.getElementById('modal-chat-settings');
-  const modalReport = document.getElementById('modal-report');
-
-  // 1. Mở modal cài đặt khi bấm vào nút 3 chấm
-  if (e.target.closest('#btn-chat-options')) {
-    if (modalChatSettings) modalChatSettings.classList.remove('hidden');
-    return;
-  }
-
-  // 2. Đóng modal cài đặt khi bấm nút X
-  if (e.target.closest('#btn-close-chat-settings')) {
-    if (modalChatSettings) modalChatSettings.classList.add('hidden');
-    return;
-  }
-
-  // 3. Mở bảng Báo cáo từ modal cài đặt
-  if (e.target.closest('#set-report')) {
-    if (modalChatSettings) modalChatSettings.classList.add('hidden');
-    if (modalReport) modalReport.classList.remove('hidden');
-    return;
-  }
-
-  // 4. Đóng bảng Báo cáo khi bấm nút Hủy
-  if (e.target.closest('#btn-cancel-report')) {
-    if (modalReport) modalReport.classList.add('hidden');
-    return;
-  }
-
-  // 5. Gửi báo cáo thành công
-  if (e.target.closest('#btn-submit-report')) {
-    const reasonSelect = document.getElementById('report-reason-select');
-    const reason = reasonSelect ? reasonSelect.value : 'Vi phạm';
-    showToast("Đã gửi báo cáo thành công với lý do: " + reason, true);
-    if (modalReport) modalReport.classList.add('hidden');
-    return;
-  }
-
-  // 6. Đóng modal khi bấm ra vùng nền tối bên ngoài (backdrop)
-  if (modalChatSettings && e.target === modalChatSettings) {
-    modalChatSettings.classList.add('hidden');
-  }
-  if (modalReport && e.target === modalReport) {
-    modalReport.classList.add('hidden');
-  }
-});
-
 // =========================================================
-// KHÔI PHỤC: CÀI ĐẶT NHÓM & TẠO NHÓM (EVENT DELEGATION)
+// CÁC HÀM XỬ LÝ GIAO DIỆN NHÓM
 // =========================================================
-
-// 1. Hàm Render danh sách bạn bè để chọn khi Tạo nhóm
 function renderGroupMembersCheckbox() {
   const container = document.getElementById('group-members-list');
   if (!container) return;
   container.innerHTML = '';
-  
   if (state.friends.length === 0) {
     container.innerHTML = '<p style="font-size: 13px; color: #718096; text-align: center; padding: 10px;">Chưa có bạn bè để thêm</p>';
     return;
   }
-  
   state.friends.forEach(f => {
     container.innerHTML += `
       <label class="member-checkbox-item" style="display: flex; align-items: center; gap: 10px; padding: 6px 0; cursor: pointer;">
@@ -530,7 +432,6 @@ function renderGroupMembersCheckbox() {
   });
 }
 
-// 2. Hàm Render danh sách thành viên trong Cài đặt nhóm
 function renderGroupSettingsModal() {
   const group = state.groups.find(g => g.id === state.activeRoomId);
   if (!group) return;
@@ -553,8 +454,8 @@ function renderGroupSettingsModal() {
     group.members.forEach(m => {
       const isMemberAdmin = m.id === group.adminId;
       const isSelf = m.id === state.currentUser.id;
-
       let actionButtons = '';
+      
       if (isAdmin && !isSelf) {
         actionButtons = `
           <div style="display:flex; gap:5px; margin-top:5px;">
@@ -588,19 +489,24 @@ function renderGroupSettingsModal() {
   }
 }
 
-// 3. Hàm gửi action cài đặt nhóm lên server
 window.execGroupAction = function(action, targetId) {
   socket.emit('group:action', { action, groupId: state.activeRoomId, targetId });
 };
 
-// 4. Bắt toàn bộ sự kiện click trên giao diện (Không bao giờ trượt)
+// =========================================================
+// BỘ ĐIỀU KHIỂN EVENT CLICK DUY NHẤT (QUAN TRỌNG NHẤT)
+// =========================================================
 document.addEventListener('click', (e) => {
-  
-  // --- A. XỬ LÝ NÚT TẠO NHÓM ---
   const modalGroup = document.getElementById('modal-group');
-  
-  // Mở modal (Hỗ trợ bắt qua ID hoặc Class "btn-create-group" trong cài đặt bạn bè)
+  const modalChatSettings = document.getElementById('modal-chat-settings');
+  const modalReport = document.getElementById('modal-report');
+  const modalGroupSettings = document.getElementById('modal-group-settings');
+
+  // --- 1. MỞ TẠO NHÓM TỪ BẤT KỲ ĐÂU (CẢ TRONG CÀI ĐẶT BẠN BÈ) ---
   if (e.target.closest('#btn-open-group-modal') || e.target.closest('.btn-create-group')) {
+    // Nếu đang mở cài đặt bạn bè -> Tắt đi để nhường chỗ cho bảng tạo nhóm
+    if (modalChatSettings) modalChatSettings.classList.add('hidden');
+    
     if (modalGroup) {
       modalGroup.classList.remove('hidden');
       modalGroup.style.display = 'flex';
@@ -608,8 +514,8 @@ document.addEventListener('click', (e) => {
     }
     return;
   }
-  
-  // Đóng modal tạo nhóm
+
+  // Đóng tạo nhóm
   if (e.target.closest('#btn-close-group-modal')) {
     if (modalGroup) {
       modalGroup.classList.add('hidden');
@@ -617,7 +523,7 @@ document.addEventListener('click', (e) => {
     }
     return;
   }
-  
+
   // Xác nhận tạo nhóm
   if (e.target.closest('#btn-submit-group')) {
     const groupNameInput = document.getElementById('group-name-input');
@@ -644,10 +550,39 @@ document.addEventListener('click', (e) => {
     return;
   }
 
-  // --- B. XỬ LÝ CÀI ĐẶT NHÓM CŨ ---
-  const modalGroupSettings = document.getElementById('modal-group-settings');
-  
-  // Mở cài đặt nhóm
+  // --- 2. CÀI ĐẶT CHAT BẠN BÈ & BÁO CÁO ---
+  if (e.target.closest('#btn-chat-options')) {
+    if (modalChatSettings) {
+      modalChatSettings.classList.remove('hidden');
+      modalChatSettings.style.display = 'flex';
+    }
+    return;
+  }
+  if (e.target.closest('#btn-close-chat-settings')) {
+    if (modalChatSettings) modalChatSettings.classList.add('hidden');
+    return;
+  }
+  if (e.target.closest('#set-report')) {
+    if (modalChatSettings) modalChatSettings.classList.add('hidden');
+    if (modalReport) {
+      modalReport.classList.remove('hidden');
+      modalReport.style.display = 'flex';
+    }
+    return;
+  }
+  if (e.target.closest('#btn-cancel-report')) {
+    if (modalReport) modalReport.classList.add('hidden');
+    return;
+  }
+  if (e.target.closest('#btn-submit-report')) {
+    const reasonSelect = document.getElementById('report-reason-select');
+    const reason = reasonSelect ? reasonSelect.value : 'Vi phạm';
+    showToast("Đã gửi báo cáo thành công với lý do: " + reason, true);
+    if (modalReport) modalReport.classList.add('hidden');
+    return;
+  }
+
+  // --- 3. CÀI ĐẶT NHÓM CHAT ---
   if (e.target.closest('#btn-group-settings')) {
     renderGroupSettingsModal();
     if (modalGroupSettings) {
@@ -656,8 +591,6 @@ document.addEventListener('click', (e) => {
     }
     return;
   }
-  
-  // Đóng cài đặt nhóm
   if (e.target.closest('#btn-close-group-settings')) {
     if (modalGroupSettings) {
       modalGroupSettings.style.display = 'none';
@@ -667,8 +600,6 @@ document.addEventListener('click', (e) => {
     }
     return;
   }
-  
-  // Rời / Giải tán
   if (e.target.closest('#btn-leave-group')) {
     if (confirm('Bạn có chắc chắn muốn rời nhóm?')) execGroupAction('leave', null);
     return;
@@ -678,7 +609,7 @@ document.addEventListener('click', (e) => {
     return;
   }
 
-  // --- C. XỬ LÝ THÊM THÀNH VIÊN ---
+  // --- 4. THÊM THÀNH VIÊN VÀO NHÓM ---
   if (e.target.closest('#btn-show-add-member')) {
     const group = state.groups.find(g => g.id === state.activeRoomId);
     if (!group) return;
@@ -707,13 +638,11 @@ document.addEventListener('click', (e) => {
     addSection.classList.remove('hidden');
     return;
   }
-  
   if (e.target.closest('#btn-cancel-add-member')) {
     const addSection = document.getElementById('add-member-section');
     if (addSection) addSection.classList.add('hidden');
     return;
   }
-  
   if (e.target.closest('#btn-confirm-add-member')) {
     const checkboxes = document.querySelectorAll('.add-member-checkbox:checked');
     const newMemberIds = Array.from(checkboxes).map(cb => cb.value);
@@ -727,4 +656,8 @@ document.addEventListener('click', (e) => {
     }
     return;
   }
+
+  // --- 5. BẤM RA NGOÀI ĐỂ ĐÓNG BẢNG ---
+  if (modalChatSettings && e.target === modalChatSettings) modalChatSettings.classList.add('hidden');
+  if (modalReport && e.target === modalReport) modalReport.classList.add('hidden');
 });
