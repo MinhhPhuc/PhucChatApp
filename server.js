@@ -141,18 +141,24 @@ io.on('connection', (socket) => {
 
     // Thành viên rời nhóm
     if (action === 'leave') {
+      // Nếu là admin và nhóm còn thành viên khác, tự động nhường quyền admin cho người đầu tiên còn lại
       if (isAdmin && group.members.size > 1) {
-        return socket.emit('message:error', 'Bạn là Quản trị viên! Hãy chuyển quyền cho người khác trước khi rời nhóm.');
+        group.members.delete(currentUser.id);
+        const nextMemberId = Array.from(group.members)[0];
+        group.adminId = nextMemberId; // Chuyển quyền admin
+      } else {
+        group.members.delete(currentUser.id);
       }
-      group.members.delete(currentUser.id);
+
       socket.leave(groupId);
-      io.to(currentUser.id).emit('group:kicked_out'); // Đẩy ra khỏi giao diện
+      io.to(currentUser.id).emit('group:kicked_out'); 
       Array.from(group.members).forEach(mId => io.to(mId).emit('group:updated'));
       
-      // Xóa nhóm luôn nếu không còn ai
-      if (group.members.size === 0) DB.groups.delete(groupId);
+      if (group.members.size === 0) {
+        DB.groups.delete(groupId);
+      }
       
-      saveDB(); // [MỚI] Lưu lại dữ liệu
+      saveDB();
       return;
     }
 
