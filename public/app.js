@@ -391,19 +391,20 @@ function openRoom(roomId, name, avatar, status) {
   emojiPicker.classList.add('hidden');
   
   const btnSettings = document.getElementById('btn-group-settings');
-  const btnChatOptions = document.getElementById('btn-chat-options'); // Lấy nút 3 chấm
+  const btnChatOptions = document.getElementById('btn-chat-options');
 
   if (roomId.startsWith('grp_')) {
     if (btnSettings) btnSettings.classList.remove('hidden');
-    if (btnChatOptions) btnChatOptions.classList.add('hidden'); // Ẩn nút 3 chấm 1-1 nếu là nhóm (hoặc bỏ dòng này nếu muốn hiện cả hai)
+    if (btnChatOptions) btnChatOptions.classList.add('hidden');
   } else {
     if (btnSettings) btnSettings.classList.add('hidden');
-    if (btnChatOptions) btnChatOptions.classList.remove('hidden'); // BẮT BUỘC PHẢI CÓ ĐỂ HIỆN NÚT KHI CHAT 1-1
+    if (btnChatOptions) btnChatOptions.classList.remove('hidden');
   }
   
   socket.emit('messages:get', { roomId });
   renderChatList();
 }
+
 socket.on('message:received', (msg) => {
   state.lastMessages.set(msg.roomId, { content: msg.content, timestamp: msg.timestamp, senderId: msg.sender.id, senderName: msg.sender.username, type: msg.type });
   
@@ -514,21 +515,28 @@ function renderGroupSettingsModal() {
   }
 }
 
-btnSettings.onclick = () => {
-  renderGroupSettingsModal();
-  modalGroupSettings.classList.remove('hidden');
-  modalGroupSettings.style.display = 'flex';
-};
+if (btnSettings) {
+  btnSettings.onclick = () => {
+    renderGroupSettingsModal();
+    modalGroupSettings.classList.remove('hidden');
+    modalGroupSettings.style.display = 'flex';
+  };
+}
 
-document.getElementById('btn-close-group-settings').onclick = () => {
-  modalGroupSettings.style.display = 'none';
-  document.getElementById('add-member-section').classList.add('hidden');
-};
+const btnCloseGroupSettings = document.getElementById('btn-close-group-settings');
+if (btnCloseGroupSettings) {
+  btnCloseGroupSettings.onclick = () => {
+    modalGroupSettings.style.display = 'none';
+    document.getElementById('add-member-section').classList.add('hidden');
+  };
+}
 
-btnLeave.onclick = () => execGroupAction('leave', null);
-btnDeleteGroup.onclick = () => {
-  if (confirm('Bạn có chắc chắn muốn giải tán nhóm này không?')) execGroupAction('delete_group', null);
-};
+if (btnLeave) btnLeave.onclick = () => execGroupAction('leave', null);
+if (btnDeleteGroup) {
+  btnDeleteGroup.onclick = () => {
+    if (confirm('Bạn có chắc chắn muốn giải tán nhóm này không?')) execGroupAction('delete_group', null);
+  };
+}
 
 window.execGroupAction = function(action, targetId) {
   socket.emit('group:action', { action, groupId: state.activeRoomId, targetId });
@@ -545,54 +553,64 @@ socket.on('group:kicked_out', () => {
 });
 
 // --- CHỨC NĂNG THÊM THÀNH VIÊN VÀO NHÓM ---
-document.getElementById('btn-show-add-member').onclick = () => {
-  const group = state.groups.find(g => g.id === state.activeRoomId);
-  if (!group) return;
+const btnShowAddMember = document.getElementById('btn-show-add-member');
+if (btnShowAddMember) {
+  btnShowAddMember.onclick = () => {
+    const group = state.groups.find(g => g.id === state.activeRoomId);
+    if (!group) return;
 
-  const addSection = document.getElementById('add-member-section');
-  const listDiv = document.getElementById('add-member-list');
-  listDiv.innerHTML = '';
+    const addSection = document.getElementById('add-member-section');
+    const listDiv = document.getElementById('add-member-list');
+    listDiv.innerHTML = '';
 
-  const memberIdsInGroup = new Set((group.members || []).map(m => String(m.id)));
-  const friendsNotInGroup = state.friends.filter(f => !memberIdsInGroup.has(String(f.id)));
+    const memberIdsInGroup = new Set((group.members || []).map(m => String(m.id)));
+    const friendsNotInGroup = state.friends.filter(f => !memberIdsInGroup.has(String(f.id)));
 
-  if (friendsNotInGroup.length === 0) {
-    listDiv.innerHTML = '<div style="font-size:13px; color:#718096; text-align:center;">Tất cả bạn bè của bạn đều đã ở trong nhóm này!</div>';
-  } else {
-    friendsNotInGroup.forEach(f => {
-      listDiv.innerHTML += `
-        <label style="display:flex; align-items:center; gap:10px; margin-bottom:8px; cursor:pointer; padding:4px; background:#fff; border-radius:4px; border:1px solid #edf2f7;">
-          <input type="checkbox" class="add-member-checkbox" value="${f.id}" style="width:16px; height:16px;">
-          <img src="${f.avatar}" style="width:28px; height:28px; border-radius:50%;">
-          <span style="font-size:14px; font-weight:500;">${f.username}</span>
-        </label>
-      `;
-    });
-  }
+    if (friendsNotInGroup.length === 0) {
+      listDiv.innerHTML = '<div style="font-size:13px; color:#718096; text-align:center;">Tất cả bạn bè của bạn đều đã ở trong nhóm này!</div>';
+    } else {
+      friendsNotInGroup.forEach(f => {
+        listDiv.innerHTML += `
+          <label style="display:flex; align-items:center; gap:10px; margin-bottom:8px; cursor:pointer; padding:4px; background:#fff; border-radius:4px; border:1px solid #edf2f7;">
+            <input type="checkbox" class="add-member-checkbox" value="${f.id}" style="width:16px; height:16px;">
+            <img src="${f.avatar}" style="width:28px; height:28px; border-radius:50%;">
+            <span style="font-size:14px; font-weight:500;">${f.username}</span>
+          </label>
+        `;
+      });
+    }
 
-  addSection.classList.remove('hidden');
-};
+    addSection.classList.remove('hidden');
+  };
+}
 
-document.getElementById('btn-cancel-add-member').onclick = () => {
-  document.getElementById('add-member-section').classList.add('hidden');
-};
-
-document.getElementById('btn-confirm-add-member').onclick = () => {
-  const checkboxes = document.querySelectorAll('.add-member-checkbox:checked');
-  const newMemberIds = Array.from(checkboxes).map(cb => cb.value);
-
-  if (newMemberIds.length > 0) {
-    socket.emit('group:add_members', {
-      groupId: state.activeRoomId,
-      newMemberIds: newMemberIds
-    });
-    
+const btnCancelAddMember = document.getElementById('btn-cancel-add-member');
+if (btnCancelAddMember) {
+  btnCancelAddMember.onclick = () => {
     document.getElementById('add-member-section').classList.add('hidden');
-    showToast('Đã thêm thành viên thành công!');
-  } else {
-    showToast('Vui lòng chọn ít nhất một người bạn!', false);
-  }
-};
+  };
+}
+
+const btnConfirmAddMember = document.getElementById('btn-confirm-add-member');
+if (btnConfirmAddMember) {
+  btnConfirmAddMember.onclick = () => {
+    const checkboxes = document.querySelectorAll('.add-member-checkbox:checked');
+    const newMemberIds = Array.from(checkboxes).map(cb => cb.value);
+
+    if (newMemberIds.length > 0) {
+      socket.emit('group:add_members', {
+        groupId: state.activeRoomId,
+        newMemberIds: newMemberIds
+      });
+      
+      document.getElementById('add-member-section').classList.add('hidden');
+      showToast('Đã thêm thành viên thành công!');
+    } else {
+      showToast('Vui lòng chọn ít nhất một người bạn!', false);
+    }
+  };
+}
+
 // --- XỬ LÝ SỰ KIỆN MODAL CÀI ĐẶT CHAT 1-1 & BÁO CÁO (DÙNG EVENT DELEGATION) ---
 document.addEventListener('click', (e) => {
   const modalChatSettings = document.getElementById('modal-chat-settings');
