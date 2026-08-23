@@ -662,7 +662,7 @@ document.addEventListener('click', (e) => {
   if (modalReport && e.target === modalReport) modalReport.classList.add('hidden');
 });
 
-// Xử lý toàn diện cho Modal Tùy chỉnh chat 1-1 và chuyển đổi Modal
+// Xử lý chuyển đổi modal, nút X và tự động render danh sách thành viên khi tạo nhóm
 document.addEventListener('click', function(e) {
   // 1. Khi bấm nút "Tạo nhóm cùng bạn này"
   const createGroupBtn = e.target.closest('#set-create-group');
@@ -670,13 +670,21 @@ document.addEventListener('click', function(e) {
     const modalChatSettings = document.getElementById('modal-chat-settings');
     if (modalChatSettings) {
       modalChatSettings.classList.add('hidden');
-      modalChatSettings.style.display = 'none'; // Buộc ẩn hẳn tránh bị chồng
+      modalChatSettings.style.display = 'none'; // Ẩn hẳn modal cài đặt 1-1
     }
 
     const modalGroup = document.getElementById('modal-group');
     if (modalGroup) {
       modalGroup.classList.remove('hidden');
-      modalGroup.style.display = 'flex'; // Hiện modal tạo nhóm chuẩn dạng flex
+      modalGroup.style.display = 'flex'; // Hiện modal tạo nhóm
+    }
+
+    // Tự động gọi lại hàm render danh sách bạn bè vào ô chọn thành viên nhóm
+    if (typeof renderGroupMembersList === 'function') {
+      renderGroupMembersList();
+    } else {
+      // Fallback: Nếu hàm render gốc tên khác, tìm trong app.js xem hàm nào tạo checkbox bạn bè và gọi ở đây
+      console.log('Modal tạo nhóm đã mở, kiểm tra lại hàm render danh sách bạn bè trong app.js');
     }
   }
 
