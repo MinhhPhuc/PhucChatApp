@@ -655,3 +655,32 @@ if(btnSubmitReport) {
     modalReport.style.display = 'none';
   });
 }
+
+// --- BỔ SUNG XỬ LÝ MỞ MODAL CÀI ĐẶT TRÒ CHUYỆN ---
+document.addEventListener('DOMContentLoaded', () => {
+  const btnChatOptions = document.getElementById('btn-chat-options');
+  const modalChatSettings = document.getElementById('modal-chat-settings');
+  const btnCloseChatSettings = document.getElementById('btn-close-chat-settings');
+
+  if (btnChatOptions && modalChatSettings) {
+    btnChatOptions.addEventListener('click', () => {
+      modalChatSettings.classList.remove('hidden');
+      modalChatSettings.style.display = 'flex';
+    });
+  }
+
+  if (btnCloseChatSettings && modalChatSettings) {
+    btnCloseChatSettings.addEventListener('click', () => {
+      modalChatSettings.classList.add('hidden');
+      modalChatSettings.style.display = 'none';
+    });
+  }
+
+  // Đóng modal khi bấm ra ngoài vùng nội dung
+  window.addEventListener('click', (e) => {
+    if (e.target === modalChatSettings) {
+      modalChatSettings.classList.add('hidden');
+      modalChatSettings.style.display = 'none';
+    }
+  });
+});
