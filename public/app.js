@@ -605,25 +605,6 @@ document.getElementById('btn-confirm-add-member').onclick = () => {
   }
 };
 
-// Xử lý mở/đóng modal cài đặt chat 1-1
-const btnChatOptions = document.getElementById('btn-chat-options');
-const modalChatSettings = document.getElementById('modal-chat-settings');
-const btnCloseChatSettings = document.getElementById('btn-close-chat-settings');
-
-if(btnChatOptions) {
-  btnChatOptions.addEventListener('click', () => {
-    modalChatSettings.classList.remove('hidden');
-    modalChatSettings.style.display = 'flex';
-  });
-}
-
-if(btnCloseChatSettings) {
-  btnCloseChatSettings.addEventListener('click', () => {
-    modalChatSettings.classList.add('hidden');
-    modalChatSettings.style.display = 'none';
-  });
-}
-
 // Xử lý nút báo cáo gửi admin
 const setReport = document.getElementById('set-report');
 const modalReport = document.getElementById('modal-report');
@@ -657,18 +638,22 @@ if(btnSubmitReport) {
 }
 
 // --- BỔ SUNG XỬ LÝ MỞ MODAL CÀI ĐẶT TRÒ CHUYỆN ---
+// --- XỬ LÝ SỰ KIỆN MODAL CÀI ĐẶT CHAT 1-1 ---
 document.addEventListener('DOMContentLoaded', () => {
   const btnChatOptions = document.getElementById('btn-chat-options');
   const modalChatSettings = document.getElementById('modal-chat-settings');
   const btnCloseChatSettings = document.getElementById('btn-close-chat-settings');
 
+  // Mở modal khi bấm nút 3 chấm
   if (btnChatOptions && modalChatSettings) {
-    btnChatOptions.addEventListener('click', () => {
+    btnChatOptions.addEventListener('click', (e) => {
+      e.stopPropagation();
       modalChatSettings.classList.remove('hidden');
       modalChatSettings.style.display = 'flex';
     });
   }
 
+  // Đóng modal khi bấm nút Đóng
   if (btnCloseChatSettings && modalChatSettings) {
     btnCloseChatSettings.addEventListener('click', () => {
       modalChatSettings.classList.add('hidden');
@@ -676,11 +661,44 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Đóng modal khi bấm ra ngoài vùng nội dung
+  // Đóng modal khi bấm ra vùng nền tối bên ngoài
   window.addEventListener('click', (e) => {
-    if (e.target === modalChatSettings) {
+    if (modalChatSettings && e.target === modalChatSettings) {
       modalChatSettings.classList.add('hidden');
       modalChatSettings.style.display = 'none';
     }
   });
+
+  // Xử lý nút báo cáo gửi admin (nếu có)
+  const setReport = document.getElementById('set-report');
+  const modalReport = document.getElementById('modal-report');
+  const btnCancelReport = document.getElementById('btn-cancel-report');
+  const btnSubmitReport = document.getElementById('btn-submit-report');
+
+  if (setReport && modalReport && modalChatSettings) {
+    setReport.addEventListener('click', () => {
+      modalChatSettings.classList.add('hidden');
+      modalChatSettings.style.display = 'none';
+      modalReport.classList.remove('hidden');
+      modalReport.style.display = 'flex';
+    });
+  }
+
+  if (btnCancelReport && modalReport) {
+    btnCancelReport.addEventListener('click', () => {
+      modalReport.classList.add('hidden');
+      modalReport.style.display = 'none';
+    });
+  }
+
+  if (btnSubmitReport && modalReport) {
+    btnSubmitReport.addEventListener('click', () => {
+      const reasonSelect = document.getElementById('report-reason-select');
+      const reason = reasonSelect ? reasonSelect.value : 'Vi phạm';
+      alert("Đã gửi báo cáo thành công với lý do: " + reason);
+      modalReport.classList.add('hidden');
+      modalReport.style.display = 'none';
+    });
+  }
 });
+
