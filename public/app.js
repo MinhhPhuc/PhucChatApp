@@ -661,3 +661,24 @@ document.addEventListener('click', (e) => {
   if (modalChatSettings && e.target === modalChatSettings) modalChatSettings.classList.add('hidden');
   if (modalReport && e.target === modalReport) modalReport.classList.add('hidden');
 });
+
+// Thêm đoạn code này vào cuối file app.js của bạn
+document.addEventListener('click', function(e) {
+  // Kiểm tra nếu bấm vào nút "Tạo nhóm cùng bạn này"
+  const createGroupBtn = e.target.closest('#set-create-group');
+  if (createGroupBtn) {
+    // Ẩn modal tùy chỉnh chat 1-1 đi
+    const modalChatSettings = document.getElementById('modal-chat-settings');
+    if (modalChatSettings) modalChatSettings.classList.add('hidden');
+
+    // Hiện modal tạo nhóm lên
+    const modalGroup = document.getElementById('modal-group');
+    if (modalGroup) {
+      modalGroup.classList.remove('hidden');
+      modalGroup.style.display = 'flex'; // Đảm bảo hiển thị dạng flex căn giữa
+    }
+
+    // Nếu có tên bạn đang chat, tự động chọn sẵn người đó vào danh sách tạo nhóm (tùy chọn)
+    console.log('Đã mở modal tạo nhóm từ cài đặt 1-1');
+  }
+});
