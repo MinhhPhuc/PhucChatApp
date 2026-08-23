@@ -97,6 +97,14 @@
       </div>
     </div>
 
+    <!-- THANH PHÂN CHIA TAB CHAT -->
+    <div id="chat-filter-tabs" style="display: flex; align-items: center; gap: 8px; padding: 10px 16px; overflow-x: auto; border-bottom: 1px solid var(--border-color, #edf2f7);">
+      <button class="filter-tab-btn active" data-filter="all" style="background: var(--primary-light, #ebf8ff); color: var(--primary-color, #3182ce); border: none; padding: 6px 14px; border-radius: 16px; font-weight: 600; font-size: 13px; cursor: pointer; transition: 0.2s;">Tất cả</button>
+      <button class="filter-tab-btn" data-filter="unread" style="background: transparent; color: var(--text-secondary, #718096); border: none; padding: 6px 14px; border-radius: 16px; font-weight: 500; font-size: 13px; cursor: pointer; transition: 0.2s;">Chưa đọc</button>
+      <button class="filter-tab-btn" data-filter="groups" style="background: transparent; color: var(--text-secondary, #718096); border: none; padding: 6px 14px; border-radius: 16px; font-weight: 500; font-size: 13px; cursor: pointer; transition: 0.2s;">Nhóm</button>
+      <button class="filter-tab-btn" data-filter="more" style="background: transparent; color: var(--text-secondary, #718096); border: none; padding: 6px 10px; border-radius: 16px; font-weight: 500; font-size: 13px; cursor: pointer; transition: 0.2s;"><i class="fa-solid fa-ellipsis"></i></button>
+    </div>
+
     <!-- DANH SÁCH KHUNG CHAT & BẠN BÈ -->
     <main class="chat-list" id="chat-list"></main>
 
