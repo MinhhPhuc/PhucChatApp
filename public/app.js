@@ -604,3 +604,54 @@ document.getElementById('btn-confirm-add-member').onclick = () => {
     showToast('Vui lòng chọn ít nhất một người bạn!', false);
   }
 };
+
+// Xử lý mở/đóng modal cài đặt chat 1-1
+const btnChatOptions = document.getElementById('btn-chat-options');
+const modalChatSettings = document.getElementById('modal-chat-settings');
+const btnCloseChatSettings = document.getElementById('btn-close-chat-settings');
+
+if(btnChatOptions) {
+  btnChatOptions.addEventListener('click', () => {
+    modalChatSettings.classList.remove('hidden');
+    modalChatSettings.style.display = 'flex';
+  });
+}
+
+if(btnCloseChatSettings) {
+  btnCloseChatSettings.addEventListener('click', () => {
+    modalChatSettings.classList.add('hidden');
+    modalChatSettings.style.display = 'none';
+  });
+}
+
+// Xử lý nút báo cáo gửi admin
+const setReport = document.getElementById('set-report');
+const modalReport = document.getElementById('modal-report');
+const btnCancelReport = document.getElementById('btn-cancel-report');
+const btnSubmitReport = document.getElementById('btn-submit-report');
+
+if(setReport) {
+  setReport.addEventListener('click', () => {
+    modalChatSettings.classList.add('hidden');
+    modalChatSettings.style.display = 'none';
+    modalReport.classList.remove('hidden');
+    modalReport.style.display = 'flex';
+  });
+}
+
+if(btnCancelReport) {
+  btnCancelReport.addEventListener('click', () => {
+    modalReport.classList.add('hidden');
+    modalReport.style.display = 'none';
+  });
+}
+
+if(btnSubmitReport) {
+  btnSubmitReport.addEventListener('click', () => {
+    const reason = document.getElementById('report-reason-select').value;
+    // Bạn có thể gọi socket hoặc fetch gửi thông tin báo cáo về server tại đây
+    alert("Đã gửi báo cáo thành công với lý do: " + reason);
+    modalReport.classList.add('hidden');
+    modalReport.style.display = 'none';
+  });
+}
