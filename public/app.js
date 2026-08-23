@@ -140,55 +140,79 @@ document.getElementById('btn-logout').onclick = () => {
 
 // --- MODAL TẠO NHÓM ---
 const modalGroup = document.getElementById('modal-group');
+const btnOpenGroupModal = document.getElementById('btn-open-group-modal');
+const btnCloseGroupModal = document.getElementById('btn-close-group-modal');
+const btnSubmitGroup = document.getElementById('btn-submit-group');
 
-document.getElementById('btn-open-group-modal').onclick = () => {
-  modalGroup.classList.remove('hidden');
-  modalGroup.style.display = 'flex';
-  renderGroupMembersCheckbox();
-};
+if (btnOpenGroupModal) {
+  btnOpenGroupModal.onclick = () => {
+    if (modalGroup) {
+      modalGroup.classList.remove('hidden');
+      modalGroup.style.display = 'flex';
+      renderGroupMembersCheckbox();
+    }
+  };
+}
 
-document.getElementById('btn-close-group-modal').onclick = () => {
-  modalGroup.classList.add('hidden');
-  modalGroup.style.display = 'none';
-};
+if (btnCloseGroupModal) {
+  btnCloseGroupModal.onclick = () => {
+    if (modalGroup) {
+      modalGroup.classList.add('hidden');
+      modalGroup.style.display = 'none';
+    }
+  };
+}
 
 function renderGroupMembersCheckbox() {
   const container = document.getElementById('group-members-list');
+  if (!container) return;
   container.innerHTML = '';
+  
   if (state.friends.length === 0) {
-    container.innerHTML = '<p style="font-size: 13px; color: #718096; text-align: center;">Chưa có bạn bè để thêm vào nhóm</p>';
+    container.innerHTML = '<p style="font-size: 13px; color: #718096; text-align: center; padding: 10px;">Chưa có bạn bè để thêm vào nhóm</p>';
     return;
   }
+  
   state.friends.forEach(f => {
     container.innerHTML += `
-      <label class="member-checkbox-item">
+      <label class="member-checkbox-item" style="display: flex; align-items: center; gap: 10px; padding: 6px 0; cursor: pointer;">
         <input type="checkbox" value="${f.id}" class="group-member-checkbox" style="width: 16px; height: 16px;">
-        <img src="${f.avatar}" style="width: 28px; height: 28px; border-radius: 50%;">
-        <span style="font-size: 14px;">${f.username}</span>
+        <img src="${f.avatar}" style="width: 28px; height: 28px; border-radius: 50%; object-fit: cover;">
+        <span style="font-size: 14px; font-weight: 500;">${f.username}</span>
       </label>
     `;
   });
 }
 
-document.getElementById('btn-submit-group').onclick = () => {
-  const groupName = document.getElementById('group-name-input').value.trim();
-  if (!groupName) {
-    alert('Vui lòng nhập tên nhóm!');
-    return;
-  }
-  const checkboxes = document.querySelectorAll('.group-member-checkbox:checked');
-  const memberIds = Array.from(checkboxes).map(cb => cb.value);
+if (btnSubmitGroup) {
+  btnSubmitGroup.onclick = () => {
+    const groupNameInput = document.getElementById('group-name-input');
+    const groupName = groupNameInput ? groupNameInput.value.trim() : '';
+    
+    if (!groupName) {
+      showToast('Vui lòng nhập tên nhóm!', false);
+      if (groupNameInput) groupNameInput.focus();
+      return;
+    }
 
-  socket.emit('group:create', {
-    name: groupName,
-    avatar: state.selectedGroupAvatar,
-    memberIds
-  });
+    const checkboxes = document.querySelectorAll('.group-member-checkbox:checked');
+    const memberIds = Array.from(checkboxes).map(cb => cb.value);
 
-  document.getElementById('group-name-input').value = '';
-  modalGroup.style.display = 'none';
-  showToast('Đã tạo nhóm thành công!');
-};
+    socket.emit('group:create', {
+      name: groupName,
+      avatar: state.selectedGroupAvatar,
+      memberIds: memberIds
+    });
+
+    if (groupNameInput) groupNameInput.value = '';
+    if (modalGroup) {
+      modalGroup.classList.add('hidden');
+      modalGroup.style.display = 'none';
+    }
+    
+    showToast('Đang tạo nhóm...');
+  };
+}
 
 // --- TÌM KIẾM ---
 const searchInput = document.getElementById('search-input');
