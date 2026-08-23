@@ -138,54 +138,31 @@ document.getElementById('btn-logout').onclick = () => {
   location.reload();
 };
 
-// --- MODAL TẠO NHÓM ---
-const modalGroup = document.getElementById('modal-group');
-const btnOpenGroupModal = document.getElementById('btn-open-group-modal');
-const btnCloseGroupModal = document.getElementById('btn-close-group-modal');
-const btnSubmitGroup = document.getElementById('btn-submit-group');
+// Lắng nghe sự kiện click trên toàn bộ tài liệu (đảm bảo 100% bắt được click)
+document.addEventListener('click', (e) => {
+  const modalGroup = document.getElementById('modal-group');
 
-if (btnOpenGroupModal) {
-  btnOpenGroupModal.onclick = () => {
+  // 1. Mở modal khi bấm nút "Tạo nhóm"
+  if (e.target.closest('#btn-open-group-modal')) {
     if (modalGroup) {
       modalGroup.classList.remove('hidden');
       modalGroup.style.display = 'flex';
       renderGroupMembersCheckbox();
     }
-  };
-}
+    return;
+  }
 
-if (btnCloseGroupModal) {
-  btnCloseGroupModal.onclick = () => {
+  // 2. Đóng modal khi bấm nút "Đóng" hoặc nút "X"
+  if (e.target.closest('#btn-close-group-modal')) {
     if (modalGroup) {
       modalGroup.classList.add('hidden');
       modalGroup.style.display = 'none';
     }
-  };
-}
-
-function renderGroupMembersCheckbox() {
-  const container = document.getElementById('group-members-list');
-  if (!container) return;
-  container.innerHTML = '';
-  
-  if (state.friends.length === 0) {
-    container.innerHTML = '<p style="font-size: 13px; color: #718096; text-align: center; padding: 10px;">Chưa có bạn bè để thêm vào nhóm</p>';
     return;
   }
-  
-  state.friends.forEach(f => {
-    container.innerHTML += `
-      <label class="member-checkbox-item" style="display: flex; align-items: center; gap: 10px; padding: 6px 0; cursor: pointer;">
-        <input type="checkbox" value="${f.id}" class="group-member-checkbox" style="width: 16px; height: 16px;">
-        <img src="${f.avatar}" style="width: 28px; height: 28px; border-radius: 50%; object-fit: cover;">
-        <span style="font-size: 14px; font-weight: 500;">${f.username}</span>
-      </label>
-    `;
-  });
-}
 
-if (btnSubmitGroup) {
-  btnSubmitGroup.onclick = () => {
+  // 3. Xử lý khi bấm nút "Xác nhận tạo nhóm"
+  if (e.target.closest('#btn-submit-group')) {
     const groupNameInput = document.getElementById('group-name-input');
     const groupName = groupNameInput ? groupNameInput.value.trim() : '';
     
@@ -211,8 +188,9 @@ if (btnSubmitGroup) {
     }
     
     showToast('Đang tạo nhóm...');
-  };
-}
+    return;
+  }
+});
 
 // --- TÌM KIẾM ---
 const searchInput = document.getElementById('search-input');
@@ -478,163 +456,6 @@ socket.on('auth:forced_logout', () => {
   location.reload();
 });
 
-// --- QUẢN LÝ CÀI ĐẶT NHÓM ---
-const modalGroupSettings = document.getElementById('modal-group-settings');
-const btnSettings = document.getElementById('btn-group-settings');
-const btnLeave = document.getElementById('btn-leave-group');
-const btnDeleteGroup = document.getElementById('btn-delete-group');
-
-function renderGroupSettingsModal() {
-  const group = state.groups.find(g => g.id === state.activeRoomId);
-  if (!group) return;
-
-  const isAdmin = group.adminId === state.currentUser.id;
-  document.getElementById('setting-member-count').innerText = group.members ? group.members.length : group.membersCount;
-  
-  if (isAdmin) {
-    btnDeleteGroup.classList.remove('hidden');
-  } else {
-    btnDeleteGroup.classList.add('hidden');
-  }
-
-  const listContainer = document.getElementById('setting-members-list');
-  listContainer.innerHTML = '';
-
-  if (group.members) {
-    group.members.forEach(m => {
-      const isMemberAdmin = m.id === group.adminId;
-      const isSelf = m.id === state.currentUser.id;
-
-      let actionButtons = '';
-      if (isAdmin && !isSelf) {
-        actionButtons = `
-          <div style="display:flex; gap:5px; margin-top:5px;">
-            <button onclick="execGroupAction('transfer_admin', '${m.id}')" style="background:#3182ce; color:white; border:none; padding:4px 8px; border-radius:4px; font-size:11px; cursor:pointer;">Phong Admin</button>
-            ${m.isMuted 
-              ? `<button onclick="execGroupAction('unmute', '${m.id}')" style="background:#38a169; color:white; border:none; padding:4px 8px; border-radius:4px; font-size:11px; cursor:pointer;">Bỏ Mute</button>`
-              : `<button onclick="execGroupAction('mute', '${m.id}')" style="background:#d69e2e; color:white; border:none; padding:4px 8px; border-radius:4px; font-size:11px; cursor:pointer;">Mute</button>`
-            }
-            <button onclick="execGroupAction('kick', '${m.id}')" style="background:#e53e3e; color:white; border:none; padding:4px 8px; border-radius:4px; font-size:11px; cursor:pointer;">Kick</button>
-          </div>
-        `;
-      }
-
-      listContainer.innerHTML += `
-        <div style="padding: 10px; border-bottom: 1px solid #edf2f7;">
-          <div style="display: flex; align-items: center; justify-content: space-between;">
-            <div style="display: flex; align-items: center; gap: 10px;">
-              <img src="${m.avatar}" style="width: 32px; height: 32px; border-radius: 50%;">
-              <div>
-                <span style="font-weight: bold; font-size: 14px;">${m.username} ${isSelf ? '(Bạn)' : ''}</span>
-                <div style="font-size: 11px; color: ${m.isMuted ? '#e53e3e' : '#718096'};">
-                  ${isMemberAdmin ? '👑 Quản Trị Viên' : 'Thành Viên'} ${m.isMuted ? ' • 🔇 Đang bị cấm chat' : ''}
-                </div>
-              </div>
-            </div>
-          </div>
-          ${actionButtons}
-        </div>
-      `;
-    });
-  }
-}
-
-if (btnSettings) {
-  btnSettings.onclick = () => {
-    renderGroupSettingsModal();
-    modalGroupSettings.classList.remove('hidden');
-    modalGroupSettings.style.display = 'flex';
-  };
-}
-
-const btnCloseGroupSettings = document.getElementById('btn-close-group-settings');
-if (btnCloseGroupSettings) {
-  btnCloseGroupSettings.onclick = () => {
-    modalGroupSettings.style.display = 'none';
-    document.getElementById('add-member-section').classList.add('hidden');
-  };
-}
-
-if (btnLeave) btnLeave.onclick = () => execGroupAction('leave', null);
-if (btnDeleteGroup) {
-  btnDeleteGroup.onclick = () => {
-    if (confirm('Bạn có chắc chắn muốn giải tán nhóm này không?')) execGroupAction('delete_group', null);
-  };
-}
-
-window.execGroupAction = function(action, targetId) {
-  socket.emit('group:action', { action, groupId: state.activeRoomId, targetId });
-};
-
-socket.on('message:error', (msg) => showToast(msg, false));
-
-socket.on('group:kicked_out', () => {
-  modalGroupSettings.style.display = 'none';
-  document.getElementById('chat-screen').classList.add('hidden');
-  state.activeRoomId = null;
-  socket.emit('auth:session', { userId: state.currentUser.id });
-  showToast('Bạn đã rời khỏi nhóm hoặc nhóm đã bị giải tán.', false);
-});
-
-// --- CHỨC NĂNG THÊM THÀNH VIÊN VÀO NHÓM ---
-const btnShowAddMember = document.getElementById('btn-show-add-member');
-if (btnShowAddMember) {
-  btnShowAddMember.onclick = () => {
-    const group = state.groups.find(g => g.id === state.activeRoomId);
-    if (!group) return;
-
-    const addSection = document.getElementById('add-member-section');
-    const listDiv = document.getElementById('add-member-list');
-    listDiv.innerHTML = '';
-
-    const memberIdsInGroup = new Set((group.members || []).map(m => String(m.id)));
-    const friendsNotInGroup = state.friends.filter(f => !memberIdsInGroup.has(String(f.id)));
-
-    if (friendsNotInGroup.length === 0) {
-      listDiv.innerHTML = '<div style="font-size:13px; color:#718096; text-align:center;">Tất cả bạn bè của bạn đều đã ở trong nhóm này!</div>';
-    } else {
-      friendsNotInGroup.forEach(f => {
-        listDiv.innerHTML += `
-          <label style="display:flex; align-items:center; gap:10px; margin-bottom:8px; cursor:pointer; padding:4px; background:#fff; border-radius:4px; border:1px solid #edf2f7;">
-            <input type="checkbox" class="add-member-checkbox" value="${f.id}" style="width:16px; height:16px;">
-            <img src="${f.avatar}" style="width:28px; height:28px; border-radius:50%;">
-            <span style="font-size:14px; font-weight:500;">${f.username}</span>
-          </label>
-        `;
-      });
-    }
-
-    addSection.classList.remove('hidden');
-  };
-}
-
-const btnCancelAddMember = document.getElementById('btn-cancel-add-member');
-if (btnCancelAddMember) {
-  btnCancelAddMember.onclick = () => {
-    document.getElementById('add-member-section').classList.add('hidden');
-  };
-}
-
-const btnConfirmAddMember = document.getElementById('btn-confirm-add-member');
-if (btnConfirmAddMember) {
-  btnConfirmAddMember.onclick = () => {
-    const checkboxes = document.querySelectorAll('.add-member-checkbox:checked');
-    const newMemberIds = Array.from(checkboxes).map(cb => cb.value);
-
-    if (newMemberIds.length > 0) {
-      socket.emit('group:add_members', {
-        groupId: state.activeRoomId,
-        newMemberIds: newMemberIds
-      });
-      
-      document.getElementById('add-member-section').classList.add('hidden');
-      showToast('Đã thêm thành viên thành công!');
-    } else {
-      showToast('Vui lòng chọn ít nhất một người bạn!', false);
-    }
-  };
-}
-
 // --- XỬ LÝ SỰ KIỆN MODAL CÀI ĐẶT CHAT 1-1 & BÁO CÁO (DÙNG EVENT DELEGATION) ---
 document.addEventListener('click', (e) => {
   const modalChatSettings = document.getElementById('modal-chat-settings');
@@ -680,5 +501,230 @@ document.addEventListener('click', (e) => {
   }
   if (modalReport && e.target === modalReport) {
     modalReport.classList.add('hidden');
+  }
+});
+
+// =========================================================
+// KHÔI PHỤC: CÀI ĐẶT NHÓM & TẠO NHÓM (EVENT DELEGATION)
+// =========================================================
+
+// 1. Hàm Render danh sách bạn bè để chọn khi Tạo nhóm
+function renderGroupMembersCheckbox() {
+  const container = document.getElementById('group-members-list');
+  if (!container) return;
+  container.innerHTML = '';
+  
+  if (state.friends.length === 0) {
+    container.innerHTML = '<p style="font-size: 13px; color: #718096; text-align: center; padding: 10px;">Chưa có bạn bè để thêm</p>';
+    return;
+  }
+  
+  state.friends.forEach(f => {
+    container.innerHTML += `
+      <label class="member-checkbox-item" style="display: flex; align-items: center; gap: 10px; padding: 6px 0; cursor: pointer;">
+        <input type="checkbox" value="${f.id}" class="group-member-checkbox" style="width: 16px; height: 16px;">
+        <img src="${f.avatar}" style="width: 28px; height: 28px; border-radius: 50%; object-fit: cover;">
+        <span style="font-size: 14px; font-weight: 500;">${f.username}</span>
+      </label>
+    `;
+  });
+}
+
+// 2. Hàm Render danh sách thành viên trong Cài đặt nhóm
+function renderGroupSettingsModal() {
+  const group = state.groups.find(g => g.id === state.activeRoomId);
+  if (!group) return;
+
+  const isAdmin = group.adminId === state.currentUser.id;
+  const countEl = document.getElementById('setting-member-count');
+  if (countEl) countEl.innerText = group.members ? group.members.length : group.membersCount;
+  
+  const btnDeleteGroup = document.getElementById('btn-delete-group');
+  if (btnDeleteGroup) {
+    if (isAdmin) btnDeleteGroup.classList.remove('hidden');
+    else btnDeleteGroup.classList.add('hidden');
+  }
+
+  const listContainer = document.getElementById('setting-members-list');
+  if (!listContainer) return;
+  listContainer.innerHTML = '';
+
+  if (group.members) {
+    group.members.forEach(m => {
+      const isMemberAdmin = m.id === group.adminId;
+      const isSelf = m.id === state.currentUser.id;
+
+      let actionButtons = '';
+      if (isAdmin && !isSelf) {
+        actionButtons = `
+          <div style="display:flex; gap:5px; margin-top:5px;">
+            <button onclick="execGroupAction('transfer_admin', '${m.id}')" style="background:#3182ce; color:white; border:none; padding:4px 8px; border-radius:4px; font-size:11px; cursor:pointer;">Phong Admin</button>
+            ${m.isMuted 
+              ? `<button onclick="execGroupAction('unmute', '${m.id}')" style="background:#38a169; color:white; border:none; padding:4px 8px; border-radius:4px; font-size:11px; cursor:pointer;">Bỏ Mute</button>`
+              : `<button onclick="execGroupAction('mute', '${m.id}')" style="background:#d69e2e; color:white; border:none; padding:4px 8px; border-radius:4px; font-size:11px; cursor:pointer;">Mute</button>`
+            }
+            <button onclick="execGroupAction('kick', '${m.id}')" style="background:#e53e3e; color:white; border:none; padding:4px 8px; border-radius:4px; font-size:11px; cursor:pointer;">Kick</button>
+          </div>
+        `;
+      }
+
+      listContainer.innerHTML += `
+        <div style="padding: 10px; border-bottom: 1px solid #edf2f7;">
+          <div style="display: flex; align-items: center; justify-content: space-between;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <img src="${m.avatar}" style="width: 32px; height: 32px; border-radius: 50%;">
+              <div>
+                <span style="font-weight: bold; font-size: 14px;">${m.username} ${isSelf ? '(Bạn)' : ''}</span>
+                <div style="font-size: 11px; color: ${m.isMuted ? '#e53e3e' : '#718096'};">
+                  ${isMemberAdmin ? '👑 Quản Trị Viên' : 'Thành Viên'} ${m.isMuted ? ' • 🔇 Đang bị cấm chat' : ''}
+                </div>
+              </div>
+            </div>
+          </div>
+          ${actionButtons}
+        </div>
+      `;
+    });
+  }
+}
+
+// 3. Hàm gửi action cài đặt nhóm lên server
+window.execGroupAction = function(action, targetId) {
+  socket.emit('group:action', { action, groupId: state.activeRoomId, targetId });
+};
+
+// 4. Bắt toàn bộ sự kiện click trên giao diện (Không bao giờ trượt)
+document.addEventListener('click', (e) => {
+  
+  // --- A. XỬ LÝ NÚT TẠO NHÓM ---
+  const modalGroup = document.getElementById('modal-group');
+  
+  // Mở modal (Hỗ trợ bắt qua ID hoặc Class "btn-create-group" trong cài đặt bạn bè)
+  if (e.target.closest('#btn-open-group-modal') || e.target.closest('.btn-create-group')) {
+    if (modalGroup) {
+      modalGroup.classList.remove('hidden');
+      modalGroup.style.display = 'flex';
+      renderGroupMembersCheckbox();
+    }
+    return;
+  }
+  
+  // Đóng modal tạo nhóm
+  if (e.target.closest('#btn-close-group-modal')) {
+    if (modalGroup) {
+      modalGroup.classList.add('hidden');
+      modalGroup.style.display = 'none';
+    }
+    return;
+  }
+  
+  // Xác nhận tạo nhóm
+  if (e.target.closest('#btn-submit-group')) {
+    const groupNameInput = document.getElementById('group-name-input');
+    const groupName = groupNameInput ? groupNameInput.value.trim() : '';
+    if (!groupName) {
+      showToast('Vui lòng nhập tên nhóm!', false);
+      return;
+    }
+    const checkboxes = document.querySelectorAll('.group-member-checkbox:checked');
+    const memberIds = Array.from(checkboxes).map(cb => cb.value);
+    
+    socket.emit('group:create', {
+      name: groupName,
+      avatar: state.selectedGroupAvatar,
+      memberIds: memberIds
+    });
+    
+    if (groupNameInput) groupNameInput.value = '';
+    if (modalGroup) {
+      modalGroup.classList.add('hidden');
+      modalGroup.style.display = 'none';
+    }
+    showToast('Đang tạo nhóm...');
+    return;
+  }
+
+  // --- B. XỬ LÝ CÀI ĐẶT NHÓM CŨ ---
+  const modalGroupSettings = document.getElementById('modal-group-settings');
+  
+  // Mở cài đặt nhóm
+  if (e.target.closest('#btn-group-settings')) {
+    renderGroupSettingsModal();
+    if (modalGroupSettings) {
+      modalGroupSettings.classList.remove('hidden');
+      modalGroupSettings.style.display = 'flex';
+    }
+    return;
+  }
+  
+  // Đóng cài đặt nhóm
+  if (e.target.closest('#btn-close-group-settings')) {
+    if (modalGroupSettings) {
+      modalGroupSettings.style.display = 'none';
+      modalGroupSettings.classList.add('hidden');
+      const addSection = document.getElementById('add-member-section');
+      if (addSection) addSection.classList.add('hidden');
+    }
+    return;
+  }
+  
+  // Rời / Giải tán
+  if (e.target.closest('#btn-leave-group')) {
+    if (confirm('Bạn có chắc chắn muốn rời nhóm?')) execGroupAction('leave', null);
+    return;
+  }
+  if (e.target.closest('#btn-delete-group')) {
+    if (confirm('Bạn có chắc chắn muốn giải tán nhóm này không?')) execGroupAction('delete_group', null);
+    return;
+  }
+
+  // --- C. XỬ LÝ THÊM THÀNH VIÊN ---
+  if (e.target.closest('#btn-show-add-member')) {
+    const group = state.groups.find(g => g.id === state.activeRoomId);
+    if (!group) return;
+    
+    const addSection = document.getElementById('add-member-section');
+    const listDiv = document.getElementById('add-member-list');
+    if (!addSection || !listDiv) return;
+    
+    listDiv.innerHTML = '';
+    const memberIdsInGroup = new Set((group.members || []).map(m => String(m.id)));
+    const friendsNotInGroup = state.friends.filter(f => !memberIdsInGroup.has(String(f.id)));
+
+    if (friendsNotInGroup.length === 0) {
+      listDiv.innerHTML = '<div style="font-size:13px; color:#718096; text-align:center;">Tất cả bạn bè đều đã ở trong nhóm!</div>';
+    } else {
+      friendsNotInGroup.forEach(f => {
+        listDiv.innerHTML += `
+          <label style="display:flex; align-items:center; gap:10px; margin-bottom:8px; cursor:pointer; padding:4px; background:#fff; border-radius:4px; border:1px solid #edf2f7;">
+            <input type="checkbox" class="add-member-checkbox" value="${f.id}" style="width:16px; height:16px;">
+            <img src="${f.avatar}" style="width:28px; height:28px; border-radius:50%;">
+            <span style="font-size:14px; font-weight:500;">${f.username}</span>
+          </label>
+        `;
+      });
+    }
+    addSection.classList.remove('hidden');
+    return;
+  }
+  
+  if (e.target.closest('#btn-cancel-add-member')) {
+    const addSection = document.getElementById('add-member-section');
+    if (addSection) addSection.classList.add('hidden');
+    return;
+  }
+  
+  if (e.target.closest('#btn-confirm-add-member')) {
+    const checkboxes = document.querySelectorAll('.add-member-checkbox:checked');
+    const newMemberIds = Array.from(checkboxes).map(cb => cb.value);
+    if (newMemberIds.length > 0) {
+      socket.emit('group:add_members', { groupId: state.activeRoomId, newMemberIds: newMemberIds });
+      const addSection = document.getElementById('add-member-section');
+      if (addSection) addSection.classList.add('hidden');
+      showToast('Đã thêm thành viên thành công!');
+    } else {
+      showToast('Vui lòng chọn ít nhất một người bạn!', false);
+    }
+    return;
   }
 });
