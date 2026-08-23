@@ -413,7 +413,7 @@ function appendMessage(msg) {
 // =========================================================
 // CÁC HÀM XỬ LÝ GIAO DIỆN NHÓM
 // =========================================================
-function renderGroupMembersCheckbox() {
+function renderGroupMembersCheckbox(preSelectedFriendId = null) {
   const container = document.getElementById('group-members-list');
   if (!container) return;
   container.innerHTML = '';
@@ -422,9 +422,10 @@ function renderGroupMembersCheckbox() {
     return;
   }
   state.friends.forEach(f => {
+    const isChecked = f.id === preSelectedFriendId ? 'checked' : '';
     container.innerHTML += `
       <label class="member-checkbox-item" style="display: flex; align-items: center; gap: 10px; padding: 6px 0; cursor: pointer;">
-        <input type="checkbox" value="${f.id}" class="group-member-checkbox" style="width: 16px; height: 16px;">
+        <input type="checkbox" value="${f.id}" class="group-member-checkbox" ${isChecked} style="width: 16px; height: 16px;">
         <img src="${f.avatar}" style="width: 28px; height: 28px; border-radius: 50%; object-fit: cover;">
         <span style="font-size: 14px; font-weight: 500;">${f.username}</span>
       </label>
@@ -494,7 +495,7 @@ window.execGroupAction = function(action, targetId) {
 };
 
 // =========================================================
-// BỘ ĐIỀU KHIỂN EVENT CLICK DUY NHẤT (QUAN TRỌNG NHẤT)
+// BỘ ĐIỀU KHIỂN EVENT CLICK DUY NHẤT (ĐÃ GỘP CHUẨN XÁC)
 // =========================================================
 document.addEventListener('click', (e) => {
   const modalGroup = document.getElementById('modal-group');
@@ -502,16 +503,39 @@ document.addEventListener('click', (e) => {
   const modalReport = document.getElementById('modal-report');
   const modalGroupSettings = document.getElementById('modal-group-settings');
 
-  // --- 1. MỞ TẠO NHÓM TỪ BẤT KỲ ĐÂU (CẢ TRONG CÀI ĐẶT BẠN BÈ) ---
+  // --- 1. MỞ TẠO NHÓM TỪ NÚT CHUNG ---
   if (e.target.closest('#btn-open-group-modal') || e.target.closest('.btn-create-group')) {
-    // Nếu đang mở cài đặt bạn bè -> Tắt đi để nhường chỗ cho bảng tạo nhóm
     if (modalChatSettings) modalChatSettings.classList.add('hidden');
     
     if (modalGroup) {
       modalGroup.classList.remove('hidden');
       modalGroup.style.display = 'flex';
-      renderGroupMembersCheckbox();
+      renderGroupMembersCheckbox(null);
     }
+    return;
+  }
+
+  // --- 1.1 MỞ TẠO NHÓM TỪ NÚT "Tạo nhóm cùng bạn này" TRONG MENU CÀI ĐẶT 1-1 ---
+  const createGroupBtn = e.target.closest('#set-create-group');
+  if (createGroupBtn) {
+    if (modalChatSettings) {
+      modalChatSettings.classList.add('hidden');
+      modalChatSettings.style.display = 'none';
+    }
+
+    if (modalGroup) {
+      modalGroup.classList.remove('hidden');
+      modalGroup.style.display = 'flex';
+    }
+
+    // Tự động tìm ID người bạn đang chat (nếu activeRoomId là dạng DM) để tích chọn sẵn
+    let targetFriendId = null;
+    if (state.activeRoomId && state.activeRoomId.includes('_DM_')) {
+      const parts = state.activeRoomId.split('_DM_');
+      targetFriendId = parts.find(id => id !== state.currentUser.id);
+    }
+
+    renderGroupMembersCheckbox(targetFriendId);
     return;
   }
 
@@ -559,7 +583,10 @@ document.addEventListener('click', (e) => {
     return;
   }
   if (e.target.closest('#btn-close-chat-settings')) {
-    if (modalChatSettings) modalChatSettings.classList.add('hidden');
+    if (modalChatSettings) {
+      modalChatSettings.classList.add('hidden');
+      modalChatSettings.style.display = 'none';
+    }
     return;
   }
   if (e.target.closest('#set-report')) {
@@ -660,41 +687,4 @@ document.addEventListener('click', (e) => {
   // --- 5. BẤM RA NGOÀI ĐỂ ĐÓNG BẢNG ---
   if (modalChatSettings && e.target === modalChatSettings) modalChatSettings.classList.add('hidden');
   if (modalReport && e.target === modalReport) modalReport.classList.add('hidden');
-});
-
-// Xử lý chuyển đổi modal, nút X và tự động render danh sách thành viên khi tạo nhóm
-document.addEventListener('click', function(e) {
-  // 1. Khi bấm nút "Tạo nhóm cùng bạn này"
-  const createGroupBtn = e.target.closest('#set-create-group');
-  if (createGroupBtn) {
-    const modalChatSettings = document.getElementById('modal-chat-settings');
-    if (modalChatSettings) {
-      modalChatSettings.classList.add('hidden');
-      modalChatSettings.style.display = 'none'; // Ẩn hẳn modal cài đặt 1-1
-    }
-
-    const modalGroup = document.getElementById('modal-group');
-    if (modalGroup) {
-      modalGroup.classList.remove('hidden');
-      modalGroup.style.display = 'flex'; // Hiện modal tạo nhóm
-    }
-
-    // Tự động gọi lại hàm render danh sách bạn bè vào ô chọn thành viên nhóm
-    if (typeof renderGroupMembersList === 'function') {
-      renderGroupMembersList();
-    } else {
-      // Fallback: Nếu hàm render gốc tên khác, tìm trong app.js xem hàm nào tạo checkbox bạn bè và gọi ở đây
-      console.log('Modal tạo nhóm đã mở, kiểm tra lại hàm render danh sách bạn bè trong app.js');
-    }
-  }
-
-  // 2. Khi bấm nút "X" hoặc nút đóng modal tùy chỉnh chat 1-1
-  const closeChatSettingsBtn = e.target.closest('#btn-close-chat-settings');
-  if (closeChatSettingsBtn) {
-    const modalChatSettings = document.getElementById('modal-chat-settings');
-    if (modalChatSettings) {
-      modalChatSettings.classList.add('hidden');
-      modalChatSettings.style.display = 'none';
-    }
-  }
 });
