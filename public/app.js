@@ -662,23 +662,31 @@ document.addEventListener('click', (e) => {
   if (modalReport && e.target === modalReport) modalReport.classList.add('hidden');
 });
 
-// Thêm đoạn code này vào cuối file app.js của bạn
+// Xử lý toàn diện cho Modal Tùy chỉnh chat 1-1 và chuyển đổi Modal
 document.addEventListener('click', function(e) {
-  // Kiểm tra nếu bấm vào nút "Tạo nhóm cùng bạn này"
+  // 1. Khi bấm nút "Tạo nhóm cùng bạn này"
   const createGroupBtn = e.target.closest('#set-create-group');
   if (createGroupBtn) {
-    // Ẩn modal tùy chỉnh chat 1-1 đi
     const modalChatSettings = document.getElementById('modal-chat-settings');
-    if (modalChatSettings) modalChatSettings.classList.add('hidden');
+    if (modalChatSettings) {
+      modalChatSettings.classList.add('hidden');
+      modalChatSettings.style.display = 'none'; // Buộc ẩn hẳn tránh bị chồng
+    }
 
-    // Hiện modal tạo nhóm lên
     const modalGroup = document.getElementById('modal-group');
     if (modalGroup) {
       modalGroup.classList.remove('hidden');
-      modalGroup.style.display = 'flex'; // Đảm bảo hiển thị dạng flex căn giữa
+      modalGroup.style.display = 'flex'; // Hiện modal tạo nhóm chuẩn dạng flex
     }
+  }
 
-    // Nếu có tên bạn đang chat, tự động chọn sẵn người đó vào danh sách tạo nhóm (tùy chọn)
-    console.log('Đã mở modal tạo nhóm từ cài đặt 1-1');
+  // 2. Khi bấm nút "X" hoặc nút đóng modal tùy chỉnh chat 1-1
+  const closeChatSettingsBtn = e.target.closest('#btn-close-chat-settings');
+  if (closeChatSettingsBtn) {
+    const modalChatSettings = document.getElementById('modal-chat-settings');
+    if (modalChatSettings) {
+      modalChatSettings.classList.add('hidden');
+      modalChatSettings.style.display = 'none';
+    }
   }
 });

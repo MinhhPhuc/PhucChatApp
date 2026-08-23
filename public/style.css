@@ -57,7 +57,7 @@ body, html { width: 100%; height: 100%; background: var(--bg-main); color: var(-
 .chat-screen { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: var(--bg-main); z-index: 100; display: flex; flex-direction: column; }
 /* Xóa bỏ dòng: .hidden { display: none !important; } cũ đi và thay bằng: */
 .hidden {
-  display: none;
+  display: none !important;
 }
 .chat-header { display: flex; align-items: center; gap: 12px; padding: 12px; border-bottom: 1px solid var(--border); }
 .messages-viewport { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 8px; }
