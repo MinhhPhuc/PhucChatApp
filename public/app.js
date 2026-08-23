@@ -229,6 +229,16 @@ socket.on('data:sync', (data) => {
   state.allUsers = data.allUsers;
   state.groups = data.groups || [];
 
+  // [CẬP NHẬT] Tự động làm mới tiêu đề số thành viên trên Header nếu đang mở nhóm
+  if (state.activeRoomId && state.activeRoomId.startsWith('grp_')) {
+    const currentGroup = state.groups.find(g => g.id === state.activeRoomId);
+    if (currentGroup) {
+      const count = currentGroup.members ? currentGroup.members.length : (currentGroup.membersCount || 0);
+      const statusEl = document.getElementById('active-chat-status');
+      if (statusEl) statusEl.innerText = `${count} thành viên`;
+    }
+  }
+
   state.friends.forEach(f => {
     const dmRoomId = [state.currentUser.id, f.id].sort().join('_DM_');
     socket.emit('messages:get', { roomId: dmRoomId });
@@ -277,7 +287,8 @@ function renderChatList() {
     state.groups.forEach(g => {
       const lastMsg = state.lastMessages.get(g.id);
       const unreadCount = state.unreadCounts.get(g.id) || 0;
-      let previewText = `${g.membersCount || (g.members ? g.members.length : 0)} thành viên`;
+      const memberCount = g.members ? g.members.length : (g.membersCount || 0);
+      let previewText = `${memberCount} thành viên`;
       let timeText = '';
       if (lastMsg) {
         const time = new Date(lastMsg.timestamp);
@@ -287,7 +298,7 @@ function renderChatList() {
       }
 
       list.innerHTML += `
-        <div class="chat-item ${unreadCount > 0 ? 'unread' : ''}" onclick="openRoom('${g.id}', '${g.name}', '${g.avatar}', '${g.membersCount || (g.members ? g.members.length : 0)} thành viên')">
+        <div class="chat-item ${unreadCount > 0 ? 'unread' : ''}" onclick="openRoom('${g.id}', '${g.name}', '${g.avatar}', '${memberCount} thành viên')">
           <div class="avatar-wrapper">
             <img class="avatar" src="${g.avatar}">
           </div>
@@ -388,8 +399,18 @@ function openRoom(roomId, name, avatar, status) {
   state.activeRoomId = roomId;
   state.unreadCounts.set(roomId, 0);
 
+  // [CẬP NHẬT] Đảm bảo lấy chính xác số thành viên động mới nhất khi bấm mở phòng
+  let displayStatus = status;
+  if (roomId.startsWith('grp_')) {
+    const currentGroup = state.groups.find(g => g.id === roomId);
+    if (currentGroup) {
+      const count = currentGroup.members ? currentGroup.members.length : (currentGroup.membersCount || 0);
+      displayStatus = `${count} thành viên`;
+    }
+  }
+
   document.getElementById('active-chat-name').innerText = name;
-  document.getElementById('active-chat-status').innerText = status;
+  document.getElementById('active-chat-status').innerText = displayStatus;
   document.getElementById('chat-screen').classList.remove('hidden');
   if(emojiPicker) emojiPicker.classList.add('hidden');
   
@@ -479,7 +500,8 @@ function renderGroupSettingsModal() {
 
   const isAdmin = group.adminId === state.currentUser.id;
   const countEl = document.getElementById('setting-member-count');
-  if (countEl) countEl.innerText = group.members ? group.members.length : group.membersCount;
+  const memberCount = group.members ? group.members.length : (group.membersCount || 0);
+  if (countEl) countEl.innerText = memberCount;
   
   const btnDeleteGroup = document.getElementById('btn-delete-group');
   if (btnDeleteGroup) {
@@ -534,7 +556,6 @@ window.execGroupAction = function(action, targetId) {
   const currentGroupId = state.activeRoomId;
   socket.emit('group:action', { action, groupId: currentGroupId, targetId });
 
-  // Xử lý cập nhật ngay lập tức giao diện client mà không cần đợi hoặc F5
   const modalGroupSettings = document.getElementById('modal-group-settings');
   if (modalGroupSettings) {
     modalGroupSettings.style.display = 'none';
@@ -542,17 +563,10 @@ window.execGroupAction = function(action, targetId) {
   }
 
   if (action === 'leave' || action === 'delete_group') {
-    // 1. Lọc bỏ nhóm khỏi danh sách state.groups ngay lập tức
     state.groups = state.groups.filter(g => g.id !== currentGroupId);
-    
-    // 2. Ẩn khung chat đi và reset activeRoomId
     document.getElementById('chat-screen').classList.add('hidden');
     state.activeRoomId = null;
-
-    // 3. Render lại danh sách chat
     renderChatList();
-
-    // 4. Thông báo cho người dùng
     showToast(action === 'leave' ? 'Đã rời nhóm thành công!' : 'Đã giải tán nhóm thành công!');
   }
 };
@@ -690,7 +704,7 @@ document.addEventListener('click', (e) => {
     return;
   }
 
-  // --- SỬA SỰ KIỆN RỜI NHÓM & GIẢI TÁN NHÓM VỚI MODAL XÁC NHẬN ĐẸP MẮT & CẬP NHẬT TRỰC TIẾP ---
+  // --- SỬA SỰ KIỆN RỜI NHÓM & GIẢI TÁN NHÓM VỚI MODAL XÁC NHẬN ---
   if (e.target.closest('#btn-leave-group')) {
     showConfirmModal(
       'Xác nhận rời nhóm',
