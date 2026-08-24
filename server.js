@@ -79,6 +79,30 @@ loadDB();
 // ==========================================
 
 // --- API QUẢN TRỊ VIÊN (ADMIN) ---
+app.get('/api/admin/data', (req, res) => {
+  let totalMessages = 0;
+  DB.messages.forEach(msgs => { totalMessages += msgs.length; });
+
+  const accountsList = Array.from(DB.accounts.values()).map(acc => {
+    const userObj = DB.users.get(acc.id);
+    return {
+      id: acc.id,
+      username: acc.username,
+      avatar: acc.avatar,
+      status: userObj ? userObj.status : 'offline'
+    };
+  });
+
+  res.json({
+    stats: {
+      totalUsers: DB.accounts.size,
+      totalGroups: DB.groups.size,
+      totalMessages: totalMessages
+    },
+    accounts: accountsList
+  });
+});
+
 app.get('/api/admin/reports', (req, res) => {
   if (!DB.reports) return res.json([]);
   res.json(Array.from(DB.reports.values()));
@@ -490,7 +514,7 @@ io.on('connection', (socket) => {
   });
 
   // ========================================================
-  // --- XỬ LÝ SỰ KIỆN BÁO CÁO & KHÁNG CÁO (ĐÃ SỬA VỊ TRÍ) ---
+  // --- XỬ LÝ SỰ KIỆN BÁO CÁO & KHÁNG CÁO ---
   // ========================================================
   
   // 1. Nhận báo cáo vi phạm từ user
@@ -570,7 +594,6 @@ io.on('connection', (socket) => {
     });
   });
 
-  // Hỗ trợ alias thêm sự kiện 'appeal:submit' nếu client đang gọi tên này
   socket.on('appeal:submit', (data) => {
     socket.emit('appeal:restriction', data);
   });
