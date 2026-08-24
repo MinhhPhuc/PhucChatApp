@@ -812,9 +812,8 @@ document.addEventListener('click', (e) => {
   const modalNickname = document.getElementById('modal-nickname');
   const modalConfirm = document.getElementById('modal-confirm');
 
-  // 1. XÓA ĐOẠN CHAT
-  const btnDeleteChat = e.target.closest('#delete-chat, #btn-delete-chat, #set-delete-chat') || 
-                        (e.target.innerText && e.target.innerText.includes('Xóa đoạn chat') ? e.target : null);
+  // 1. XÓA ĐOẠN CHAT (Chỉ bắt đúng ID/Class, tuyệt đối không dùng innerText)
+  const btnDeleteChat = e.target.closest('#delete-chat, #btn-delete-chat, #set-delete-chat');
   if (btnDeleteChat) {
     if (modalChatSettings) {
       modalChatSettings.classList.add('hidden');
@@ -831,9 +830,7 @@ document.addEventListener('click', (e) => {
   }
 
   // 2. XÓA KẾT BẠN (HỦY KẾT BẠN)
-  const btnUnfriend = e.target.closest('#set-unfriend, #btn-unfriend') || 
-                      (e.target.innerText && e.target.innerText.includes('Xóa kết bạn') ? e.target : null);
-
+  const btnUnfriend = e.target.closest('#set-unfriend, #btn-unfriend');
   if (btnUnfriend) {
     if (modalChatSettings) {
       modalChatSettings.classList.add('hidden');
