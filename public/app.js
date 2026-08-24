@@ -1162,15 +1162,20 @@ if (btnUnfriend) {
     }).then((result) => {
       if (result.isConfirmed) {
         const { reason, description } = result.value;
+        
+        // Lấy thông tin user hiện tại từ localStorage (hoặc biến toàn cục có sẵn)
+        const currentUsr = JSON.parse(localStorage.getItem('user')) || {};
+
         socket.emit('report:submit', { 
-          targetId: targetUserId, 
-          reason, 
-          description,
-          reporterId: currentUsr?.id,
-          reporterName: currentUsr?.username
+            targetId: targetUserId, 
+            reason, 
+            description,
+            reporterId: currentUsr?.id,
+            reporterName: currentUsr?.username
         });
+        
         showToast('Đã gửi báo cáo tới Admin thành công!');
-      }
+    }
     });
     return;
   }
