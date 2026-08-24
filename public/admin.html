@@ -6,23 +6,49 @@
   <title>Admin Dashboard - Web Chat</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
-    body { font-family: Arial, sans-serif; background: #f4f6f9; margin: 0; padding: 20px; color: #333; }
-    .container { max-width: 1000px; margin: 0 auto; background: white; padding: 24px; border-radius: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); margin-bottom: 20px; }
-    h2 { margin-top: 0; color: #2d3748; display: flex; align-items: center; gap: 10px; }
-    .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 24px; }
-    .stat-card { background: #edf2f7; padding: 16px; border-radius: 8px; text-align: center; }
-    .stat-card h3 { margin: 0 0 8px 0; font-size: 14px; color: #4a5568; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f4f6f9; margin: 0; padding: 20px; color: #333; }
+    .container { max-width: 1000px; margin: 0 auto; background: white; padding: 24px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+    h2 { margin-top: 0; color: #2d3748; display: flex; align-items: center; gap: 10px; font-size: 22px; margin-bottom: 20px; }
+    h3 { margin-top: 0; color: #2d3748; font-size: 18px; margin-bottom: 12px; }
+
+    /* HÀNG 5 Ô THỐNG KÊ */
+    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 24px; }
+    .stat-card { background: #edf2f7; padding: 16px; border-radius: 10px; text-align: center; cursor: pointer; transition: all 0.2s ease; border: 1px solid transparent; }
+    .stat-card:hover { transform: translateY(-2px); box-shadow: 0 4px 10px rgba(0,0,0,0.06); }
+    .stat-card h3 { margin: 0 0 8px 0; font-size: 13px; color: #4a5568; }
     .stat-card p { margin: 0; font-size: 24px; font-weight: bold; color: #2b6cb0; }
+    
+    .stat-card.alert-report { background: #fff5f5; border-color: #feb2b2; }
+    .stat-card.alert-report p { color: #e53e3e; }
+    .stat-card.alert-appeal { background: #f0fff4; border-color: #9ae6b4; }
+    .stat-card.alert-appeal p { color: #38a169; }
+
+    /* THANH NÚT TAB */
+    .admin-tabs { display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; }
+    .tab-btn { padding: 10px 18px; border: 1px solid #cbd5e1; background: #f8fafc; color: #475569; border-radius: 8px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; font-size: 14px; transition: all 0.2s; }
+    .tab-btn:hover { background: #e2e8f0; }
+    .tab-btn.active { background: #2b6cb0; color: #ffffff; border-color: #2b6cb0; }
+
+    .badge-count { background: #e53e3e; color: white; font-size: 11px; padding: 2px 7px; border-radius: 10px; }
+    .tab-btn.active .badge-count { background: #ffffff; color: #e53e3e; }
+
+    /* ẨN / HIỆN NỘI DUNG TAB */
+    .admin-tab-content { display: none !important; }
+    .admin-tab-content.active { display: block !important; }
+
+    /* BẢNG DỮ LIỆU */
     table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-    th, td { padding: 12px; text-align: left; border-bottom: 1px solid #e2e8f0; }
+    th, td { padding: 12px; text-align: left; border-bottom: 1px solid #e2e8f0; font-size: 14px; }
     th { background: #f7fafc; font-weight: bold; color: #4a5568; }
-    .user-row img { width: 36px; height: 36px; border-radius: 50%; vertical-align: middle; margin-right: 10px; }
-    .btn { padding: 6px 12px; border-radius: 4px; cursor: pointer; font-weight: bold; border: none; color: white; }
+    .user-row img { width: 36px; height: 36px; border-radius: 50%; vertical-align: middle; margin-right: 10px; object-fit: cover; }
+    
+    .btn { padding: 6px 12px; border-radius: 6px; cursor: pointer; font-weight: bold; border: none; color: white; font-size: 13px; transition: opacity 0.2s; }
+    .btn:hover { opacity: 0.85; }
     .btn-delete { background: #e53e3e; }
-    .btn-delete:hover { background: #c53030; }
     .btn-warning { background: #d69e2e; }
     .btn-success { background: #38a169; }
     .btn-secondary { background: #718096; }
+    
     .badge { padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; }
     .badge.online { background: #c6f6d5; color: #22543d; }
     .badge.offline { background: #edf2f7; color: #718096; }
@@ -33,8 +59,9 @@
   <div class="container">
     <h2><i class="fa-solid fa-gauge-high"></i> Trang Quản Trị Hệ Thống (Admin)</h2>
     
+    <!-- 5 Ô THỐNG KÊ HÀNG NGANG -->
     <div class="stats-grid">
-      <div class="stat-card">
+      <div class="stat-card" onclick="switchAdminTab('users')">
         <h3>Tổng số tài khoản</h3>
         <p id="stat-users">0</p>
       </div>
@@ -46,136 +73,86 @@
         <h3>Tổng số tin nhắn</h3>
         <p id="stat-msgs">0</p>
       </div>
+      <div class="stat-card alert-report" onclick="switchAdminTab('reports')">
+        <h3>🚨 Báo cáo vi phạm</h3>
+        <p id="stat-reports">0</p>
+      </div>
+      <div class="stat-card alert-appeal" onclick="switchAdminTab('appeals')">
+        <h3>📩 Yêu cầu kháng cáo</h3>
+        <p id="stat-appeals">0</p>
+      </div>
     </div>
 
-    <h3>Danh Sách Người Dùng</h3>
-    <table>
-      <thead>
-        <tr>
-          <th>ID & Tên Tài Khoản</th>
-          <th>Trạng Thái</th>
-          <th>Thao Tác</th>
-        </tr>
-      </thead>
-      <tbody id="admin-user-list">
-        <tr><td colspan="3" style="text-align:center;">Đang tải...</td></tr>
-      </tbody>
-    </table>
-  </div>
+    <!-- THANH CHUYỂN TAB -->
+    <div class="admin-tabs">
+      <button class="tab-btn active" onclick="switchAdminTab('users')">
+        <i class="fa-solid fa-users"></i> Người Dùng
+      </button>
+      <button class="tab-btn" onclick="switchAdminTab('reports')">
+        <i class="fa-solid fa-triangle-exclamation"></i> Báo Cáo Vi Phạm 
+        <span id="badge-reports" class="badge-count">0</span>
+      </button>
+      <button class="tab-btn" onclick="switchAdminTab('appeals')">
+        <i class="fa-solid fa-headset"></i> Yêu Cầu Kháng Cáo 
+        <span id="badge-appeals" class="badge-count">0</span>
+      </button>
+    </div>
 
-  <!-- PHẦN QUẢN LÝ BÁO CÁO VI PHẠM -->
-  <div class="container">
-    <h3 style="color: #c53030;"><i class="fa-solid fa-triangle-exclamation"></i> Danh sách Báo cáo Vi phạm</h3>
-    <table id="reports-table">
-      <thead>
-        <tr>
-          <th>Người báo cáo</th>
-          <th>Người bị cáo buộc</th>
-          <th>Lý do</th>
-          <th>Mô tả chi tiết</th>
-          <th>Thao tác</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr><td colspan="5" style="text-align:center; color:#718096;">Không có báo cáo vi phạm nào.</td></tr>
-      </tbody>
-    </table>
-  </div>
+    <!-- TAB 1: DANH SÁCH NGƯỜI DÙNG -->
+    <div id="tab-users" class="admin-tab-content active">
+      <h3>Danh Sách Người Dùng</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>ID & Tên Tài Khoản</th>
+            <th>Trạng Thái</th>
+            <th>Thao Tác</th>
+          </tr>
+        </thead>
+        <tbody id="admin-user-list">
+          <tr><td colspan="3" style="text-align:center;">Đang tải...</td></tr>
+        </tbody>
+      </table>
+    </div>
 
-  <!-- PHẦN QUẢN LÝ YÊU CẦU HỖ TRỢ / KHÁNG CÁO -->
-  <div class="container">
-    <h3 style="color: #2b6cb0;"><i class="fa-solid fa-headset"></i> Yêu cầu Hỗ trợ / Kháng cáo mở khóa</h3>
-    <table id="appeals-table">
-      <thead>
-        <tr>
-          <th>Tài khoản gửi</th>
-          <th>Nội dung / Lý do kháng cáo</th>
-          <th>Thời gian</th>
-          <th>Thao tác</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr><td colspan="4" style="text-align:center; color:#718096;">Chưa có yêu cầu hỗ trợ nào.</td></tr>
-      </tbody>
-    </table>
-  </div>
+    <!-- TAB 2: BÁO CÁO VI PHẠM -->
+    <div id="tab-reports" class="admin-tab-content">
+      <h3 style="color: #c53030;">Danh Sách Báo Cáo Vi Phạm</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Người báo cáo</th>
+            <th>Người bị cáo buộc</th>
+            <th>Lý do</th>
+            <th>Mô tả chi tiết</th>
+            <th>Thao tác</th>
+          </tr>
+        </thead>
+        <tbody id="reports-list-tbody">
+          <tr><td colspan="5" style="text-align:center; color:#718096;">Không có báo cáo vi phạm nào.</td></tr>
+        </tbody>
+      </table>
+    </div>
 
-    <!-- HÀNG THỐNG KÊ (5 Ô HÀNG NGANG) -->
-  <div class="stats-grid">
-    <div class="stat-card">
-      <h3>Tổng số tài khoản</h3>
-      <p id="stat-users">8</p>
-    </div>
-    <div class="stat-card">
-      <h3>Tổng số nhóm chat</h3>
-      <p id="stat-groups">2</p>
-    </div>
-    <div class="stat-card">
-      <h3>Tổng số tin nhắn</h3>
-      <p id="stat-messages">8</p>
-    </div>
-    <div class="stat-card alert-report" onclick="switchAdminTab('reports')">
-      <h3>🚨 Báo cáo vi phạm</h3>
-      <p id="stat-reports">0</p>
-    </div>
-    <div class="stat-card alert-appeal" onclick="switchAdminTab('appeals')">
-      <h3>📩 Yêu cầu kháng cáo</h3>
-      <p id="stat-appeals">0</p>
+    <!-- TAB 3: KHÁNG CÁO -->
+    <div id="tab-appeals" class="admin-tab-content">
+      <h3 style="color: #2b6cb0;">Yêu Cầu Hỗ Trợ / Kháng Cáo Mở Khóa</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Tài khoản gửi</th>
+            <th>Nội dung / Lý do kháng cáo</th>
+            <th>Thời gian</th>
+            <th>Thao tác</th>
+          </tr>
+        </thead>
+        <tbody id="appeals-list-tbody">
+          <tr><td colspan="4" style="text-align:center; color:#718096;">Chưa có yêu cầu hỗ trợ nào.</td></tr>
+        </tbody>
+      </table>
     </div>
   </div>
 
-  <!-- THANH NÚT CHUYỂN TAB ĐỂ KHÔNG PHẢI CUỘN TRANG -->
-  <div class="admin-tabs">
-    <button class="tab-btn active" onclick="switchAdminTab('users')">👥 Người Dùng</button>
-    <button class="tab-btn" onclick="switchAdminTab('reports')">
-      🚨 Báo Cáo Vi Phạm <span id="badge-reports" class="badge">0</span>
-    </button>
-    <button class="tab-btn" onclick="switchAdminTab('appeals')">
-      ⚖️ Yêu Cầu Kháng Cáo <span id="badge-appeals" class="badge">0</span>
-    </button>
-  </div>
-
-  <!-- TẬP HỢP NỘI DUNG DẠNG TAB -->
-  <div id="tab-users" class="admin-tab-content active">
-    <h2>Danh Sách Người Dùng</h2>
-    <!-- Chèn bảng Danh sách người dùng hiện tại của bạn vào đây -->
-  </div>
-
-  <div id="tab-reports" class="admin-tab-content">
-    <h2>Danh Sách Báo Cáo Vi Phạm</h2>
-    <table class="admin-table">
-      <thead>
-        <tr>
-          <th>Người Báo Cáo</th>
-          <th>Đối Tượng</th>
-          <th>Lý Do</th>
-          <th>Mô Tả</th>
-          <th>Thao Tác</th>
-        </tr>
-      </thead>
-      <tbody id="reports-list-tbody">
-        <!-- Dữ liệu JS tự động điền -->
-      </tbody>
-    </table>
-  </div>
-
-  <div id="tab-appeals" class="admin-tab-content">
-    <h2>Danh Sách Yêu Cầu Kháng Cáo</h2>
-    <table class="admin-table">
-      <thead>
-        <tr>
-          <th>Tài Khoản</th>
-          <th>Nội Dung Kháng Cáo</th>
-          <th>Thời Gian</th>
-          <th>Thao Tác</th>
-        </tr>
-      </thead>
-      <tbody id="appeals-list-tbody">
-        <!-- Dữ liệu JS tự động điền -->
-      </tbody>
-    </table>
-  </div>
-  
   <script src="/socket.io/socket.io.js"></script>
   <script>
     const socket = io();
@@ -185,20 +162,34 @@
         socket.emit('join_admin_room', { isAdmin: true });
     });
 
+    // Chuyển đổi Tab
+    function switchAdminTab(tabName) {
+      document.querySelectorAll('.admin-tab-content').forEach(el => el.classList.remove('active'));
+      document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+
+      const targetTab = document.getElementById(`tab-${tabName}`);
+      if (targetTab) targetTab.classList.add('active');
+
+      const activeBtn = Array.from(document.querySelectorAll('.tab-btn')).find(btn => 
+        btn.getAttribute('onclick')?.includes(tabName)
+      );
+      if (activeBtn) activeBtn.classList.add('active');
+    }
+
     // 1. Tải dữ liệu tổng quan và danh sách user
     async function loadAdminData() {
       try {
         const res = await fetch('/api/admin/data');
         const data = await res.json();
 
-        document.getElementById('stat-users').innerText = data.stats.totalUsers;
-        document.getElementById('stat-groups').innerText = data.stats.totalGroups;
-        document.getElementById('stat-msgs').innerText = data.stats.totalMessages;
+        document.getElementById('stat-users').innerText = data.stats.totalUsers || 0;
+        document.getElementById('stat-groups').innerText = data.stats.totalGroups || 0;
+        document.getElementById('stat-msgs').innerText = data.stats.totalMessages || 0;
 
         const tbody = document.getElementById('admin-user-list');
         tbody.innerHTML = '';
 
-        if (data.accounts.length === 0) {
+        if (!data.accounts || data.accounts.length === 0) {
           tbody.innerHTML = `<tr><td colspan="3" style="text-align:center; color:#718096;">Chưa có tài khoản nào trong hệ thống</td></tr>`;
           return;
         }
@@ -238,10 +229,14 @@
       try {
         const res = await fetch('/api/admin/reports');
         const reports = await res.json();
-        const tbody = document.querySelector('#reports-table tbody');
+        const tbody = document.getElementById('reports-list-tbody');
+        
+        document.getElementById('stat-reports').innerText = reports.length || 0;
+        document.getElementById('badge-reports').innerText = reports.length || 0;
+
         tbody.innerHTML = '';
 
-        if (reports.length === 0) {
+        if (!reports || reports.length === 0) {
           tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:#718096;">Không có báo cáo vi phạm nào.</td></tr>`;
           return;
         }
@@ -283,10 +278,14 @@
       try {
         const res = await fetch('/api/admin/appeals');
         const appeals = await res.json();
-        const tbody = document.querySelector('#appeals-table tbody');
+        const tbody = document.getElementById('appeals-list-tbody');
+
+        document.getElementById('stat-appeals').innerText = appeals.length || 0;
+        document.getElementById('badge-appeals').innerText = appeals.length || 0;
+
         tbody.innerHTML = '';
 
-        if (appeals.length === 0) {
+        if (!appeals || appeals.length === 0) {
           tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:#718096;">Chưa có yêu cầu hỗ trợ nào.</td></tr>`;
           return;
         }
@@ -337,24 +336,6 @@
       loadReports();
       loadAppeals();
     });
-
-  function switchAdminTab(tabName) {
-    // Ẩn tất cả nội dung tab
-    document.querySelectorAll('.admin-tab-content').forEach(el => el.classList.remove('active'));
-    // Bỏ active nút cũ
-    document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
-
-    // Hiển thị tab được bấm
-    const targetTab = document.getElementById(`tab-${tabName}`);
-    if (targetTab) targetTab.classList.add('active');
-
-    // Đánh dấu active nút tương ứng
-    const activeBtn = Array.from(document.querySelectorAll('.tab-btn')).find(btn => 
-      btn.getAttribute('onclick')?.includes(tabName)
-    );
-    if (activeBtn) activeBtn.classList.add('active');
-  }
-
   </script>
 </body>
 </html>
