@@ -267,7 +267,6 @@
         const res = await fetch(`/api/admin/user/${userId}/restrict`, { method: 'POST' });
         const data = await res.json();
 
-        // Xóa ngay báo cáo đã xử lý khỏi cơ sở dữ liệu
         if (reportId) {
           await fetch(`/api/admin/report/${reportId}`, { method: 'DELETE' });
         }
@@ -326,7 +325,6 @@
         const res = await fetch(`/api/admin/user/${userId}/lift-restriction`, { method: 'POST' });
         const data = await res.json();
 
-        // Xóa ngay kháng cáo đã xử lý khỏi cơ sở dữ liệu
         if (appealId) {
           await fetch(`/api/admin/appeal/${appealId}`, { method: 'DELETE' });
         }
@@ -336,62 +334,6 @@
       } catch (err) {
         console.error('Lỗi gỡ hạn chế:', err);
       }
-    }
-
-    async function restrictUser(userId) {
-      if (!confirm('Bạn có chắc chắn muốn hạn chế nhắn tin tài khoản này trong 24 giờ?')) return;
-      const res = await fetch(`/api/admin/user/${userId}/restrict`, { method: 'POST' });
-      const data = await res.json();
-      alert(data.message);
-      loadReports();
-    }
-
-    async function deleteReport(reportId) {
-      await fetch(`/api/admin/report/${reportId}`, { method: 'DELETE' });
-      loadReports();
-    }
-
-    // 3. Tải danh sách yêu cầu hỗ trợ / kháng cáo
-    async function loadAppeals() {
-      try {
-        const res = await fetch('/api/admin/appeals');
-        const appeals = await res.json();
-        const tbody = document.getElementById('appeals-list-tbody');
-
-        document.getElementById('stat-appeals').innerText = appeals.length || 0;
-        document.getElementById('badge-appeals').innerText = appeals.length || 0;
-
-        tbody.innerHTML = '';
-
-        if (!appeals || appeals.length === 0) {
-          tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:#718096;">Chưa có yêu cầu hỗ trợ nào.</td></tr>`;
-          return;
-        }
-
-        appeals.forEach(apl => {
-          const dateStr = new Date(apl.timestamp).toLocaleString('vi-VN');
-          tbody.innerHTML += `
-            <tr>
-              <td><b>${apl.username}</b> <span style="color:#a0aec0; font-size:12px;">(${apl.userId})</span></td>
-              <td>${apl.reason}</td>
-              <td>${dateStr}</td>
-              <td>
-                <button class="btn btn-success" onclick="liftRestriction('${apl.userId}')">Gỡ hạn chế</button>
-              </td>
-            </tr>
-          `;
-        });
-      } catch (err) {
-        console.error('Lỗi tải kháng cáo:', err);
-      }
-    }
-
-    async function liftRestriction(userId) {
-      if (!confirm('Bạn có chắc chắn muốn gỡ toàn bộ lệnh hạn chế cho tài khoản này?')) return;
-      const res = await fetch(`/api/admin/user/${userId}/lift-restriction`, { method: 'POST' });
-      const data = await res.json();
-      alert(data.message);
-      loadAppeals();
     }
 
     // Khởi chạy ban đầu
