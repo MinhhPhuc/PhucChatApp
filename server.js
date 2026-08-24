@@ -75,11 +75,23 @@ function saveDB() {
 loadDB();
 // ==========================================
 
-// Lấy danh sách báo cáo cho Admin
-app.get('/api/admin/reports', (req, res) => {
-  const reportsList = Array.from(DB.reports.values());
-  res.json(reportsList);
-});
+// Lấy danh sách báo cáo vi phạm
+  app.get('/api/admin/reports', (req, res) => {
+    // Nếu chưa có DB.reports (chưa có ai báo cáo), trả về mảng rỗng để tránh lỗi
+    if (!DB.reports) {
+      return res.json([]);
+    }
+    res.json(Array.from(DB.reports.values()));
+  });
+
+  // Lấy danh sách yêu cầu hỗ trợ / kháng cáo
+  app.get('/api/admin/appeals', (req, res) => {
+    // Nếu chưa có DB.appeals, trả về mảng rỗng
+    if (!DB.appeals) {
+      return res.json([]);
+    }
+    res.json(Array.from(DB.appeals.values()));
+  });
 
 // Hạn chế người dùng 24h
 app.post('/api/admin/user/:id/restrict', (req, res) => {
