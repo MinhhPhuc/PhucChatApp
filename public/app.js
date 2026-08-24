@@ -1023,32 +1023,38 @@ document.addEventListener('click', (e) => {
 });
 
 // ==========================================
-  // XỬ LÝ XÓA TOÀN BỘ LỊCH SỬ CHAT (ĐÃ FIX)
-  // ==========================================
-  // Bắt theo ID hoặc text hiển thị "Xóa đoạn chat" để tránh lệch ID
+// XỬ LÝ XÓA TOÀN BỘ LỊCH SỬ CHAT (ĐÃ BỌC AN TOÀN)
+// ==========================================
+document.addEventListener('click', (e) => {
+  // 1. Bắt theo ID hoặc text hiển thị "Xóa đoạn chat"
   const btnDeleteChat = e.target.closest('#delete-chat, #btn-delete-chat, #set-delete-chat') || 
                         (e.target.innerText && e.target.innerText.includes('Xóa đoạn chat') ? e.target : null);
 
-  if (btnDeleteChat) {
-    // Đóng modal Cài đặt
-    if (modalChatSettings) {
-      modalChatSettings.classList.add('hidden');
-      modalChatSettings.style.display = 'none';
-    }
+  if (!btnDeleteChat) return;
 
-    if (state.activeRoomId) {
-      // Dùng confirm mặc định của trình duyệt để đảm bảo luôn chạy được
-      if (confirm('Bạn có chắc chắn muốn xóa toàn bộ lịch sử đoạn chat này không?')) {
-        // 1. Gửi lệnh xóa lên Server
-        socket.emit('messages:clear', { roomId: state.activeRoomId });
+  // 2. Tự động tìm và đóng modal Cài đặt
+  const modalChatSettings = document.getElementById('modal-chat-settings');
+  if (modalChatSettings) {
+    modalChatSettings.classList.add('hidden');
+    modalChatSettings.style.display = 'none';
+  }
 
-        // 2. Xóa giao diện ngay lập tức
-        const viewport = document.getElementById('messages-viewport');
-        if (viewport) viewport.innerHTML = '';
+  // 3. Xử lý xóa lịch sử tin nhắn
+  if (state && state.activeRoomId) {
+    if (confirm('Bạn có chắc chắn muốn xóa toàn bộ lịch sử đoạn chat này không?')) {
+      // Gửi lệnh xóa lên Server
+      socket.emit('messages:clear', { roomId: state.activeRoomId });
 
+      // Xóa giao diện ngay lập tức
+      const viewport = document.getElementById('messages-viewport');
+      if (viewport) viewport.innerHTML = '';
+
+      if (state.lastMessages && state.lastMessages.delete) {
         state.lastMessages.delete(state.activeRoomId);
-        renderChatList();
-        showToast('Đã xóa toàn bộ lịch sử đoạn chat!');
       }
+
+      if (typeof renderChatList === 'function') renderChatList();
+      if (typeof showToast === 'function') showToast('Đã xóa toàn bộ lịch sử đoạn chat!');
     }
   }
+});
