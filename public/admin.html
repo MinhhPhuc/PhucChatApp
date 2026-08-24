@@ -194,6 +194,21 @@
     });
   }
   
+  // Lắng nghe yêu cầu hỗ trợ / kháng cáo mới từ người dùng đẩy về real-time
+  if (typeof socket !== 'undefined') {
+    socket.on('admin:new-appeal', (appealsList) => {
+      console.log("Đã nhận được yêu cầu hỗ trợ mới:", appealsList);
+      
+      // Nếu trang Admin của bạn có hàm tải lại dữ liệu, hãy gọi nó ở đây:
+      if (typeof fetchAdminData === 'function') {
+        fetchAdminData(); 
+      } else {
+        // Hoặc tự động tải lại trang để hiển thị ngay yêu cầu mới mà không cần F5 thủ công
+        location.reload(); 
+      }
+    });
+  }
+
   </script>
 </body>
 </html>
