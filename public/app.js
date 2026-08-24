@@ -578,6 +578,9 @@ function renderChatList() {
 
   // 4. Người dùng khác (khi tìm kiếm)
   if (query && state.currentUser) {
+    // Khởi tạo mảng lưu trữ ID những người đã gửi lời mời (nếu chưa có)
+    if (!state.sentRequests) state.sentRequests = new Set();
+
     const friendIds = new Set((state.friends || []).map(f => f.id));
     const strangers = (state.allUsers || []).filter(u => 
       u.id !== state.currentUser.id && 
@@ -587,24 +590,57 @@ function renderChatList() {
 
     if (strangers.length > 0) {
       strangers.forEach(u => {
+        // Kiểm tra xem đã gửi lời mời cho người này chưa
+        const isSent = state.sentRequests.has(u.id);
+
+        // Đổi giao diện nút tùy thuộc vào trạng thái
+        let actionButton = '';
+        if (isSent) {
+          actionButton = `<button class="btn-action gray" onclick="cancelFriendRequest('${u.id}')" style="background:#e4e6eb; color:#050505; border:none; padding:6px 12px; border-radius:16px; font-weight:600; cursor:pointer;">Hủy kết bạn</button>`;
+        } else {
+          actionButton = `<button class="btn-action blue" onclick="sendFriendRequest('${u.id}')" style="background:#0084ff; color:#fff; border:none; padding:6px 12px; border-radius:16px; font-weight:600; cursor:pointer;">Kết Bạn</button>`;
+        }
+
         list.innerHTML += `
           <div class="chat-item" style="padding: 10px 14px;">
             <img class="avatar" src="${u.avatar}">
             <div style="flex:1; padding-left: 8px;">
               <h4 style="margin:0; font-size: 14px;">${u.username}</h4>
-              <span style="font-size:12px; color:var(--text-sub);">Chưa kết bạn</span>
+              <span style="font-size:12px; color:var(--text-sub);">${isSent ? 'Đã gửi lời mời' : 'Chưa kết bạn'}</span>
             </div>
-            <button class="btn-action blue" onclick="sendFriendRequest('${u.id}')" style="background:#0084ff; color:#fff; border:none; padding:6px 12px; border-radius:16px; font-weight:600; cursor:pointer;">Kết Bạn</button>
+            ${actionButton}
           </div>
         `;
       });
     }
   }
+} // <--- Đừng quên dấu ngoặc đóng của hàm renderChatList
+
+
+function sendFriendRequest(userId) {
+  // ... (Giữ nguyên đoạn code gửi Socket/API lên server cũ của bạn ở đây) ...
+  // Ví dụ: socket.emit('send_friend_request', userId);
+
+  // Thêm userId vào trạng thái đã gửi
+  if (!state.sentRequests) state.sentRequests = new Set();
+  state.sentRequests.add(userId);
+
+  // Gọi lại hàm render để giao diện tự cập nhật sang nút "Hủy kết bạn"
+  renderChatList();
 }
 
-function sendFriendRequest(targetUserId) {
-  socket.emit('friend:request', { targetUserId });
-  showToast('Đã gửi lời mời kết bạn!');
+// Thêm hàm xử lý khi nhấn Hủy kết bạn
+function cancelFriendRequest(userId) {
+  // ... (Nếu server có chức năng hủy lời mời, bạn gửi Socket/API ở đây) ...
+  // Ví dụ: socket.emit('cancel_friend_request', userId);
+
+  // Xóa userId khỏi danh sách đã gửi
+  if (state.sentRequests) {
+    state.sentRequests.delete(userId);
+  }
+
+  // Gọi lại hàm render để giao diện tự cập nhật lại thành nút "Kết Bạn"
+  renderChatList();
 }
 
 function acceptFriend(reqId) { 
