@@ -12,7 +12,7 @@ let state = {
   unreadCounts: new Map(),
   searchQuery: '',
   activeFilter: 'all',
-  nicknames: new Map(),
+  nicknames: new Map(JSON.parse(localStorage.getItem('chat_nicknames') || '[[nis, val]]').filter(([k]) => k !== 'nis')),
   selectedRegAvatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=default',
   selectedGroupAvatar: 'https://api.dicebear.com/7.x/identicon/svg?seed=group'
 };
@@ -908,4 +908,39 @@ document.addEventListener('click', (e) => {
   // --- 5. BẤM RA NGOÀI ĐỂ ĐÓNG BẢNG ---
   if (modalChatSettings && e.target === modalChatSettings) modalChatSettings.classList.add('hidden');
   if (modalReport && e.target === modalReport) modalReport.classList.add('hidden');
+
+  // Lưu biệt danh mới
+  if (e.target.closest('#btn-save-nickname')) {
+    const inputNick = document.getElementById('nickname-input');
+    const newNickname = inputNick ? inputNick.value.trim() : '';
+
+    if (state.activeRoomId && state.activeRoomId.includes('_DM_')) {
+      if (newNickname) {
+        state.nicknames.set(state.activeRoomId, newNickname);
+      } else {
+        state.nicknames.delete(state.activeRoomId);
+      }
+
+      // === LƯU VÀO LOCALSTORAGE ĐỂ KHÔNG BỊ MẤT KHI F5 ===
+      localStorage.setItem('chat_nicknames', JSON.stringify(Array.from(state.nicknames.entries())));
+
+      const parts = state.activeRoomId.split('_DM_');
+      const targetFriendId = parts.find(id => id !== state.currentUser.id);
+      const friend = state.friends.find(f => f.id === targetFriendId);
+      
+      const displayName = newNickname || (friend ? friend.username : 'Cuộc trò chuyện');
+      const headerNameEl = document.getElementById('active-chat-name');
+      if (headerNameEl) headerNameEl.innerText = displayName;
+
+      showToast('Đã cập nhật biệt danh thành công!');
+    }
+
+    if (modalNickname) {
+      modalNickname.style.display = 'none';
+      modalNickname.classList.add('hidden');
+    }
+    renderChatList();
+    return;
+  }
+
 });
