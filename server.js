@@ -451,6 +451,15 @@ io.on('connection', (socket) => {
       io.emit('users:sync', Array.from(DB.users.values()));
     }
   });
+
+  socket.on('friend:unfriend', async ({ friendId }) => {
+    // Xử lý xóa quan hệ bạn bè trong CSDL của bạn tại đây...
+    
+    // Gửi sự kiện cập nhật lại dữ liệu cho cả 2 người dùng
+    io.to(userId).emit('friend:updated');
+    io.to(friendId).emit('friend:updated');
+  });
+
 });
 
 function syncUserData(socket, userId) {
