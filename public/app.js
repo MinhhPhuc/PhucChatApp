@@ -202,15 +202,51 @@ socket.on('auth:restricted', (message) => {
   });
 });
 
-// Lắng nghe thông báo lỗi khi gửi tin nhắn (bao gồm cả thông báo tài khoản bị hạn chế)
+// Lắng nghe thông báo lỗi/hạn chế tin nhắn
 socket.on('message:error', (errorMsg) => {
-  Swal.fire({
-    icon: 'warning',
-    title: 'Thông báo',
-    text: errorMsg,
-    confirmButtonColor: '#d33',
-    confirmButtonText: 'Đã hiểu'
-  });
+  // Kiểm tra xem có phải lỗi hạn chế không để hiện nút hỗ trợ
+  if (errorMsg.includes('hạn chế')) {
+    Swal.fire({
+      icon: 'warning',
+      title: 'Tài khoản bị hạn chế',
+      text: errorMsg,
+      showCancelButton: true,
+      confirmButtonText: 'Đã hiểu',
+      cancelButtonText: '🛠️ Yêu cầu hỗ trợ gỡ hạn chế',
+      confirmButtonColor: '#d33',
+      cancelButtonColor: '#3182ce',
+      reverseButtons: true
+    }).then((result) => {
+      // Nếu người dùng bấm nút "Yêu cầu hỗ trợ gỡ hạn chế" (nút cancel trong swal)
+      if (result.dismiss === Swal.DismissReason.cancel) {
+        Swal.fire({
+          title: 'Gửi yêu cầu hỗ trợ',
+          input: 'textarea',
+          inputPlaceholder: 'Nhập lý do hoặc lời nhắn tới Admin để xin giảm/gỡ án phạt...',
+          showCancelButton: true,
+          confirmButtonText: 'Gửi yêu cầu',
+          cancelButtonText: 'Hủy',
+          confirmButtonColor: '#3182ce',
+          cancelButtonColor: '#cbd5e0'
+        }).then((appealResult) => {
+          if (appealResult.isConfirmed) {
+            const reason = appealResult.value || 'Xin hỗ trợ gỡ hạn chế tài khoản';
+            socket.emit('appeal:restriction', { reason });
+            showToast('Đã gửi yêu cầu hỗ trợ tới Admin thành công!');
+          }
+        });
+      }
+    });
+  } else {
+    // Các lỗi thông thường khác
+    Swal.fire({
+      icon: 'warning',
+      title: 'Thông báo',
+      text: errorMsg,
+      confirmButtonColor: '#d33',
+      confirmButtonText: 'Đã hiểu'
+    });
+  }
 });
 
 const savedToken = localStorage.getItem('chat_session_token');

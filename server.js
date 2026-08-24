@@ -462,6 +462,29 @@ io.on('connection', (socket) => {
         io.to(parts[0]).to(parts[1]).emit('message:received', msg);
       }
     }
+  
+    // --- XỬ LÝ YÊU CẦU HỖ TRỢ / KHÁNG CÁO HẠN CHẾ ---
+    socket.on('appeal:restriction', ({ reason }) => {
+      if (!currentUser) return;
+
+      const appealId = `apl_${Math.random().toString(36).substr(2, 9)}`;
+      const appealObj = {
+        id: appealId,
+        userId: currentUser.id,
+        username: currentUser.username,
+        reason: reason || 'Xin gỡ hạn chế',
+        timestamp: Date.now(),
+        status: 'pending'
+      };
+
+      if (!DB.appeals) DB.appeals = new Map();
+      DB.appeals.set(appealId, appealObj);
+      saveDB();
+
+      // Bắn thông báo cập nhật về cho trang Admin nếu đang mở
+      io.emit('admin:new-appeal', Array.from(DB.appeals.values()));
+    });
+  
   });
 
   socket.on('disconnect', () => {
