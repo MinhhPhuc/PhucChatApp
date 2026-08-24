@@ -131,6 +131,19 @@ app.use(express.static(path.join(__dirname, 'public')));
 io.on('connection', (socket) => {
   let currentUser = null;
 
+// Thao tác xóa lịch sử nhắn tin của một phòng
+  socket.on('messages:clear', ({ roomId }) => {
+    // 1. Xóa trong CSDL hoặc mảng lưu trữ tin nhắn tạm thời của bạn
+    // Ví dụ nếu dùng mảng tạm: messages = messages.filter(m => m.roomId !== roomId);
+    if (global.messagesStore && global.messagesStore[roomId]) {
+      global.messagesStore[roomId] = [];
+    }
+
+    // 2. Phát sự kiện phản hồi lại cho Client
+    io.to(roomId).emit('messages:cleared', { roomId });
+    socket.emit('messages:cleared', { roomId });
+  });
+
   // --- CÁC THAO TÁC QUẢN LÝ NHÓM ---
   socket.on('group:action', ({ action, groupId, targetId }) => {
     if (!currentUser) return;

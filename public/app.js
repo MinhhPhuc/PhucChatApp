@@ -547,6 +547,16 @@ socket.on('message:received', (msg) => {
   renderChatList();
 });
 
+// Lắng nghe khi lịch sử chat của phòng được xóa thành công
+socket.on('messages:cleared', ({ roomId }) => {
+  if (state.activeRoomId === roomId) {
+    const viewport = document.getElementById('messages-viewport');
+    if (viewport) viewport.innerHTML = '';
+  }
+  state.lastMessages.delete(roomId);
+  renderChatList();
+});
+
 function sendMessage() {
   if (!msgInput) return;
   const content = msgInput.value.trim();
@@ -692,6 +702,32 @@ document.addEventListener('click', (e) => {
   const modalReport = document.getElementById('modal-report');
   const modalGroupSettings = document.getElementById('modal-group-settings');
   const modalTheme = document.getElementById('modal-theme');
+// ==========================================
+  // XỬ LÝ XÓA TOÀN BỘ LỊCH SỬ CHAT
+  // ==========================================
+  const btnDeleteChat = e.target.closest('#delete-chat') || e.target.closest('#btn-delete-chat') || e.target.closest('#set-delete-chat');
+  if (btnDeleteChat) {
+    if (modalChatSettings) {
+      modalChatSettings.classList.add('hidden');
+      modalChatSettings.style.display = 'none';
+    }
+
+    if (state.activeRoomId) {
+      showConfirmModal('Xóa đoạn chat', 'Bạn có chắc chắn muốn xóa toàn bộ lịch sử trò chuyện này không? Thao tác này không thể hoàn tác.', () => {
+        // Gửi yêu cầu xóa lên Server
+        socket.emit('messages:clear', { roomId: state.activeRoomId });
+
+        // Cập nhật giao diện lập tức tại Client
+        const viewport = document.getElementById('messages-viewport');
+        if (viewport) viewport.innerHTML = '';
+
+        state.lastMessages.delete(state.activeRoomId);
+        renderChatList();
+        showToast('Đã xóa toàn bộ lịch sử đoạn chat!');
+      });
+    }
+    return;
+  }
 
   // 1. Lọc tab danh sách chat
   const tabBtn = e.target.closest('.filter-tab-btn');
