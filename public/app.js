@@ -8,6 +8,7 @@ let state = {
   roomReactions: new Map(JSON.parse(localStorage.getItem('chat_room_reactions') || '[]')),
   friends: [],
   requests: [],
+  sentRequests: new Set(),
   allUsers: [],
   groups: [],
   lastMessages: new Map(),
@@ -295,22 +296,13 @@ if (btnLogout) {
   };
 }
 
-// Tìm sự kiện socket nhận danh sách hoặc số lượng lời mời
+// Sự kiện socket nhận danh sách lời mời kết bạn từ server
 socket.on('receive_friend_requests', (requests) => {
-    // requests ở đây là mảng dữ liệu thật từ server gửi về
-    const count = requests.length; 
-    const badge = document.getElementById('request-count-badge');
-    
-    if (badge) {
-        if (count > 0) {
-            badge.innerText = count;
-            badge.style.display = 'inline-block'; // Hiện màu đỏ khi có người mời
-        } else {
-            badge.style.display = 'none'; // Ẩn đi khi số lượng = 0
-        }
-    }
-    
-    // ... code render danh sách lời mời ra màn hình của bạn
+  if (Array.isArray(requests)) {
+    state.requests = requests; // Cập nhật dữ liệu vào state
+    updateRequestBadge(state.requests); // Cập nhật badge hiển thị
+    renderChatList(); // Render lại danh sách ra màn hình
+  }
 });
 
 // Xử lý click ra ngoài modal cài đặt chat để đóng an toàn
@@ -383,9 +375,9 @@ if (imageUploadInput) {
 
 // --- SYNC DỮ LIỆU TỪ SERVER ---
 socket.on('data:sync', (data) => {
-  state.friends = data.friends;
-  state.requests = data.requests;
-  state.allUsers = data.allUsers;
+  state.friends = data.friends || [];
+  state.requests = data.requests || [];
+  state.allUsers = data.allUsers || [];
   state.groups = data.groups || [];
 
   if (state.activeRoomId && state.activeRoomId.startsWith('grp_')) {
@@ -414,7 +406,10 @@ socket.on('data:sync', (data) => {
   }
 });
 
-socket.on('friend:incoming', () => { if(state.currentUser) socket.emit('auth:session', { userId: state.currentUser.id }); });
+socket.on('friend:incoming', () => { 
+  showToast('Bạn có lời mời kết bạn mới!');
+  if(state.currentUser) socket.emit('auth:session', { userId: state.currentUser.id }); 
+});
 socket.on('friend:updated', () => { if(state.currentUser) socket.emit('auth:session', { userId: state.currentUser.id }); });
 socket.on('group:updated', () => { if(state.currentUser) socket.emit('auth:session', { userId: state.currentUser.id }); });
 socket.on('auth:forced_logout', () => {
@@ -432,16 +427,7 @@ function renderChatList() {
   const filter = state.activeFilter || 'all';
 
   // 0. Tự động cập nhật Badge hiển thị số lời mời kết bạn
-  const badge = document.getElementById('request-count-badge');
-  if (badge) {
-    const reqCount = state.requests ? state.requests.length : 0;
-    if (reqCount >= 1) {
-      badge.innerText = reqCount;
-      badge.style.display = 'inline-block'; // Hiện badge khi có lời mời
-    } else {
-      badge.style.display = 'none'; // Ẩn badge khi không có lời mời
-    }
-  }
+  updateRequestBadge(state.requests);
 
   // 1. Xử lý hiển thị danh sách Lời mời kết bạn (CHỈ khi ở tab 'requests')
   if (filter === 'requests' && !query) {
@@ -501,7 +487,7 @@ function renderChatList() {
 
   combinedChats.sort((a, b) => b.timeVal - a.timeVal);
 
-  if (combinedChats.length === 0) {
+  if (combinedChats.length === 0 && !query) {
     list.innerHTML += `<div class="empty-hint" style="text-align:center; padding:30px; color:var(--text-sub);">Không có cuộc trò chuyện nào</div>`;
   } else {
     combinedChats.forEach(entry => {
@@ -578,7 +564,6 @@ function renderChatList() {
 
   // 4. Người dùng khác (khi tìm kiếm)
   if (query && state.currentUser) {
-    // Khởi tạo mảng lưu trữ ID những người đã gửi lời mời (nếu chưa có)
     if (!state.sentRequests) state.sentRequests = new Set();
 
     const friendIds = new Set((state.friends || []).map(f => f.id));
@@ -590,10 +575,8 @@ function renderChatList() {
 
     if (strangers.length > 0) {
       strangers.forEach(u => {
-        // Kiểm tra xem đã gửi lời mời cho người này chưa
         const isSent = state.sentRequests.has(u.id);
 
-        // Đổi giao diện nút tùy thuộc vào trạng thái
         let actionButton = '';
         if (isSent) {
           actionButton = `<button class="btn-action gray" onclick="cancelFriendRequest('${u.id}')" style="background:#e4e6eb; color:#050505; border:none; padding:6px 12px; border-radius:16px; font-weight:600; cursor:pointer;">Hủy kết bạn</button>`;
@@ -614,14 +597,11 @@ function renderChatList() {
       });
     }
   }
-} // <--- Đừng quên dấu ngoặc đóng của hàm renderChatList
-
+}
 
 function sendFriendRequest(userId) {
-  // 1. Bắt buộc phải phát sự kiện socket gửi lên server
   socket.emit('friend:request', { targetId: userId });
 
-  // 2. Cập nhật trạng thái giao diện local
   if (!state.sentRequests) state.sentRequests = new Set();
   state.sentRequests.add(userId);
 
@@ -630,10 +610,8 @@ function sendFriendRequest(userId) {
 }
 
 function cancelFriendRequest(userId) {
-  // 1. Bắt buộc phải phát sự kiện hủy lời mời lên server
   socket.emit('friend:cancel_request', { targetId: userId });
 
-  // 2. Cập nhật trạng thái giao diện local
   if (state.sentRequests) {
     state.sentRequests.delete(userId);
   }
@@ -897,7 +875,7 @@ document.addEventListener('click', (e) => {
   const modalNickname = document.getElementById('modal-nickname');
   const modalConfirm = document.getElementById('modal-confirm');
 
-  // 1. XÓA ĐOẠN CHAT (Chỉ bắt đúng ID/Class, tuyệt đối không dùng innerText)
+  // 1. XÓA ĐOẠN CHAT
   const btnDeleteChat = e.target.closest('#delete-chat, #btn-delete-chat, #set-delete-chat');
   if (btnDeleteChat) {
     if (modalChatSettings) {

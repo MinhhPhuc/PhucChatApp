@@ -76,7 +76,6 @@ function saveDB() {
 }
 
 loadDB();
-// ==========================================
 
 // --- API QUẢN TRỊ VIÊN (ADMIN) ---
 app.get('/api/admin/data', (req, res) => {
@@ -424,22 +423,48 @@ io.on('connection', (socket) => {
   });
 
   // --- BẠN BÈ ---
-  socket.on('friend:request', ({ targetUserId }) => {
-    if (!currentUser || currentUser.id === targetUserId) return;
-    const reqId = `freq_${currentUser.id}_${targetUserId}`;
+  socket.on('friend:request', ({ targetId, targetUserId }) => {
+    const finalTargetId = targetId || targetUserId;
+    if (!currentUser || currentUser.id === finalTargetId) return;
+    const reqId = `freq_${currentUser.id}_${finalTargetId}`;
 
     DB.friendRequests.set(reqId, {
       id: reqId,
       fromUserId: currentUser.id,
       fromUsername: currentUser.username,
       fromAvatar: currentUser.avatar,
-      toUserId: targetUserId,
+      toUserId: finalTargetId,
       status: 'pending'
     });
 
     saveDB();
-    io.to(targetUserId).emit('friend:incoming');
+    io.to(finalTargetId).emit('friend:incoming');
+    
+    // Gửi trực tiếp danh sách lời mời cập nhật tới người nhận
+    const recipientSocket = io.sockets.sockets.get([...io.sockets.adapter.rooms.get(finalTargetId) || []][0]);
+    if (recipientSocket) {
+      syncUserData(recipientSocket, finalTargetId);
+    }
+    
     syncUserData(socket, currentUser.id);
+  });
+
+  socket.on('friend:cancel_request', ({ targetId, targetUserId }) => {
+    const finalTargetId = targetId || targetUserId;
+    if (!currentUser || !finalTargetId) return;
+    const reqId = `freq_${currentUser.id}_${finalTargetId}`;
+
+    if (DB.friendRequests.has(reqId)) {
+      DB.friendRequests.delete(reqId);
+      saveDB();
+
+      syncUserData(socket, currentUser.id);
+      
+      const targetSocket = io.sockets.sockets.get([...io.sockets.adapter.rooms.get(finalTargetId) || []][0]);
+      if (targetSocket) {
+        syncUserData(targetSocket, finalTargetId);
+      }
+    }
   });
 
   socket.on('friend:accept', ({ reqId }) => {
@@ -454,8 +479,12 @@ io.on('connection', (socket) => {
     DB.friends.get(req.toUserId).add(req.fromUserId);
 
     saveDB();
-    syncUserData(socket, req.fromUserId);
+    
+    const fromSocket = io.sockets.sockets.get([...io.sockets.adapter.rooms.get(req.fromUserId) || []][0]);
+    if (fromSocket) syncUserData(fromSocket, req.fromUserId);
+    
     syncUserData(socket, req.toUserId);
+
     io.to(req.fromUserId).emit('friend:updated');
     io.to(req.toUserId).emit('friend:updated');
   });
@@ -469,6 +498,10 @@ io.on('connection', (socket) => {
 
     saveDB();
     syncUserData(socket, currentUserId);
+    
+    const friendSocket = io.sockets.sockets.get([...io.sockets.adapter.rooms.get(friendId) || []][0]);
+    if (friendSocket) syncUserData(friendSocket, friendId);
+
     io.to(friendId).emit('friend:updated');
   });
 
@@ -513,11 +546,7 @@ io.on('connection', (socket) => {
     }
   });
 
-  // ========================================================
-  // --- XỬ LÝ SỰ KIỆN BÁO CÁO & KHÁNG CÁO ---
-  // ========================================================
-  
-  // 1. Nhận báo cáo vi phạm từ user
+  // --- BÁO CÁO & KHÁNG CÁO ---
   socket.on('report:submit', ({ targetId, reason, description, reporterId, reporterName }) => {
     const finalReporterId = reporterId || (currentUser ? currentUser.id : null);
     const finalReporterName = reporterName || (currentUser ? currentUser.username : 'Người dùng');
@@ -555,7 +584,6 @@ io.on('connection', (socket) => {
     DB.reports.set(reportId, reportObj);
     saveDB();
 
-    // Bắn realtime về trang Admin
     io.emit('admin:new-report', Array.from(DB.reports.values()));
     io.to('admin_room').emit('admin_notification', {
       type: 'new_report',
@@ -564,7 +592,6 @@ io.on('connection', (socket) => {
     });
   });
 
-  // 2. Nhận yêu cầu hỗ trợ / kháng cáo từ user bị hạn chế
   socket.on('appeal:restriction', ({ reason, userId, username }) => {
     const finalUserId = userId || (currentUser ? currentUser.id : null);
     const finalUsername = username || (currentUser ? currentUser.username : 'Người dùng');
@@ -585,7 +612,6 @@ io.on('connection', (socket) => {
     DB.appeals.set(appealId, appealObj);
     saveDB();
 
-    // Phát sự kiện realtime về trang Admin
     io.emit('admin:new-appeal', Array.from(DB.appeals.values()));
     io.to('admin_room').emit('admin_notification', {
       type: 'restriction_appeal',
@@ -610,6 +636,7 @@ io.on('connection', (socket) => {
 
 // Hàm sync dữ liệu người dùng
 function syncUserData(socket, userId) {
+  if (!socket) return;
   const friendSet = DB.friends.get(userId) || new Set();
   const friendsList = Array.from(friendSet).map(id => {
     let acc = null;
@@ -654,6 +681,9 @@ function syncUserData(socket, userId) {
     allUsers: allRegisteredUsers,
     groups: userGroups
   });
+  
+  // Bắn trực tiếp danh sách lời mời kết bạn để app.js nhận ngay
+  socket.emit('receive_friend_requests', incomingRequests);
 }
 
 const PORT = process.env.PORT || 3000;
