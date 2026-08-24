@@ -8,6 +8,17 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   <style>
+    /* Reset kích thước chuẩn chống tràn khung */
+    *, *::before, *::after {
+      box-sizing: border-box !important;
+    }
+
+    body {
+      margin: 0;
+      padding: 0;
+      overflow-x: hidden;
+    }
+
     /* Toast Notification thành công */
     #toast-notification {
       position: fixed;
@@ -26,23 +37,58 @@
     #toast-notification.show {
       transform: translateX(-50%) translateY(0);
     }
-    .modal-group-content {
+
+    /* Định dạng Modal cân xứng */
+    .modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.6);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      padding: 16px;
+    }
+
+    .modal-group-content, .modal-content {
       background: #ffffff;
       color: #333;
-      width: 90%;
-      max-width: 420px;
+      width: 100%;
+      max-width: 400px;
       padding: 24px;
       border-radius: 12px;
       box-shadow: 0 5px 20px rgba(0,0,0,0.2);
+      overflow-x: hidden;
     }
-    .modal-group-content input[type="text"] {
+
+    .modal input, 
+    .modal select, 
+    .modal textarea {
       width: 100%;
-      padding: 12px;
+      max-width: 100%;
+      padding: 10px 12px;
       border: 1px solid #cbd5e0;
       border-radius: 8px;
+      margin-top: 6px;
       margin-bottom: 14px;
-      font-size: 15px;
+      font-size: 14px;
+      outline: none;
+      background: #ffffff;
+      color: #2d3748;
     }
+
+    .modal textarea {
+      min-height: 90px;
+      resize: vertical; /* Cấm kéo giãn ngang */
+    }
+
+    .modal-actions {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+      margin-top: 8px;
+    }
+
     .members-checkbox-list {
       max-height: 150px;
       overflow-y: auto;
@@ -59,7 +105,7 @@
       cursor: pointer;
     }
 
-    /* --- BỔ SUNG GIAO DIỆN LỜI MỜI KẾT BẠN & NÚT ĐỒNG Ý --- */
+    /* --- GIAO DIỆN LỜI MỜI KẾT BẠN & NÚT ĐỒNG Ý --- */
     .btn-accept-friend, .btn-action.green {
       background: #0084ff !important;
       color: #ffffff !important;
@@ -95,12 +141,12 @@
   <!-- Toast Thông Báo -->
   <div id="toast-notification">Thành công!</div>
 
-  <!-- MODAL XÁC NHẬN ĐẸP MẮT (Dùng chung) -->
-  <div id="modal-confirm" class="modal hidden" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); align-items: center; justify-content: center; z-index: 1200;">
-    <div class="modal-content" style="background: #ffffff; color: #333; padding: 24px; border-radius: 12px; width: 90%; max-width: 360px; text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.2);">
+  <!-- MODAL XÁC NHẬN ĐẸP MẮT -->
+  <div id="modal-confirm" class="modal hidden" style="display: none; z-index: 1200;">
+    <div class="modal-content" style="text-align: center;">
       <h3 id="confirm-title" style="margin-top: 0; margin-bottom: 12px; font-size: 18px; color: #2d3748;">Xác nhận</h3>
       <p id="confirm-message" style="font-size: 14px; color: #4a5568; margin-bottom: 20px;">Bạn có chắc chắn muốn thực hiện hành động này?</p>
-      <div style="display: flex; gap: 10px; justify-content: center;">
+      <div class="modal-actions">
         <button id="btn-confirm-yes" style="flex: 1; padding: 10px; background: #e53e3e; color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer;">Đồng ý</button>
         <button id="btn-confirm-no" style="flex: 1; padding: 10px; background: #cbd5e0; color: #2d3748; border: none; border-radius: 6px; font-weight: bold; cursor: pointer;">Hủy</button>
       </div>
@@ -130,10 +176,10 @@
 
     <!-- THANH PHÂN CHIA TAB CHAT -->
     <div id="chat-filter-tabs" style="display: flex; align-items: center; gap: 8px; padding: 10px 16px; overflow-x: auto; border-bottom: 1px solid var(--border-color, #edf2f7);">
-      <button class="filter-tab-btn active" data-filter="all" style="background: var(--primary-light, #ebf8ff); color: var(--primary-color, #3182ce); border: none; padding: 6px 14px; border-radius: 16px; font-weight: 600; font-size: 13px; cursor: pointer; transition: 0.2s;">Tất cả</button>
-      <button class="filter-tab-btn" data-filter="unread" style="background: transparent; color: var(--text-secondary, #718096); border: none; padding: 6px 14px; border-radius: 16px; font-weight: 500; font-size: 13px; cursor: pointer; transition: 0.2s;">Chưa đọc</button>
-      <button class="filter-tab-btn" data-filter="groups" style="background: transparent; color: var(--text-secondary, #718096); border: none; padding: 6px 14px; border-radius: 16px; font-weight: 500; font-size: 13px; cursor: pointer; transition: 0.2s;">Nhóm</button>
-      <button class="filter-tab-btn" data-filter="requests" style="background: transparent; color: var(--text-secondary, #718096); border: none; padding: 6px 14px; border-radius: 16px; font-weight: 500; font-size: 13px; cursor: pointer; transition: 0.2s; display: inline-flex; align-items: center; gap: 6px;">
+      <button class="filter-tab-btn active" data-filter="all" style="background: var(--primary-light, #ebf8ff); color: var(--primary-color, #3182ce); border: none; padding: 6px 14px; border-radius: 16px; font-weight: 600; font-size: 13px; cursor: pointer;">Tất cả</button>
+      <button class="filter-tab-btn" data-filter="unread" style="background: transparent; color: var(--text-secondary, #718096); border: none; padding: 6px 14px; border-radius: 16px; font-weight: 500; font-size: 13px; cursor: pointer;">Chưa đọc</button>
+      <button class="filter-tab-btn" data-filter="groups" style="background: transparent; color: var(--text-secondary, #718096); border: none; padding: 6px 14px; border-radius: 16px; font-weight: 500; font-size: 13px; cursor: pointer;">Nhóm</button>
+      <button class="filter-tab-btn" data-filter="requests" style="background: transparent; color: var(--text-secondary, #718096); border: none; padding: 6px 14px; border-radius: 16px; font-weight: 500; font-size: 13px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;">
         <i class="fa-solid fa-user-friends"></i> Lời mời <span id="request-count-badge" style="background: #e53e3e; color: white; border-radius: 50%; padding: 1px 6px; font-size: 11px; display: none;">0</span>
       </button>
     </div>
@@ -151,9 +197,7 @@
             <span id="active-chat-status" class="status-text">Đang kết nối...</span>
           </div>
         </div>
-        <!-- Nút Tùy chọn cài đặt chat 1-1 -->
         <button id="btn-chat-options" class="icon-btn" title="Tùy chọn đoạn chat" style="position: relative; z-index: 10; cursor: pointer;"><i class="fa-solid fa-ellipsis"></i></button>
-        <!-- Nút Cài đặt nhóm (Chỉ hiện khi là phòng nhóm) -->
         <button id="btn-group-settings" class="icon-btn hidden" title="Cài đặt nhóm" style="position: relative; z-index: 10; cursor: pointer;"><i class="fa-solid fa-gear"></i></button>
       </header>
 
@@ -181,31 +225,28 @@
         <input type="text" id="msg-input" placeholder="Nhập tin nhắn...">
         <button class="icon-btn send-btn" id="btn-send"><i class="fa-solid fa-paper-plane"></i></button>
         
-        <!-- Nút Cảm xúc nhanh (Quick Reaction) giống Messenger -->
-        <div id="quick-reaction-trigger" class="quick-reaction-btn" title="Gửi cảm xúc nhanh" style="font-size: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center; min-width: 36px; height: 36px; user-select: none; transition: transform 0.2s;">
+        <div id="quick-reaction-trigger" class="quick-reaction-btn" title="Gửi cảm xúc nhanh" style="font-size: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center; min-width: 36px; height: 36px; user-select: none;">
           ❤️
         </div>
       </footer>
     </section>
 
     <!-- MODAL TẠO NHÓM -->
-    <div id="modal-group" class="modal hidden" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:1000; justify-content:center; align-items:center;">
-      <div class="modal-group-content" style="background: #ffffff; color: #333; width: 90%; max-width: 420px; padding: 24px; border-radius: 12px; box-shadow: 0 5px 20px rgba(0,0,0,0.2);">
+    <div id="modal-group" class="modal hidden">
+      <div class="modal-group-content">
        <h3 style="margin-top: 0; margin-bottom: 16px; text-align: center; color: #2d3748;">Tạo Nhóm Trò Chuyện</h3>
         <div style="text-align: center; margin-bottom: 12px;">
           <img id="group-preview-avatar" src="https://api.dicebear.com/7.x/identicon/svg?seed=group" style="width: 80px; height: 80px; border-radius: 50%; object-fit: cover; border: 2px solid #3182ce; margin-bottom: 6px;"><br>
           <label for="group-avatar-file" style="cursor: pointer; background: #3182ce; color: white; padding: 6px 12px; border-radius: 6px; font-size: 13px; display: inline-block;">Chọn Ảnh Nhóm</label>
           <input type="file" id="group-avatar-file" accept="image/*" class="hidden">
         </div>
-        <label style="font-weight: bold; font-size: 13px; color: #4a5568; display: block; margin-bottom: 4px;">Tên Nhóm</label>
-        <input type="text" id="group-name-input" placeholder="Nhập tên nhóm..." style="width: 100%; padding: 12px; border: 1px solid #cbd5e0; border-radius: 8px; margin-bottom: 14px; font-size: 15px; box-sizing: border-box;">
+        <label style="font-weight: bold; font-size: 13px; color: #4a5568; display: block;">Tên Nhóm</label>
+        <input type="text" id="group-name-input" placeholder="Nhập tên nhóm...">
           
         <label style="font-weight: bold; font-size: 13px; color: #4a5568; display: block; margin-bottom: 4px;">Thêm Thành Viên (Từ bạn bè)</label>
-        <div id="group-members-list" class="members-checkbox-list" style="max-height: 150px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px; margin-bottom: 16px;">
-          <!-- Render danh sách bạn bè -->
-        </div>
+        <div id="group-members-list" class="members-checkbox-list"></div>
 
-        <div style="display: flex; gap: 10px;">
+        <div class="modal-actions">
           <button id="btn-submit-group" style="flex:1; background: #38a169; color: white; border: none; padding: 12px; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 15px;">Tạo Nhóm</button>
           <button id="btn-close-group-modal" style="flex:1; background: #e2e8f0; color: #333; border: none; padding: 12px; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 15px;">Hủy</button>
         </div>
@@ -213,8 +254,8 @@
     </div>
 
     <!-- MODAL QUẢN LÝ NHÓM -->
-    <div id="modal-group-settings" class="modal hidden" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:1000; justify-content:center; align-items:center;">
-      <div class="modal-group-content" style="background: #ffffff; color: #333; width: 90%; max-width: 450px; padding: 24px; border-radius: 12px; box-shadow: 0 5px 20px rgba(0,0,0,0.2);">
+    <div id="modal-group-settings" class="modal hidden">
+      <div class="modal-group-content" style="max-width: 450px;">
         <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
           <h3 style="margin: 0;">Quản Lý Nhóm</h3>
           <button id="btn-close-group-settings" style="background:none; border:none; cursor:pointer; font-size: 18px; color:#a0aec0;"><i class="fa-solid fa-xmark"></i></button>
@@ -246,15 +287,15 @@
 
     <!-- MODAL XÁC THỰC -->
     <div id="modal-auth" class="modal">
-      <div class="modal-content" style="background: #ffffff; max-width: 400px; padding: 24px; border-radius: 12px; color: #333;">
+      <div class="modal-content" style="max-width: 400px;">
         <div class="auth-tabs" style="display: flex; margin-bottom: 20px; gap: 10px;">
           <button id="tab-btn-login" class="tab-btn active" style="flex:1; padding: 10px; font-weight: bold; cursor: pointer;">Đăng Nhập</button>
           <button id="tab-btn-register" class="tab-btn" style="flex:1; padding: 10px; font-weight: bold; cursor: pointer;">Đăng Ký</button>
         </div>
         
         <form id="form-login" class="auth-form" onsubmit="return false;">
-          <input type="text" id="login-username" placeholder="Tên tài khoản..." required autocomplete="username" style="width:100%; padding:12px; margin-bottom:12px; border:1px solid #cbd5e0; border-radius:8px;">
-          <input type="password" id="login-password" placeholder="Mật khẩu..." required autocomplete="current-password" style="width:100%; padding:12px; margin-bottom:12px; border:1px solid #cbd5e0; border-radius:8px;">
+          <input type="text" id="login-username" placeholder="Tên tài khoản..." required autocomplete="username">
+          <input type="password" id="login-password" placeholder="Mật khẩu..." required autocomplete="current-password">
           <button type="submit" class="btn-primary" style="width:100%; background:#3182ce; color:white; border:none; padding:14px; border-radius:8px; font-weight:bold; cursor:pointer;">Đăng Nhập</button>
         </form>
 
@@ -267,77 +308,83 @@
               <button type="button" id="reg-random-avatar" class="btn-action green" style="padding: 8px 14px; font-size: 14px; background: #38a169; color: white; border: none; border-radius: 6px; cursor: pointer;">Ngẫu Nhiên</button>
             </div>
           </div>
-          <input type="text" id="reg-username" placeholder="Chọn tên tài khoản mới..." required autocomplete="username" style="width:100%; padding:12px; margin-bottom:12px; border:1px solid #cbd5e0; border-radius:8px;">
-          <input type="password" id="reg-password" placeholder="Tạo mật khẩu..." required autocomplete="new-password" style="width:100%; padding:12px; margin-bottom:12px; border:1px solid #cbd5e0; border-radius:8px;">
+          <input type="text" id="reg-username" placeholder="Chọn tên tài khoản mới..." required autocomplete="username">
+          <input type="password" id="reg-password" placeholder="Tạo mật khẩu..." required autocomplete="new-password">
           <button type="submit" class="btn-secondary" style="width:100%; background:#38a169; color:white; border:none; padding:14px; border-radius:8px; font-weight:bold; cursor:pointer;">Tạo Tài Khoản</button>
         </form>
       </div>
     </div>
-  </div>
 
-  <!-- MODAL CÀI ĐẶT TRÒ CHUYỆN 1-1 -->
-  <div id="modal-chat-settings" class="modal hidden" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:1000; justify-content:center; align-items:center;">
-    <div class="modal-group-content" style="background: #ffffff; color: #333; width: 90%; max-width: 400px; padding: 24px; border-radius: 12px; box-shadow: 0 5px 20px rgba(0,0,0,0.2);">
-      <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-        <h3 id="settings-friend-title" style="margin: 0; font-size: 18px;">Tùy chỉnh đoạn chat</h3>
-        <button id="btn-close-chat-settings" style="background:none; border:none; cursor:pointer; font-size: 18px; color:#a0aec0;"><i class="fa-solid fa-xmark"></i></button>
-      </div>
-      
-      <div style="display: flex; flex-direction: column; gap: 8px;">
-        <button id="set-create-group" style="background: #f7fafc; border: 1px solid #e2e8f0; color: #2d3748; text-align: left; padding: 10px 14px; border-radius: 8px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 10px;"><i class="fa-solid fa-users" style="color: #3182ce;"></i> Tạo nhóm cùng bạn này</button>
-        <button id="set-nickname" style="background: #f7fafc; border: 1px solid #e2e8f0; color: #2d3748; text-align: left; padding: 10px 14px; border-radius: 8px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 10px;"><i class="fa-solid fa-pen" style="color: #3182ce;"></i> Đổi biệt danh</button>
-        <button id="set-theme" style="background: #f7fafc; border: 1px solid #e2e8f0; color: #2d3748; text-align: left; padding: 10px 14px; border-radius: 8px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 10px;"><i class="fa-solid fa-palette" style="color: #3182ce;"></i> Tùy chỉnh chủ đề</button>
-        <button id="set-emoji" style="background: #f7fafc; border: 1px solid #e2e8f0; color: #2d3748; text-align: left; padding: 10px 14px; border-radius: 8px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 10px;"><i class="fa-solid fa-heart" style="color: #e53e3e;"></i> Cảm xúc nhanh</button>
-        <button id="set-clear-chat" style="background: #fff5f5; border: 1px solid #fed7d7; color: #e53e3e; text-align: left; padding: 10px 14px; border-radius: 8px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 10px;"><i class="fa-solid fa-trash"></i> Xóa đoạn chat</button>
-        <button id="set-unfriend" style="background: #fff5f5; border: 1px solid #fed7d7; color: #e53e3e; text-align: left; padding: 10px 14px; border-radius: 8px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 10px;"><i class="fa-solid fa-user-slash"></i> Xóa kết bạn</button>
-        <button id="set-report" style="background: #fffaf0; border: 1px solid #feebc8; color: #dd6b20; text-align: left; padding: 10px 14px; border-radius: 8px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 10px;"><i class="fa-solid fa-triangle-exclamation"></i> Báo cáo tới Admin</button>
+    <!-- MODAL CÀI ĐẶT TRÒ CHUYỆN 1-1 -->
+    <div id="modal-chat-settings" class="modal hidden">
+      <div class="modal-group-content" style="max-width: 400px;">
+        <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+          <h3 id="settings-friend-title" style="margin: 0; font-size: 18px;">Tùy chỉnh đoạn chat</h3>
+          <button id="btn-close-chat-settings" style="background:none; border:none; cursor:pointer; font-size: 18px; color:#a0aec0;"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <button id="set-create-group" style="background: #f7fafc; border: 1px solid #e2e8f0; color: #2d3748; text-align: left; padding: 10px 14px; border-radius: 8px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 10px;"><i class="fa-solid fa-users" style="color: #3182ce;"></i> Tạo nhóm cùng bạn này</button>
+          <button id="set-nickname" style="background: #f7fafc; border: 1px solid #e2e8f0; color: #2d3748; text-align: left; padding: 10px 14px; border-radius: 8px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 10px;"><i class="fa-solid fa-pen" style="color: #3182ce;"></i> Đổi biệt danh</button>
+          <button id="set-theme" style="background: #f7fafc; border: 1px solid #e2e8f0; color: #2d3748; text-align: left; padding: 10px 14px; border-radius: 8px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 10px;"><i class="fa-solid fa-palette" style="color: #3182ce;"></i> Tùy chỉnh chủ đề</button>
+          <button id="set-emoji" style="background: #f7fafc; border: 1px solid #e2e8f0; color: #2d3748; text-align: left; padding: 10px 14px; border-radius: 8px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 10px;"><i class="fa-solid fa-heart" style="color: #e53e3e;"></i> Cảm xúc nhanh</button>
+          <button id="set-clear-chat" style="background: #fff5f5; border: 1px solid #fed7d7; color: #e53e3e; text-align: left; padding: 10px 14px; border-radius: 8px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 10px;"><i class="fa-solid fa-trash"></i> Xóa đoạn chat</button>
+          <button id="set-unfriend" style="background: #fff5f5; border: 1px solid #fed7d7; color: #e53e3e; text-align: left; padding: 10px 14px; border-radius: 8px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 10px;"><i class="fa-solid fa-user-slash"></i> Xóa kết bạn</button>
+          <button id="set-report" style="background: #fffaf0; border: 1px solid #feebc8; color: #dd6b20; text-align: left; padding: 10px 14px; border-radius: 8px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 10px;"><i class="fa-solid fa-triangle-exclamation"></i> Báo cáo tới Admin</button>
+        </div>
       </div>
     </div>
-  </div>
 
-  <!-- MODAL BÁO CÁO VI PHẠM -->
-  <div id="modal-report" class="modal hidden" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:1100; justify-content:center; align-items:center;">
-    <div class="modal-group-content" style="background: #ffffff; color: #333; width: 90%; max-width: 380px; padding: 24px; border-radius: 12px; box-shadow: 0 5px 20px rgba(0,0,0,0.2);">
-      <h3 style="margin-top: 0; color: #2d3748; margin-bottom: 12px;">Báo Cáo Vi Phạm</h3>
-      <p style="font-size: 13px; color: #718096; margin-bottom: 12px;">Chọn lý do gửi tới trang quản trị viên:</p>
-      <select id="report-reason-select" style="width: 100%; padding: 10px; border: 1px solid #cbd5e0; border-radius: 8px; margin-bottom: 16px; font-size: 14px;">
-        <option value="Spam / Tin nhắn rác">Spam / Tin nhắn rác</option>
-        <option value="Ngôn từ gây thù ghét / Lăng mạ">Ngôn từ gây thù ghét / Lăng mạ</option>
-        <option value="Nội dung không phù hợp">Nội dung không phù hợp</option>
-        <option value="Giả mạo tài khoản">Giả mạo tài khoản</option>
-      </select>
-      <div style="display: flex; gap: 10px;">
-        <button id="btn-submit-report" style="flex:1; background: #dd6b20; color: white; border: none; padding: 10px; border-radius: 8px; font-weight: bold; cursor: pointer;">Gửi Báo Cáo</button>
-        <button id="btn-cancel-report" style="flex:1; background: #cbd5e0; color: #333; border: none; padding: 10px; border-radius: 8px; font-weight: bold; cursor: pointer;">Hủy</button>
+    <!-- MODAL BÁO CÁO VI PHẠM (ĐÃ KHẮC PHỤC CÂN XỨNG & CÓ CHỖ NHẬP MÔ TẢ) -->
+    <div id="modal-report" class="modal hidden" style="z-index:1100;">
+      <div class="modal-group-content" style="max-width: 400px;">
+        <h3 style="margin-top: 0; text-align: center; color: #2d3748; margin-bottom: 16px; font-size: 20px;">Báo cáo vi phạm</h3>
+        
+        <label style="font-weight: 600; font-size: 13px; color: #4a5568; display: block;">Chọn lý do báo cáo:</label>
+        <select id="report-reason-select">
+          <option value="Spam / Tin nhắn rác">Spam tin nhắn</option>
+          <option value="Ngôn từ gây thù ghét / Lăng mạ">Ngôn từ gây thù ghét / Lăng mạ</option>
+          <option value="Nội dung không phù hợp">Nội dung không phù hợp</option>
+          <option value="Giả mạo tài khoản">Giả mạo tài khoản</option>
+        </select>
+
+        <label style="font-weight: 600; font-size: 13px; color: #4a5568; display: block;">Mô tả chi tiết:</label>
+        <textarea id="report-description-input" placeholder="Nhập chi tiết vi phạm (tùy chọn)..."></textarea>
+
+        <div class="modal-actions">
+          <button id="btn-submit-report" style="flex:1; background: #e53e3e; color: white; border: none; padding: 12px; border-radius: 8px; font-weight: bold; cursor: pointer;">Gửi báo cáo</button>
+          <button id="btn-cancel-report" style="flex:1; background: #cbd5e0; color: #2d3748; border: none; padding: 12px; border-radius: 8px; font-weight: bold; cursor: pointer;">Hủy</button>
+        </div>
       </div>
     </div>
-  </div>
 
-  <!-- MODAL ĐỔI BIỆT DANH -->
-  <div id="modal-nickname" class="modal hidden" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 1000;">
-    <div class="modal-content" style="background: var(--bg-primary, #fff); padding: 20px; border-radius: 8px; width: 320px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
-      <h3 style="margin-top: 0; margin-bottom: 12px; font-size: 16px;">Đổi biệt danh</h3>
-      <p id="nickname-target-name" style="font-size: 13px; color: var(--text-secondary, #718096); margin-bottom: 10px;"></p>
-      <input type="text" id="nickname-input" placeholder="Nhập biệt danh mới..." style="width: 100%; padding: 8px; border: 1px solid var(--border-color, #cbd5e0); border-radius: 4px; box-sizing: border-box; margin-bottom: 15px; outline: none;">
-      <div style="display: flex; justify-content: flex-end; gap: 8px;">
-        <button id="btn-cancel-nickname" style="padding: 6px 12px; border: none; background: #e2e8f0; border-radius: 4px; cursor: pointer;">Hủy</button>
-        <button id="btn-save-nickname" style="padding: 6px 12px; border: none; background: #3182ce; color: white; border-radius: 4px; cursor: pointer;">Lưu</button>
+    <!-- MODAL ĐỔI BIỆT DANH -->
+    <div id="modal-nickname" class="modal hidden">
+      <div class="modal-content" style="max-width: 340px;">
+        <h3 style="margin-top: 0; margin-bottom: 12px; font-size: 16px;">Đổi biệt danh</h3>
+        <p id="nickname-target-name" style="font-size: 13px; color: var(--text-secondary, #718096); margin-bottom: 10px;"></p>
+        <input type="text" id="nickname-input" placeholder="Nhập biệt danh mới...">
+        <div class="modal-actions" style="justify-content: flex-end;">
+          <button id="btn-cancel-nickname" style="padding: 8px 16px; border: none; background: #e2e8f0; border-radius: 6px; cursor: pointer;">Hủy</button>
+          <button id="btn-save-nickname" style="padding: 8px 16px; border: none; background: #3182ce; color: white; border-radius: 6px; cursor: pointer;">Lưu</button>
+        </div>
       </div>
     </div>
-  </div>
 
-  <!-- Modal Tùy chỉnh chủ đề đoạn chat -->
-  <div id="modal-theme" class="modal hidden" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 1000;">
-    <div class="modal-content" style="background: var(--bg-card, #fff); padding: 20px; border-radius: 12px; width: 320px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
-      <h3 style="margin-top: 0; margin-bottom: 15px; font-size: 18px; color: var(--text-main);">Chọn chủ đề đoạn chat</h3>
-      <div id="theme-options-list" style="display: flex; flex-direction: column; gap: 10px;">
-        <button class="theme-option-btn" data-theme-type="default" style="padding: 10px; border: 1px solid #ccc; border-radius: 8px; background: #fff; cursor: pointer; text-align: left; font-weight: 600;">🔵 Mặc định (Xanh dương)</button>
-        <button class="theme-option-btn" data-theme-type="love" style="padding: 10px; border: 1px solid #ffc0cb; border-radius: 8px; background: #fff0f3; color: #d53f8c; cursor: pointer; text-align: left; font-weight: 600;">❤️ Tình yêu (Hồng ngọt ngào)</button>
-        <button class="theme-option-btn" data-theme-type="monochrome" style="padding: 10px; border: 1px solid #4a5568; border-radius: 8px; background: #2d3748; color: #fff; cursor: pointer; text-align: left; font-weight: 600;">🖤 Đơn sắc (Tối giản)</button>
-        <button class="theme-option-btn" data-theme-type="nature" style="padding: 10px; border: 1px solid #68d391; border-radius: 8px; background: #f0fff4; color: #276749; cursor: pointer; text-align: left; font-weight: 600;">🌿 Thiên nhiên (Xanh lá)</button>
+    <!-- MODAL TỦY CHỈNH CHỦ ĐỀ -->
+    <div id="modal-theme" class="modal hidden">
+      <div class="modal-content" style="max-width: 340px;">
+        <h3 style="margin-top: 0; margin-bottom: 15px; font-size: 18px; color: var(--text-main);">Chọn chủ đề đoạn chat</h3>
+        <div id="theme-options-list" style="display: flex; flex-direction: column; gap: 10px;">
+          <button class="theme-option-btn" data-theme-type="default" style="padding: 10px; border: 1px solid #ccc; border-radius: 8px; background: #fff; cursor: pointer; text-align: left; font-weight: 600;">🔵 Mặc định (Xanh dương)</button>
+          <button class="theme-option-btn" data-theme-type="love" style="padding: 10px; border: 1px solid #ffc0cb; border-radius: 8px; background: #fff0f3; color: #d53f8c; cursor: pointer; text-align: left; font-weight: 600;">❤️ Tình yêu (Hồng ngọt ngào)</button>
+          <button class="theme-option-btn" data-theme-type="monochrome" style="padding: 10px; border: 1px solid #4a5568; border-radius: 8px; background: #2d3748; color: #fff; cursor: pointer; text-align: left; font-weight: 600;">🖤 Đơn sắc (Tối giản)</button>
+          <button class="theme-option-btn" data-theme-type="nature" style="padding: 10px; border: 1px solid #68d391; border-radius: 8px; background: #f0fff4; color: #276749; cursor: pointer; text-align: left; font-weight: 600;">🌿 Thiên nhiên (Xanh lá)</button>
+        </div>
+        <button id="btn-close-theme-modal" style="width: 100%; margin-top: 15px; padding: 10px; background: #e2e8f0; border: none; border-radius: 6px; cursor: pointer; font-weight: 600;">Đóng</button>
       </div>
-      <button id="btn-close-theme-modal" style="width: 100%; margin-top: 15px; padding: 8px; background: #e2e8f0; border: none; border-radius: 6px; cursor: pointer; font-weight: 600;">Đóng</button>
     </div>
+
   </div>
 
   <script src="/socket.io/socket.io.js"></script>
