@@ -134,3 +134,57 @@ body, html {
 .chat-input-bar .send-btn {
   color: var(--bg-bubble-self);
 }
+
+/* --- CÁC CHỦ ĐỀ ĐOẠN CHAT --- */
+
+/* 1. Chủ đề Tình yêu (Love) */
+#messages-viewport.theme-love {
+  background: linear-gradient(135deg, #ffe4e6 0%, #fecdd3 100%) !important;
+}
+#messages-viewport.theme-love .msg.self {
+  background-color: #e11d48 !important; /* Màu hồng đậm/đỏ hồng giống Messenger */
+  color: #ffffff !important;
+}
+#messages-viewport.theme-love .msg.other {
+  background-color: #ffffff !important;
+  color: #1f2937 !important;
+}
+
+/* 2. Chủ đề Cà phê (Coffee) */
+#messages-viewport.theme-coffee {
+  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%) !important;
+}
+#messages-viewport.theme-coffee .msg.self {
+  background-color: #b45309 !important; /* Màu nâu cà phê */
+  color: #ffffff !important;
+}
+#messages-viewport.theme-coffee .msg.other {
+  background-color: #fffbeb !important;
+  color: #451a03 !important;
+}
+
+/* 3. Chủ đề Đơn sắc / Lặp lại (Monochrome) */
+#messages-viewport.theme-monochrome {
+  background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%) !important;
+}
+#messages-viewport.theme-monochrome .msg.self {
+  background-color: #334155 !important; /* Màu xám đậm */
+  color: #ffffff !important;
+}
+#messages-viewport.theme-monochrome .msg.other {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+}
+
+/* 4. Chủ đề Thả thính / Goth Charms (Tùy chỉnh thêm nếu cần) */
+#messages-viewport.theme-nature {
+  background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%) !important;
+}
+#messages-viewport.theme-nature .msg.self {
+  background-color: #059669 !important; /* Màu xanh lá */
+  color: #ffffff !important;
+}
+#messages-viewport.theme-nature .msg.other {
+  background-color: #ffffff !important;
+  color: #064e3b !important;
+}
