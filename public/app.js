@@ -4,6 +4,7 @@ let state = {
   currentUser: null,
   activeRoomId: null,
   theme: localStorage.getItem('chat_theme') || 'dark',
+  roomThemes: new Map(JSON.parse(localStorage.getItem('chat_room_themes') || '[]')),
   friends: [],
   requests: [],
   allUsers: [],
@@ -45,7 +46,7 @@ function showConfirmModal(title, message, onYes) {
   modal.style.display = 'flex';
 }
 
-// --- QUẢN LÝ THEME ---
+// --- QUẢN LÝ THEME CHUNG ---
 function applyTheme(theme) {
   state.theme = theme;
   document.documentElement.setAttribute('data-theme', theme);
@@ -62,6 +63,20 @@ if (btnToggleTheme) {
   };
 }
 applyTheme(state.theme);
+
+// --- QUẢN LÝ CHỦ ĐỀ RIÊNG CHO TỪNG PHÒNG CHAT ---
+function applyRoomTheme(roomId) {
+  const chatViewport = document.getElementById('messages-viewport');
+  if (!chatViewport) return;
+  
+  // Xóa các class chủ đề cũ
+  chatViewport.classList.remove('theme-love', 'theme-monochrome', 'theme-nature');
+  
+  const currentTheme = state.roomThemes.get(roomId) || 'default';
+  if (currentTheme !== 'default') {
+    chatViewport.classList.add(`theme-${currentTheme}`);
+  }
+}
 
 // --- TAB ĐĂNG NHẬP / ĐĂNG KÝ ---
 const tabLogin = document.getElementById('tab-btn-login');
@@ -482,6 +497,7 @@ function openRoom(roomId, name, avatar, status) {
   }
   
   socket.emit('messages:get', { roomId });
+  applyRoomTheme(roomId);
   renderChatList();
 }
 
@@ -645,6 +661,7 @@ document.addEventListener('click', (e) => {
   const modalChatSettings = document.getElementById('modal-chat-settings');
   const modalReport = document.getElementById('modal-report');
   const modalGroupSettings = document.getElementById('modal-group-settings');
+  const modalTheme = document.getElementById('modal-theme');
 
   // Lọc tab
   const tabBtn = e.target.closest('.filter-tab-btn');
@@ -670,6 +687,45 @@ document.addEventListener('click', (e) => {
     }
 
     renderChatList();
+    return;
+  }
+
+  // Mở modal Tùy chỉnh chủ đề
+  const btnSetTheme = e.target.closest('#set-theme');
+  if (btnSetTheme) {
+    if (modalChatSettings) {
+      modalChatSettings.classList.add('hidden');
+      modalChatSettings.style.display = 'none';
+    }
+    if (modalTheme) {
+      modalTheme.classList.remove('hidden');
+      modalTheme.style.display = 'flex';
+    }
+    return;
+  }
+
+  // Đóng hoặc chọn chủ đề
+  if (e.target.closest('#btn-close-theme-modal') || (modalTheme && e.target === modalTheme)) {
+    if (modalTheme) {
+      modalTheme.style.display = 'none';
+      modalTheme.classList.add('hidden');
+    }
+    return;
+  }
+
+  const themeOptBtn = e.target.closest('.theme-option-btn');
+  if (themeOptBtn) {
+    const selectedTheme = themeOptBtn.getAttribute('data-theme-type');
+    if (state.activeRoomId) {
+      state.roomThemes.set(state.activeRoomId, selectedTheme);
+      localStorage.setItem('chat_room_themes', JSON.stringify(Array.from(state.roomThemes.entries())));
+      applyRoomTheme(state.activeRoomId);
+      showToast('Đã thay đổi chủ đề đoạn chat!');
+    }
+    if (modalTheme) {
+      modalTheme.style.display = 'none';
+      modalTheme.classList.add('hidden');
+    }
     return;
   }
 

@@ -288,6 +288,20 @@
   </div>
 </div>
 
+<!-- Modal Tùy chỉnh chủ đề đoạn chat -->
+<div id="modal-theme" class="modal hidden" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 1000;">
+  <div class="modal-content" style="background: var(--bg-card, #fff); padding: 20px; border-radius: 12px; width: 320px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
+    <h3 style="margin-top: 0; margin-bottom: 15px; font-size: 18px; color: var(--text-main);">Chọn chủ đề đoạn chat</h3>
+    <div id="theme-options-list" style="display: flex; flex-direction: column; gap: 10px;">
+      <button class="theme-option-btn" data-theme-type="default" style="padding: 10px; border: 1px solid #ccc; border-radius: 8px; background: #fff; cursor: pointer; text-align: left; font-weight: 600;">🔵 Mặc định (Xanh dương)</button>
+      <button class="theme-option-btn" data-theme-type="love" style="padding: 10px; border: 1px solid #ffc0cb; border-radius: 8px; background: #fff0f3; color: #d53f8c; cursor: pointer; text-align: left; font-weight: 600;">❤️ Tình yêu (Hồng ngọt ngào)</button>
+      <button class="theme-option-btn" data-theme-type="monochrome" style="padding: 10px; border: 1px solid #4a5568; border-radius: 8px; background: #2d3748; color: #fff; cursor: pointer; text-align: left; font-weight: 600;">🖤 Đơn sắc (Tối giản)</button>
+      <button class="theme-option-btn" data-theme-type="nature" style="padding: 10px; border: 1px solid #68d391; border-radius: 8px; background: #f0fff4; color: #276749; cursor: pointer; text-align: left; font-weight: 600;">🌿 Thiên nhiên (Xanh lá)</button>
+    </div>
+    <button id="btn-close-theme-modal" style="width: 100%; margin-top: 15px; padding: 8px; background: #e2e8f0; border: none; border-radius: 6px; cursor: pointer; font-weight: 600;">Đóng</button>
+  </div>
+</div>
+
   <script src="/socket.io/socket.io.js"></script>
   <script src="app.js"></script>
 </body>
