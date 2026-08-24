@@ -618,29 +618,28 @@ function renderChatList() {
 
 
 function sendFriendRequest(userId) {
-  // ... (Giữ nguyên đoạn code gửi Socket/API lên server cũ của bạn ở đây) ...
-  // Ví dụ: socket.emit('send_friend_request', userId);
+  // 1. Bắt buộc phải phát sự kiện socket gửi lên server
+  socket.emit('friend:request', { targetId: userId });
 
-  // Thêm userId vào trạng thái đã gửi
+  // 2. Cập nhật trạng thái giao diện local
   if (!state.sentRequests) state.sentRequests = new Set();
   state.sentRequests.add(userId);
 
-  // Gọi lại hàm render để giao diện tự cập nhật sang nút "Hủy kết bạn"
   renderChatList();
+  showToast('Đã gửi lời mời kết bạn!');
 }
 
-// Thêm hàm xử lý khi nhấn Hủy kết bạn
 function cancelFriendRequest(userId) {
-  // ... (Nếu server có chức năng hủy lời mời, bạn gửi Socket/API ở đây) ...
-  // Ví dụ: socket.emit('cancel_friend_request', userId);
+  // 1. Bắt buộc phải phát sự kiện hủy lời mời lên server
+  socket.emit('friend:cancel_request', { targetId: userId });
 
-  // Xóa userId khỏi danh sách đã gửi
+  // 2. Cập nhật trạng thái giao diện local
   if (state.sentRequests) {
     state.sentRequests.delete(userId);
   }
 
-  // Gọi lại hàm render để giao diện tự cập nhật lại thành nút "Kết Bạn"
   renderChatList();
+  showToast('Đã hủy lời mời kết bạn');
 }
 
 function acceptFriend(reqId) { 
