@@ -31,7 +31,12 @@
   --border: #6b21a8;
 }
 
-* { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+* { 
+  box-sizing: border-box; 
+  margin: 0; 
+  padding: 0; 
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
+}
 
 body, html { 
   width: 100%; 
@@ -93,7 +98,7 @@ body, html {
 .msg.self { align-self: flex-end; background: var(--bg-bubble-self); color: #fff; border-bottom-right-radius: 4px; }
 .msg.other { align-self: flex-start; background: var(--bg-bubble-other); color: var(--text-main); border-bottom-left-radius: 4px; }
 
-/* Chat Input Bar chuẩn giao diện Messenger - Đã thêm đệm viền dưới màn hình điện thoại */
+/* Chat Input Bar chuẩn giao diện Messenger */
 .chat-input-bar { 
   display: flex; 
   align-items: center; 
@@ -107,366 +112,154 @@ body, html {
 .chat-input-bar input { flex: 1; background: var(--bg-card); border: none; padding: 10px 16px; border-radius: 20px; color: var(--text-main); outline: none; font-size: 14px; }
 .chat-input-bar button, .chat-input-bar .icon-btn { background: transparent; border: none; color: var(--text-sub); font-size: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center; min-width: 36px; height: 36px; }
 
-/* Modals */
-.modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 200; display: flex; justify-content: center; align-items: center; }
-.modal.hidden { display: none !important; }
-.modal-content { background: var(--bg-main); border: 1px solid var(--border); width: 90%; max-width: 400px; padding: 20px; border-radius: 16px; display: flex; flex-direction: column; gap: 12px; }
+/* ========================================== */
+/* --- CÁC CHỦ ĐỀ ĐOẠN CHAT (THEMES) --- */
+/* ========================================== */
+
+.chat-screen.theme-love { background: linear-gradient(135deg, #ffe4e6 0%, #fecdd3 100%) !important; }
+.chat-screen.theme-love .chat-header { border-bottom-color: rgba(225, 29, 72, 0.15); }
+.chat-screen.theme-love .msg.self { background-color: #e11d48 !important; color: #ffffff !important; }
+.chat-screen.theme-love .msg.other { background-color: #ffffff !important; color: #1f2937 !important; }
+.chat-screen.theme-love .chat-input-bar { background: transparent !important; border-top-color: rgba(225, 29, 72, 0.15); }
+.chat-screen.theme-love .chat-input-bar input { background: rgba(255, 255, 255, 0.65) !important; color: #881337 !important; }
+.chat-screen.theme-love .chat-input-bar input::placeholder { color: #fb7185 !important; }
+.chat-screen.theme-love .chat-input-bar button, .chat-screen.theme-love .chat-input-bar .icon-btn { color: #e11d48 !important; }
+
+.chat-screen.theme-coffee { background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%) !important; }
+.chat-screen.theme-coffee .msg.self { background-color: #b45309 !important; color: #ffffff !important; }
+.chat-screen.theme-coffee .msg.other { background-color: #fffbeb !important; color: #451a03 !important; }
+.chat-screen.theme-coffee .chat-input-bar { background: transparent !important; border-top-color: rgba(180, 83, 9, 0.15); }
+.chat-screen.theme-coffee .chat-input-bar input { background: rgba(255, 255, 255, 0.7) !important; color: #78350f !important; }
+.chat-screen.theme-coffee .chat-input-bar input::placeholder { color: #d97706 !important; }
+.chat-screen.theme-coffee .chat-input-bar button, .chat-screen.theme-coffee .chat-input-bar .icon-btn { color: #b45309 !important; }
+
+.chat-screen.theme-monochrome { background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%) !important; }
+.chat-screen.theme-monochrome .msg.self { background-color: #334155 !important; color: #ffffff !important; }
+.chat-screen.theme-monochrome .msg.other { background-color: #ffffff !important; color: #0f172a !important; }
+.chat-screen.theme-monochrome .chat-input-bar { background: transparent !important; border-top-color: rgba(51, 65, 85, 0.15); }
+.chat-screen.theme-monochrome .chat-input-bar input { background: rgba(255, 255, 255, 0.8) !important; color: #1e293b !important; }
+.chat-screen.theme-monochrome .chat-input-bar button, .chat-screen.theme-monochrome .chat-input-bar .icon-btn { color: #334155 !important; }
+
+.chat-screen.theme-nature { background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%) !important; }
+.chat-screen.theme-nature .msg.self { background-color: #059669 !important; color: #ffffff !important; }
+.chat-screen.theme-nature .msg.other { background-color: #ffffff !important; color: #064e3b !important; }
+.chat-screen.theme-nature .chat-input-bar { background: transparent !important; border-top-color: rgba(5, 150, 105, 0.15); }
+.chat-screen.theme-nature .chat-input-bar input { background: rgba(255, 255, 255, 0.7) !important; color: #065f46 !important; }
+.chat-screen.theme-nature .chat-input-bar button, .chat-screen.theme-nature .chat-input-bar .icon-btn { color: #059669 !important; }
+
+/* Preview Link & Images */
+.msg.self div, .msg.self a { color: inherit !important; }
+.msg.self > div:not(:first-child), .msg.self .link-preview, .msg.self .preview-container { background-color: rgba(0, 0, 0, 0.1) !important; color: #ffffff !important; border-radius: 0 0 12px 12px; padding: 6px 10px; margin-top: 4px; }
+.msg.other > div:not(:first-child), .msg.other .link-preview, .msg.other .preview-container { background-color: rgba(0, 0, 0, 0.05) !important; color: #1f2937 !important; border-radius: 0 0 12px 12px; padding: 6px 10px; margin-top: 4px; }
+
+.quick-reaction-btn { font-size: 22px; cursor: pointer; display: flex; align-items: center; justify-content: center; min-width: 36px; height: 36px; transition: transform 0.2s ease; user-select: none; }
+.quick-reaction-btn:hover { transform: scale(1.2); }
+
+/* Emoji Picker */
+.emoji-picker, .emoji-container, .emoji-grid, div[class*="emoji"] { padding: 10px 12px !important; gap: 10px !important; }
+.emoji-picker span, .emoji-picker button, .emoji-container span, .emoji-container button, .emoji-grid span, .emoji-grid button, .emoji-item { font-size: 26px !important; width: 38px !important; height: 38px !important; display: inline-flex !important; align-items: center !important; justify-content: center !important; cursor: pointer; border-radius: 8px; transition: transform 0.15s ease, background-color 0.15s ease; }
+.emoji-picker span:active, .emoji-picker button:active, .emoji-container span:active, .emoji-container button:active, .emoji-item:active { transform: scale(1.3); background-color: rgba(0, 0, 0, 0.08); }
+
+.msg img, .message-content img, .chat-screen img, .chat-image { max-width: 100% !important; max-height: 280px !important; width: auto !important; height: auto !important; border-radius: 12px !important; object-fit: cover !important; display: block !important; margin-top: 4px; cursor: pointer; }
+
+/* Request Items */
+.filter-btn-request { display: inline-flex; align-items: center; gap: 6px; background: var(--bg-card); border: 1px solid var(--border); color: var(--text-main); padding: 6px 12px; border-radius: 16px; font-size: 13px; font-weight: 500; cursor: pointer; transition: background 0.2s; }
+.filter-btn-request:hover { background: var(--border); }
+.filter-btn-request.active { background: var(--bg-bubble-self); color: #fff; border-color: transparent; }
+
+.btn-action.green, .btn-accept { background: #0084ff !important; color: #ffffff !important; border: none !important; padding: 6px 16px !important; border-radius: 20px !important; font-weight: 600 !important; font-size: 13px !important; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.1); transition: transform 0.1s ease, opacity 0.2s ease; }
+.btn-action.green:hover, .btn-accept:hover { opacity: 0.9; transform: scale(1.03); }
+.btn-action.green:active, .btn-accept:active { transform: scale(0.97); }
+
+.chat-item.request-item { background: var(--bg-card); border-radius: 12px; margin: 4px 8px; padding: 10px 14px; }
+
+/* ========================================== */
+/* --- MODAL DIALOGS & REPORT MODAL FIX --- */
+/* ========================================== */
+
+.modal { 
+  position: fixed; 
+  top: 0; 
+  left: 0; 
+  width: 100%; 
+  height: 100%; 
+  background: rgba(0,0,0,0.7); 
+  z-index: 200; 
+  display: flex; 
+  justify-content: center; 
+  align-items: center; 
+  overflow-x: hidden !important; 
+}
+
+/* Đảm bảo đồng bộ tất cả tên class khung Modal */
+.modal-content, 
+.modal-group-content, 
+.modal-card, 
+.report-modal { 
+  background: #ffffff; 
+  color: #333333;
+  width: 90% !important; 
+  max-width: 400px !important; 
+  padding: 20px !important; 
+  border-radius: 16px !important; 
+  display: flex; 
+  flex-direction: column; 
+  gap: 12px; 
+  box-sizing: border-box !important;
+  overflow-x: hidden !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+}
+
+/* Ép 100% các thẻ con bên trong Modal không bị tràn lề */
+.modal-content *, 
+.modal-group-content *, 
+.modal-card *, 
+.report-modal * { 
+  box-sizing: border-box !important; 
+  max-width: 100% !important; 
+}
+
+.modal h2, .modal h3 { 
+  text-align: center; 
+  margin-top: 0; 
+  margin-bottom: 8px; 
+  font-size: 20px; 
+  color: #2d3748; 
+}
+
+/* Ép chiều rộng và chống dồn padding cho select, textarea, input */
+.modal select, 
+.modal textarea, 
+.modal input { 
+  width: 100% !important; 
+  padding: 10px 12px !important; 
+  border: 1px solid #cbd5e0 !important; 
+  border-radius: 8px !important; 
+  font-size: 14px !important; 
+  outline: none !important; 
+  background: #ffffff !important; 
+  color: #2d3748 !important;
+  margin-top: 4px !important; 
+  margin-bottom: 12px !important; 
+}
+
+/* Khung nhập mô tả chi tiết */
+.modal textarea { 
+  min-height: 90px !important; 
+  resize: vertical !important; /* Ngăn kéo co giãn ngang gây vỡ khung */
+}
+
+/* Nút bấm trong Modal */
+.modal-actions { 
+  display: flex !important; 
+  justify-content: center !important; 
+  align-items: center !important; 
+  gap: 10px !important; 
+  margin-top: 8px !important; 
+  width: 100% !important;
+}
+
 .btn-primary { background: var(--bg-bubble-self); color: #fff; border: none; padding: 10px; border-radius: 8px; font-weight: bold; cursor: pointer; }
 .btn-close { background: transparent; color: var(--text-sub); border: none; padding: 8px; cursor: pointer; }
-
-/* ========================================== */
-/* --- CÁC CHỦ ĐỀ ĐOẠN CHAT (THEMES) ĐẸP MẮT --- */
-/* ========================================== */
-
-/* 1. Chủ đề Tình yêu (Love) */
-.chat-screen.theme-love {
-  background: linear-gradient(135deg, #ffe4e6 0%, #fecdd3 100%) !important;
-}
-.chat-screen.theme-love .chat-header {
-  border-bottom-color: rgba(225, 29, 72, 0.15);
-}
-.chat-screen.theme-love .msg.self {
-  background-color: #e11d48 !important;
-  color: #ffffff !important;
-}
-.chat-screen.theme-love .msg.other {
-  background-color: #ffffff !important;
-  color: #1f2937 !important;
-}
-.chat-screen.theme-love .chat-input-bar {
-  background: transparent !important;
-  border-top-color: rgba(225, 29, 72, 0.15);
-}
-.chat-screen.theme-love .chat-input-bar input {
-  background: rgba(255, 255, 255, 0.65) !important;
-  color: #881337 !important;
-}
-.chat-screen.theme-love .chat-input-bar input::placeholder {
-  color: #fb7185 !important;
-}
-.chat-screen.theme-love .chat-input-bar button,
-.chat-screen.theme-love .chat-input-bar .icon-btn {
-  color: #e11d48 !important;
-}
-
-/* 2. Chủ đề Cà phê (Coffee) */
-.chat-screen.theme-coffee {
-  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%) !important;
-}
-.chat-screen.theme-coffee .msg.self {
-  background-color: #b45309 !important;
-  color: #ffffff !important;
-}
-.chat-screen.theme-coffee .msg.other {
-  background-color: #fffbeb !important;
-  color: #451a03 !important;
-}
-.chat-screen.theme-coffee .chat-input-bar {
-  background: transparent !important;
-  border-top-color: rgba(180, 83, 9, 0.15);
-}
-.chat-screen.theme-coffee .chat-input-bar input {
-  background: rgba(255, 255, 255, 0.7) !important;
-  color: #78350f !important;
-}
-.chat-screen.theme-coffee .chat-input-bar input::placeholder {
-  color: #d97706 !important;
-}
-.chat-screen.theme-coffee .chat-input-bar button,
-.chat-screen.theme-coffee .chat-input-bar .icon-btn {
-  color: #b45309 !important;
-}
-
-/* 3. Chủ đề Đơn sắc (Monochrome) */
-.chat-screen.theme-monochrome {
-  background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%) !important;
-}
-.chat-screen.theme-monochrome .msg.self {
-  background-color: #334155 !important;
-  color: #ffffff !important;
-}
-.chat-screen.theme-monochrome .msg.other {
-  background-color: #ffffff !important;
-  color: #0f172a !important;
-}
-.chat-screen.theme-monochrome .chat-input-bar {
-  background: transparent !important;
-  border-top-color: rgba(51, 65, 85, 0.15);
-}
-.chat-screen.theme-monochrome .chat-input-bar input {
-  background: rgba(255, 255, 255, 0.8) !important;
-  color: #1e293b !important;
-}
-.chat-screen.theme-monochrome .chat-input-bar button,
-.chat-screen.theme-monochrome .chat-input-bar .icon-btn {
-  color: #334155 !important;
-}
-
-/* 4. Chủ đề Thả thính / Nature */
-.chat-screen.theme-nature {
-  background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%) !important;
-}
-.chat-screen.theme-nature .msg.self {
-  background-color: #059669 !important;
-  color: #ffffff !important;
-}
-.chat-screen.theme-nature .msg.other {
-  background-color: #ffffff !important;
-  color: #064e3b !important;
-}
-.chat-screen.theme-nature .chat-input-bar {
-  background: transparent !important;
-  border-top-color: rgba(5, 150, 105, 0.15);
-}
-.chat-screen.theme-nature .chat-input-bar input {
-  background: rgba(255, 255, 255, 0.7) !important;
-  color: #065f46 !important;
-}
-.chat-screen.theme-nature .chat-input-bar button,
-.chat-screen.theme-nature .chat-input-bar .icon-btn {
-  color: #059669 !important;
-}
-
-/* ========================================== */
-/* --- TINH CHỈNH PHẦN XEM TRƯỚC LINK --- */
-/* ========================================== */
-.msg.self div, 
-.msg.self a {
-  color: inherit !important;
-}
-
-.msg.self > div:not(:first-child),
-.msg.self .link-preview, 
-.msg.self .preview-container {
-  background-color: rgba(0, 0, 0, 0.1) !important;
-  color: #ffffff !important;
-  border-radius: 0 0 12px 12px;
-  padding: 6px 10px;
-  margin-top: 4px;
-}
-
-.msg.other > div:not(:first-child),
-.msg.other .link-preview, 
-.msg.other .preview-container {
-  background-color: rgba(0, 0, 0, 0.05) !important;
-  color: #1f2937 !important;
-  border-radius: 0 0 12px 12px;
-  padding: 6px 10px;
-  margin-top: 4px;
-}
-
-/* --- CẢM XUẤT NHANH (QUICK REACTION) --- */
-.quick-reaction-btn {
-  font-size: 22px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 36px;
-  height: 36px;
-  transition: transform 0.2s ease;
-  user-select: none;
-}
-
-.quick-reaction-btn:hover {
-  transform: scale(1.2);
-}
-
-/* --- TĂNG KÍCH THƯỚC KHUNG BIỂU CẢM & EMOJI --- */
-
-/* Class chung cho khung chứa biểu cảm (Bạn có thể đổi tên class này theo đúng HTML của bạn, ví dụ: .emoji-picker, .emoji-box, .emoji-grid...) */
-.emoji-picker, 
-.emoji-container, 
-.emoji-grid,
-div[class*="emoji"] {
-  padding: 10px 12px !important;
-  gap: 10px !important; /* Khoảng cách giữa các emoji */
-}
-
-/* Tăng kích thước của từng icon emoji bên trong khung */
-.emoji-picker span, 
-.emoji-picker button,
-.emoji-container span, 
-.emoji-container button,
-.emoji-grid span,
-.emoji-grid button,
-.emoji-item {
-  font-size: 26px !important; /* Tăng kích thước emoji (mặc định có thể đang nhỏ khoảng 18-20px) */
-  width: 38px !important;
-  height: 38px !important;
-  display: inline-flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  cursor: pointer;
-  border-radius: 8px;
-  transition: transform 0.15s ease, background-color 0.15s ease;
-}
-
-/* Hiệu ứng khi ấn hoặc chạm vào emoji */
-.emoji-picker span:active, 
-.emoji-picker button:active,
-.emoji-container span:active, 
-.emoji-container button:active,
-.emoji-item:active {
-  transform: scale(1.3);
-  background-color: rgba(0, 0, 0, 0.08);
-}
-
-/* --- GIỚI HẠN KÍCH THƯỚC HÌNH ẢNH TRONG CHAT --- */
-.msg img, 
-.message-content img,
-.chat-screen img,
-.chat-image {
-  max-width: 100% !important;
-  max-height: 280px !important; /* Giới hạn chiều cao tối đa để ảnh gọn gàng */
-  width: auto !important;
-  height: auto !important;
-  border-radius: 12px !important;
-  object-fit: cover !important;
-  display: block !important;
-  margin-top: 4px;
-  cursor: pointer;
-}
-
-/* --- LÀM ĐẸP NÚT KẾT BẠN & ĐỒNG Ý --- */
-.filter-btn-request {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  color: var(--text-main);
-  padding: 6px 12px;
-  border-radius: 16px;
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: background 0.2s;
-}
-.filter-btn-request:hover {
-  background: var(--border);
-}
-.filter-btn-request.active {
-  background: var(--bg-bubble-self);
-  color: #fff;
-  border-color: transparent;
-}
-
-/* Nút Đồng ý kết bạn hiện đại, bo tròn */
-.btn-action.green, .btn-accept {
-  background: #0084ff !important; /* Dùng màu xanh đặc trưng Messenger hoặc #22c55e nếu thích xanh lá */
-  color: #ffffff !important;
-  border: none !important;
-  padding: 6px 16px !important;
-  border-radius: 20px !important;
-  font-weight: 600 !important;
-  font-size: 13px !important;
-  cursor: pointer;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-  transition: transform 0.1s ease, opacity 0.2s ease;
-}
-.btn-action.green:hover, .btn-accept:hover {
-  opacity: 0.9;
-  transform: scale(1.03);
-}
-.btn-action.green:active, .btn-accept:active {
-  transform: scale(0.97);
-}
-
-/* Khung chứa lời mời kết bạn trong danh sách */
-.chat-item.request-item {
-  background: var(--bg-card);
-  border-radius: 12px;
-  margin: 4px 8px;
-  padding: 10px 14px;
-}
-
-/* Khung nền mờ bao ngoài Modal */
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
-  background: rgba(0, 0, 0, 0.6);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 9999;
-}
-
-/* Khung hộp Modal báo cáo */
-.modal-card, .report-modal {
-  width: 90%;
-  max-width: 440px; /* Độ rộng vừa vặn, chuẩn giao diện */
-  background: #ffffff;
-  padding: 24px;
-  border-radius: 12px;
-  box-sizing: border-box; /* Bắt buộc để padding không gây tràn khung */
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
-  overflow-x: hidden; /* Triệt tiêu hoàn toàn thanh cuộn ngang */
-}
-
-/* Đảm bảo toàn bộ thẻ con bên trong tự động co giãn vừa khung */
-.modal-card *, 
-.report-modal * {
-  box-sizing: border-box;
-  max-width: 100%;
-}
-
-/* Tiêu đề Modal */
-.modal-card h2, .report-modal h2 {
-  text-align: center;
-  margin-top: 0;
-  margin-bottom: 20px;
-  font-size: 22px;
-  color: #333;
-}
-
-/* Các trường chọn & nhập liệu */
-.modal-card select,
-.modal-card textarea {
-  width: 100%;
-  padding: 10px 12px;
-  border: 1px solid #dcdfe6;
-  border-radius: 8px;
-  font-size: 14px;
-  outline: none;
-  margin-top: 6px;
-  margin-bottom: 16px;
-}
-
-/* Khung mô tả chi tiết */
-.modal-card textarea {
-  min-height: 100px;
-  resize: vertical; /* Chỉ cho phép kéo giãn chiều cao, chặn kéo ngang */
-}
-
-/* Khung chứa nhóm nút bấm */
-.modal-actions {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 12px;
-  margin-top: 8px;
-}
-
-/* Định dạng các nút bấm */
-.modal-actions button {
-  padding: 10px 24px;
-  border-radius: 8px;
-  border: none;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.2s;
-}
-
-.btn-submit {
-  background-color: #e53935;
-  color: #ffffff;
-}
-
-.btn-cancel {
-  background-color: #e0e0e0;
-  color: #333333;
-}
+.btn-submit { background-color: #e53935; color: #ffffff; }
+.btn-cancel { background-color: #e0e0e0; color: #333333; }
