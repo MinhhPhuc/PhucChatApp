@@ -217,7 +217,6 @@ socket.on('auth:restricted', (message) => {
 
 // Lắng nghe thông báo lỗi/hạn chế tin nhắn
 socket.on('message:error', (errorMsg) => {
-  // Kiểm tra xem có phải lỗi hạn chế không để hiện nút hỗ trợ
   if (errorMsg.includes('hạn chế')) {
     Swal.fire({
       icon: 'warning',
@@ -230,7 +229,6 @@ socket.on('message:error', (errorMsg) => {
       cancelButtonColor: '#3182ce',
       reverseButtons: true
     }).then((result) => {
-      // Nếu người dùng bấm nút "Yêu cầu hỗ trợ gỡ hạn chế" (nút cancel trong swal)
       if (result.dismiss === Swal.DismissReason.cancel) {
         Swal.fire({
           title: 'Gửi yêu cầu hỗ trợ',
@@ -244,21 +242,19 @@ socket.on('message:error', (errorMsg) => {
         }).then((appealResult) => {
           if (appealResult.isConfirmed) {
             const reason = appealResult.value || 'Xin hỗ trợ gỡ hạn chế tài khoản';
-            // Lấy thông tin user hiện tại từ biến global của bạn
-        const currentUsr = (typeof currentUser !== 'undefined' ? currentUser : null) || state.currentUser;
+            const currentUsr = (typeof currentUser !== 'undefined' ? currentUser : null) || state.currentUser;
 
-          socket.emit('appeal:restriction', { 
-            reason: reason,
-            userId: currentUsr?.id,
-            username: currentUsr?.username
-          });
-          showToast('Đã gửi yêu cầu hỗ trợ tới Admin thành công!');
-            }
+            socket.emit('appeal:restriction', { 
+              reason: reason,
+              userId: currentUsr?.id,
+              username: currentUsr?.username
+            });
+            showToast('Đã gửi yêu cầu hỗ trợ tới Admin thành công!');
+          }
         });
       }
     });
   } else {
-    // Các lỗi thông thường khác
     Swal.fire({
       icon: 'warning',
       title: 'Thông báo',
@@ -285,25 +281,13 @@ if (btnLogout) {
   };
 }
 
-const btnOpenDeleteChat = document.getElementById('btnOpenDeleteChat'); // Nút "Xóa đoạn chat" trong menu
-const confirmDeleteModal = document.getElementById('confirmDeleteModal'); // Hộp thoại xác nhận xóa (như hình 2)
-
-if (btnOpenDeleteChat && confirmDeleteModal) {
-  btnOpenDeleteChat.addEventListener('click', (e) => {
-    e.stopPropagation(); // Ngăn sự kiện nổi bọt lên các lớp cha
-    chatSettingsModal.style.display = 'none'; // Đóng menu cài đặt lại
-    confirmDeleteModal.style.display = 'flex'; // Hiển thị bảng xác nhận xóa đoạn chat
-  });
-}
-
-const chatSettingsModal = document.getElementById('chatSettingsModal'); // ID của khung cài đặt tổng
-
-if (chatSettingsModal) {
-  chatSettingsModal.addEventListener('click', function(e) {
-    // Chỉ đóng modal khi người dùng bấm chính xác vào vùng nền tối bên ngoài, 
-    // không bấm vào hộp nội dung bên trong
-    if (e.target === chatSettingsModal) {
-      chatSettingsModal.style.display = 'none'; // Ẩn bảng cài đặt đi
+// Xử lý click ra ngoài modal cài đặt chat để đóng an toàn
+const modalChatSettings = document.getElementById('modal-chat-settings');
+if (modalChatSettings) {
+  modalChatSettings.addEventListener('click', function(e) {
+    if (e.target === modalChatSettings) {
+      modalChatSettings.style.display = 'none';
+      modalChatSettings.classList.add('hidden');
     }
   });
 }
@@ -673,7 +657,6 @@ socket.on('messages:history', ({ roomId, messages }) => {
   renderChatList();
 });
 
-// Lắng nghe khi xóa đơn phương thành công từ server cho riêng user hiện tại
 socket.on('messages:cleared_me', ({ roomId }) => {
   if (state.activeRoomId === roomId) {
     const viewport = document.getElementById('messages-viewport');
@@ -829,7 +812,7 @@ document.addEventListener('click', (e) => {
   const modalNickname = document.getElementById('modal-nickname');
   const modalConfirm = document.getElementById('modal-confirm');
 
-  // 1. XÓA ĐOẠN CHAT (CHỈ Ở PHÍA CÁ NHÂN HIỆN TẠI)
+  // 1. XÓA ĐOẠN CHAT
   const btnDeleteChat = e.target.closest('#delete-chat, #btn-delete-chat, #set-delete-chat') || 
                         (e.target.innerText && e.target.innerText.includes('Xóa đoạn chat') ? e.target : null);
   if (btnDeleteChat) {
@@ -847,47 +830,40 @@ document.addEventListener('click', (e) => {
     return;
   }
 
- // --- XÓA KẾT BẠN (HỦY KẾT BẠN) ---
-const btnUnfriend = e.target.closest('#set-unfriend, #btn-unfriend') || 
-                    (e.target.innerText && e.target.innerText.includes('Xóa kết bạn') ? e.target : null);
+  // 2. XÓA KẾT BẠN (HỦY KẾT BẠN)
+  const btnUnfriend = e.target.closest('#set-unfriend, #btn-unfriend') || 
+                      (e.target.innerText && e.target.innerText.includes('Xóa kết bạn') ? e.target : null);
 
-if (btnUnfriend) {
-  if (modalChatSettings) {
-    modalChatSettings.classList.add('hidden');
-    modalChatSettings.style.display = 'none';
+  if (btnUnfriend) {
+    if (modalChatSettings) {
+      modalChatSettings.classList.add('hidden');
+      modalChatSettings.style.display = 'none';
+    }
+
+    if (state.activeRoomId && state.activeRoomId.includes('_DM_') && state.currentUser) {
+      const parts = state.activeRoomId.split('_DM_');
+      const targetFriendId = parts.find(id => id !== state.currentUser.id);
+      const friend = state.friends.find(f => f.id === targetFriendId);
+      const friendName = friend ? friend.username : 'người dùng này';
+
+      showConfirmModal(
+        'Xóa kết bạn',
+        `Bạn có chắc chắn muốn xóa kết bạn với ${friendName}?`,
+        () => {
+          socket.emit('friend:unfriend', { friendId: targetFriendId });
+          state.friends = state.friends.filter(f => f.id !== targetFriendId);
+
+          const chatScreen = document.getElementById('chat-screen');
+          if (chatScreen) chatScreen.classList.add('hidden');
+          state.activeRoomId = null;
+
+          renderChatList();
+          showToast(`Đã xóa kết bạn với ${friendName}!`);
+        }
+      );
+    }
+    return;
   }
-
-  if (state.activeRoomId && state.activeRoomId.includes('_DM_') && state.currentUser) {
-    const parts = state.activeRoomId.split('_DM_');
-    const targetFriendId = parts.find(id => id !== state.currentUser.id);
-    const friend = state.friends.find(f => f.id === targetFriendId);
-
-    const friendName = friend ? friend.username : 'người dùng này';
-
-    showConfirmModal(
-      'Xóa kết bạn',
-      `Bạn có chắc chắn muốn xóa kết bạn với ${friendName}?`,
-      () => {
-        // 1. Gửi socket lên server
-        socket.emit('friend:unfriend', { friendId: targetFriendId });
-
-        // 2. Xóa ngay bạn bè khỏi state local ở client
-        state.friends = state.friends.filter(f => f.id !== targetFriendId);
-
-        // 3. Đóng màn hình chat hiện tại
-        const chatScreen = document.getElementById('chat-screen');
-        if (chatScreen) chatScreen.classList.add('hidden');
-        state.activeRoomId = null;
-
-        // 4. Cập nhật lại danh sách hiển thị
-        renderChatList();
-
-        showToast(`Đã xóa kết bạn với ${friendName}!`);
-      }
-    );
-  }
-  return;
-}
 
   // 3. TAB LỌC DANH SÁCH CHAT
   const tabBtn = e.target.closest('.filter-tab-btn');
@@ -1159,7 +1135,6 @@ if (btnUnfriend) {
       modalChatSettings.style.display = 'none';
     }
 
-    // 👉 Tách và lấy đúng ID cá nhân của người đối diện (tránh lỗi _DM_)
     let targetUserId = state.activeRoomId; 
     if (targetUserId && targetUserId.includes('_DM_')) {
       const parts = targetUserId.split('_DM_');
@@ -1198,8 +1173,6 @@ if (btnUnfriend) {
     }).then((result) => {
       if (result.isConfirmed) {
         const { reason, description } = result.value;
-        
-        // Lấy thông tin user hiện tại từ localStorage (hoặc biến toàn cục có sẵn)
         const currentUsr = JSON.parse(localStorage.getItem('user')) || {};
 
         socket.emit('report:submit', { 
@@ -1211,7 +1184,7 @@ if (btnUnfriend) {
         });
         
         showToast('Đã gửi báo cáo tới Admin thành công!');
-    }
+      }
     });
     return;
   }
