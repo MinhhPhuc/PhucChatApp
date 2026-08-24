@@ -98,6 +98,20 @@ function applyRoomTheme(roomId) {
   }
 }
 
+function updateRequestBadge(requestsList) {
+  const badge = document.getElementById('request-count-badge');
+  if (!badge) return;
+
+  const count = requestsList ? requestsList.length : 0;
+
+  if (count >= 1) {
+    badge.innerText = count;
+    badge.style.display = 'inline-block'; // Hiện badge khi >= 1 lời mời
+  } else {
+    badge.style.display = 'none'; // Ẩn badge khi bằng 0
+  }
+}
+
 // --- EMOJI NHANH ---
 function updateQuickReactionUI(roomId) {
   const trigger = document.getElementById('quick-reaction-trigger');
@@ -417,11 +431,26 @@ function renderChatList() {
   const query = state.searchQuery || '';
   const filter = state.activeFilter || 'all';
 
-  // 1. Xử lý hiển thị danh sách Lời mời kết bạn (nếu chọn filter là 'requests' hoặc đang ở 'all')
-  if ((filter === 'all' || filter === 'requests') && state.requests.length > 0 && !query) {
-    if (filter === 'requests') {
-      list.innerHTML += `<div style="padding: 8px 16px; font-weight: 600; color: var(--text-main);">Lời mời kết bạn (${state.requests.length})</div>`;
+  // 0. Tự động cập nhật Badge hiển thị số lời mời kết bạn
+  const badge = document.getElementById('request-count-badge');
+  if (badge) {
+    const reqCount = state.requests ? state.requests.length : 0;
+    if (reqCount >= 1) {
+      badge.innerText = reqCount;
+      badge.style.display = 'inline-block'; // Hiện badge khi có lời mời
+    } else {
+      badge.style.display = 'none'; // Ẩn badge khi không có lời mời
     }
+  }
+
+  // 1. Xử lý hiển thị danh sách Lời mời kết bạn (CHỈ khi ở tab 'requests')
+  if (filter === 'requests' && !query) {
+    if (state.requests.length === 0) {
+      list.innerHTML = `<div class="empty-hint" style="text-align:center; padding:30px; color:var(--text-sub);">Không có lời mời kết bạn nào</div>`;
+      return;
+    }
+
+    list.innerHTML += `<div style="padding: 8px 16px; font-weight: 600; color: var(--text-main);">Lời mời kết bạn (${state.requests.length})</div>`;
     state.requests.forEach(req => {
       list.innerHTML += `
         <div class="chat-item request-item">
@@ -434,9 +463,8 @@ function renderChatList() {
         </div>
       `;
     });
+    return; // Dừng lại ở tab Lời mời, không render danh sách chat phía dưới
   }
-
-  if (filter === 'requests') return; // Nếu đang ở tab Lời mời thì dừng ở đây không render chat nữa
 
   // 2 & 3. Gộp chung Nhóm chat và Bạn bè để sắp xếp theo tin nhắn mới nhất
   let combinedChats = [];
@@ -473,7 +501,7 @@ function renderChatList() {
 
   combinedChats.sort((a, b) => b.timeVal - a.timeVal);
 
-  if (combinedChats.length === 0 && state.requests.length === 0) {
+  if (combinedChats.length === 0) {
     list.innerHTML += `<div class="empty-hint" style="text-align:center; padding:30px; color:var(--text-sub);">Không có cuộc trò chuyện nào</div>`;
   } else {
     combinedChats.forEach(entry => {
