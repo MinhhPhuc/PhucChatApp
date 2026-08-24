@@ -453,24 +453,22 @@ io.on('connection', (socket) => {
   });
 
   socket.on('friend:unfriend', async ({ friendId }) => {
-  try {
-    // 1. Lấy ID của người dùng hiện tại từ socket (hoặc socket.userId / socket.user.id tùy cách bạn lưu)
-    const currentUserId = socket.userId || (socket.user && socket.user.id);
-    
-    if (!currentUserId || !friendId) return;
+    try {
+      const currentUserId = socket.userId || (socket.user && socket.user.id);
+      if (!currentUserId || !friendId) return;
 
-    // 2. Xử lý xóa quan hệ bạn bè trong cơ sở dữ liệu của bạn tại đây
-    // Ví dụ: await User.findByIdAndUpdate(currentUserId, { $pull: { friends: friendId } });
-    // Ví dụ: await User.findByIdAndUpdate(friendId, { $pull: { friends: currentUserId } });
+      // 1. Xóa ID của nhau khỏi mảng friends trong MongoDB
+      await User.findByIdAndUpdate(currentUserId, { $pull: { friends: friendId } });
+      await User.findByIdAndUpdate(friendId, { $pull: { friends: currentUserId } });
 
-    // 3. Phát sự kiện tới cả 2 người dùng để Client tự động load lại dữ liệu mới
-    io.to(currentUserId).emit('friend:updated');
-    io.to(friendId).emit('friend:updated');
+      // 2. Báo cho cả 2 client tải lại dữ liệu
+      io.to(currentUserId).emit('friend:updated');
+      io.to(friendId).emit('friend:updated');
 
-  } catch (error) {
-    console.error('Lỗi khi xóa kết bạn:', error);
-  }
-});
+    } catch (error) {
+      console.error('Lỗi khi xóa kết bạn:', error);
+    }
+  });
 
 });
 
