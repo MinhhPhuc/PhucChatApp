@@ -281,6 +281,16 @@ if (btnLogout) {
   };
 }
 
+const badge = document.getElementById('request-count-badge');
+const count = friendRequests.length; // Hoặc biến đếm số lượng của bạn
+
+if (count > 0) {
+  badge.innerText = count;
+  badge.style.display = 'inline-block'; // Hiện badge khi có lời mời
+} else {
+  badge.style.display = 'none'; // Ẩn badge khi bằng 0
+}
+
 // Xử lý click ra ngoài modal cài đặt chat để đóng an toàn
 const modalChatSettings = document.getElementById('modal-chat-settings');
 if (modalChatSettings) {
