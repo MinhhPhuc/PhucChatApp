@@ -132,16 +132,25 @@ io.on('connection', (socket) => {
   let currentUser = null;
 
 // Thao tác xóa lịch sử nhắn tin của một phòng
+  // Thao tác xóa lịch sử nhắn tin của một phòng (Đã sửa tương thích với DB.messages)
   socket.on('messages:clear', ({ roomId }) => {
-    // 1. Xóa trong CSDL hoặc mảng lưu trữ tin nhắn tạm thời của bạn
-    // Ví dụ nếu dùng mảng tạm: messages = messages.filter(m => m.roomId !== roomId);
-    if (global.messagesStore && global.messagesStore[roomId]) {
-      global.messagesStore[roomId] = [];
-    }
+    if (!roomId) return;
 
-    // 2. Phát sự kiện phản hồi lại cho Client
-    io.to(roomId).emit('messages:cleared', { roomId });
-    socket.emit('messages:cleared', { roomId });
+    // 1. Xóa lịch sử trong Map dữ liệu & lưu lại vào database.json
+    DB.messages.set(roomId, []);
+    saveDB();
+
+    // 2. Báo về cho cả 2 người (nếu là Chat riêng) hoặc cả nhóm (nếu là Group)
+    if (roomId.startsWith('grp_')) {
+      io.to(roomId).emit('messages:cleared', { roomId });
+    } else {
+      const parts = roomId.split('_DM_');
+      if (parts.length === 2) {
+        io.to(parts[0]).to(parts[1]).emit('messages:cleared', { roomId });
+      } else {
+        socket.emit('messages:cleared', { roomId });
+      }
+    }
   });
 
   // --- CÁC THAO TÁC QUẢN LÝ NHÓM ---
