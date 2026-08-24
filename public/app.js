@@ -1039,3 +1039,19 @@ function renderAddMembersCheckbox() {
     `;
   });
 }
+
+// Xử lý sự kiện bấm vào nút cảm xúc nhanh ở thanh nhập tin nhắn
+document.getElementById('quick-reaction-trigger')?.addEventListener('click', () => {
+  const msgInput = document.getElementById('msg-input');
+  const quickEmoji = document.getElementById('quick-reaction-trigger').innerText || '❤️';
+  
+  // Nếu có hàm gửi tin nhắn sẵn trong app.js của bạn, gọi trực tiếp:
+  if (typeof sendMessage === 'function') {
+    // Gửi emoji cảm xúc nhanh
+    sendMessage(quickEmoji);
+  } else {
+    // Hoặc gán trực tiếp vào ô input và kích hoạt gửi
+    msgInput.value = quickEmoji;
+    document.getElementById('btn-send')?.click();
+  }
+});
