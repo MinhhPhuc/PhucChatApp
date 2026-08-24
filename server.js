@@ -452,37 +452,25 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('friend:unfriend', async ({ friendId }) => {
-  try {
-    // 1. Lấy ID của người dùng đang đăng nhập
-    const currentUserId = socket.userId || (socket.user && socket.user.id);
-    if (!currentUserId || !friendId) return;
+  socket.on('friend:unfriend', ({ friendId }) => {
+    if (!currentUser || !friendId) return;
+    const currentUserId = currentUser.id;
 
-    // --- 2. CODE XÓA BẠN BÈ TRONG DATABASE CỦA BẠN ---
-    // (Hãy chọn cách phù hợp với Database bạn đang dùng trên server):
+    // 1. Xóa bỏ ID của nhau trong cấu trúc DB.friends (Map của bạn)
+    if (DB.friends.has(currentUserId)) {
+      DB.friends.get(currentUserId).delete(friendId);
+    }
+    if (DB.friends.has(friendId)) {
+      DB.friends.get(friendId).delete(currentUserId);
+    }
 
-    // * Nếu dùng MongoDB / Mongoose:
-    await User.findByIdAndUpdate(currentUserId, { $pull: { friends: friendId } });
-    await User.findByIdAndUpdate(friendId, { $pull: { friends: currentUserId } });
+    // 2. Lưu lại thay đổi vào file database.json
+    saveDB();
 
-    // * Hoặc nếu bạn dùng file JSON (ví dụ mảng users):
-    /*
-    const userA = users.find(u => u.id === currentUserId);
-    const userB = users.find(u => u.id === friendId);
-    if (userA) userA.friends = userA.friends.filter(id => id !== friendId);
-    if (userB) userB.friends = userB.friends.filter(id => id !== currentUserId);
-    // Lưu lại file json của bạn ở đây...
-    */
-    // ------------------------------------------------
-
-    // 3. Báo cho cả 2 phía cập nhật lại dữ liệu mới nhất từ server
-    io.to(currentUserId).emit('friend:updated');
+    // 3. Đồng bộ lại dữ liệu ngay lập tức cho người đang thao tác và người bạn bị xóa
+    syncUserData(socket, currentUserId);
     io.to(friendId).emit('friend:updated');
-
-  } catch (error) {
-    console.error('Lỗi khi xóa kết bạn trên server:', error);
-  }
-});
+  });
 
 });
 
