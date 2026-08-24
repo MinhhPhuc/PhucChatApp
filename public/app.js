@@ -1061,7 +1061,7 @@ if (btnUnfriend) {
     return;
   }
   
-  // 9. BÁO CÁO TỚI ADMIN (Đã sửa lại id='set-report' cho khớp với HTML của bạn)
+  // 9. BÁO CÁO TỚI ADMIN 
   const reportBtn = e.target.closest('#set-report'); 
   if (reportBtn) {
     if (modalChatSettings) {
@@ -1069,7 +1069,13 @@ if (btnUnfriend) {
       modalChatSettings.style.display = 'none';
     }
 
-    const targetUserId = state.activeRoomId; 
+    // 👉 Tách và lấy đúng ID cá nhân của người đối diện (tránh lỗi _DM_)
+    let targetUserId = state.activeRoomId; 
+    if (targetUserId && targetUserId.includes('_DM_')) {
+      const parts = targetUserId.split('_DM_');
+      const myId = (typeof currentUser !== 'undefined' ? currentUser?.id : null) || state.currentUser?.id;
+      targetUserId = parts.find(id => id !== myId) || parts[0];
+    }
 
     Swal.fire({
       title: 'Báo cáo vi phạm',
