@@ -1061,15 +1061,14 @@ if (btnUnfriend) {
     return;
   }
   
-  // 9. BÁO CÁO TỚI ADMIN
-  const reportBtn = e.target.closest('#report-admin'); // ID nút "Báo cáo tới Admin" của bạn
+  // 9. BÁO CÁO TỚI ADMIN (Đã sửa lại id='set-report' cho khớp với HTML của bạn)
+  const reportBtn = e.target.closest('#set-report'); 
   if (reportBtn) {
     if (modalChatSettings) {
       modalChatSettings.classList.add('hidden');
       modalChatSettings.style.display = 'none';
     }
 
-    // Lấy ID người dùng đối diện trong phòng chat hiện tại (hoặc state.activeRoomId nếu là ID user)
     const targetUserId = state.activeRoomId; 
 
     Swal.fire({
