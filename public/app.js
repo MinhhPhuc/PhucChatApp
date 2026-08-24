@@ -30,7 +30,7 @@ function showToast(message, isSuccess = true) {
   }, 3000);
 }
 
-// --- HÀM HIỂN THỊ MODAL XÁC NHẬN ---
+// --- MODAL XÁC NHẬN ---
 let confirmCallback = null;
 function showConfirmModal(title, message, onYes) {
   const modal = document.getElementById('modal-confirm');
@@ -57,6 +57,7 @@ function applyTheme(theme) {
     themeIcon.className = theme === 'dark' ? 'fa-solid fa-moon' : 'fa-solid fa-sun';
   }
 }
+
 const btnToggleTheme = document.getElementById('btn-toggle-theme');
 if (btnToggleTheme) {
   btnToggleTheme.onclick = () => {
@@ -65,7 +66,7 @@ if (btnToggleTheme) {
 }
 applyTheme(state.theme);
 
-// --- QUẢN LÝ CHỦ ĐỀ RIÊNG CHO TỪNG PHÒNG CHAT ---
+// --- QUẢN LÝ CHỦ ĐỀ PHÒNG CHAT ---
 function applyRoomTheme(roomId) {
   const chatViewport = document.getElementById('messages-viewport') || document.querySelector('.chat-messages') || document.querySelector('.messages-container');
   const chatScreen = document.getElementById('chat-screen') || document.querySelector('.chat-area');
@@ -84,7 +85,7 @@ function applyRoomTheme(roomId) {
   }
 }
 
-// --- CẬP NHẬT GIAO DIỆN CẢM XÚC NHANH TRÊN THANH CHAT ---
+// --- EMOJI NHANH ---
 function updateQuickReactionUI(roomId) {
   const trigger = document.getElementById('quick-reaction-trigger');
   if (!trigger) return;
@@ -111,7 +112,7 @@ if (tabLogin && tabRegister && formLogin && formRegister) {
   };
 }
 
-// --- CHỌN AVATAR ĐĂNG KÝ ---
+// --- CHỌN AVATAR ---
 const regAvatarFile = document.getElementById('reg-avatar-file');
 const regPreviewAvatar = document.getElementById('reg-preview-avatar');
 const regRandomAvatar = document.getElementById('reg-random-avatar');
@@ -137,7 +138,6 @@ if (regRandomAvatar && regPreviewAvatar) {
   };
 }
 
-// --- CHỌN AVATAR NHÓM ---
 const groupAvatarFile = document.getElementById('group-avatar-file');
 const groupPreviewAvatar = document.getElementById('group-preview-avatar');
 if (groupAvatarFile && groupPreviewAvatar) {
@@ -154,7 +154,7 @@ if (groupAvatarFile && groupPreviewAvatar) {
   };
 }
 
-// --- XỬ LÝ ĐĂNG NHẬP / ĐĂNG KÝ ---
+// --- XỬ LÝ AUTHENTICATION ---
 if (formLogin) {
   formLogin.onsubmit = (e) => {
     e.preventDefault();
@@ -244,7 +244,6 @@ document.onclick = (e) => {
   }
 };
 
-// Sự kiện bấm vào nút cảm xúc nhanh ở góc phải thanh nhập tin nhắn
 document.getElementById('quick-reaction-trigger')?.addEventListener('click', () => {
   if (state.activeRoomId) {
     const quickEmoji = document.getElementById('quick-reaction-trigger')?.innerText || '❤️';
@@ -267,7 +266,7 @@ if (imageUploadInput) {
   };
 }
 
-// --- ĐỒNG BỘ DỮ LIỆU TỪ SERVER ---
+// --- SYNC DỮ LIỆU TỪ SERVER ---
 socket.on('data:sync', (data) => {
   state.friends = data.friends;
   state.requests = data.requests;
@@ -443,7 +442,7 @@ function renderChatList() {
     }
   }
 
-  // 4. Tìm kiếm người dùng lạ
+  // 4. Người dùng khác
   if (query && state.currentUser) {
     const friendIds = new Set((state.friends || []).map(f => f.id));
     const strangers = (state.allUsers || []).filter(u => 
@@ -547,17 +546,6 @@ socket.on('message:received', (msg) => {
   renderChatList();
 });
 
-// Lắng nghe khi lịch sử chat của phòng được xóa thành công
-socket.on('messages:cleared', ({ roomId }) => {
-  if (state.activeRoomId === roomId) {
-    const viewport = document.getElementById('messages-viewport');
-    if (viewport) viewport.innerHTML = '';
-  }
-  state.lastMessages.delete(roomId);
-  renderChatList();
-});
-
-// Nhận lịch sử tin nhắn từ Server (Giúp F5 không bị mất)
 socket.on('messages:history', ({ roomId, messages }) => {
   if (state.activeRoomId === roomId) {
     const viewport = document.getElementById('messages-viewport');
@@ -573,7 +561,6 @@ socket.on('messages:history', ({ roomId, messages }) => {
   renderChatList();
 });
 
-// Lắng nghe khi phòng bị xóa sạch tin nhắn
 socket.on('messages:cleared', ({ roomId }) => {
   if (state.activeRoomId === roomId) {
     const viewport = document.getElementById('messages-viewport');
@@ -611,14 +598,16 @@ function appendMessage(msg) {
     bodyContent = `<div class="msg-text-content">${msg.content}</div>`;
   }
 
-  div.innerHTML = `${!isSelf ? `<strong>${msg.sender.username}</strong><br>` : ''}${bodyContent}`;
+  // CHỈ HIỂN THỊ TÊN KHI LÀ CHAT NHÓM VÀ TỪ NGƯỜI KHÁC (Chat 1-1 sẽ ẩn tên hoàn toàn)
+  const isGroup = state.activeRoomId && state.activeRoomId.startsWith('grp_');
+  const showSenderName = !isSelf && isGroup;
+
+  div.innerHTML = `${showSenderName ? `<strong>${msg.sender.username}</strong><br>` : ''}${bodyContent}`;
   viewport.appendChild(div);
   viewport.scrollTop = viewport.scrollHeight;
 }
 
-// =========================================================
-// CÁC HÀM XỬ LÝ GIAO DIỆN NHÓM & CẬP NHẬT
-// =========================================================
+// --- GIAO DIỆN VÀ QUẢN LÝ NHÓM ---
 function renderGroupMembersCheckbox(preSelectedFriendId = null) {
   const container = document.getElementById('group-members-list');
   if (!container) return;
@@ -719,19 +708,18 @@ window.execGroupAction = function(action, targetId) {
   }
 };
 
-// =========================================================
-// BỘ ĐIỀU KHIỂN EVENT CLICK DUY NHẤT (ĐÃ FIX LỖI MỞ MODAL)
-// =========================================================
+// --- BỘ ĐIỀU KHIỂN EVENT CLICK HỢP NHẤT ---
 document.addEventListener('click', (e) => {
   const modalGroup = document.getElementById('modal-group');
   const modalChatSettings = document.getElementById('modal-chat-settings');
-  const modalReport = document.getElementById('modal-report');
   const modalGroupSettings = document.getElementById('modal-group-settings');
   const modalTheme = document.getElementById('modal-theme');
-// ==========================================
-  // XỬ LÝ XÓA TOÀN BỘ LỊCH SỬ CHAT
-  // ==========================================
-  const btnDeleteChat = e.target.closest('#delete-chat') || e.target.closest('#btn-delete-chat') || e.target.closest('#set-delete-chat');
+  const modalNickname = document.getElementById('modal-nickname');
+  const modalConfirm = document.getElementById('modal-confirm');
+
+  // 1. XÓA ĐOẠN CHAT
+  const btnDeleteChat = e.target.closest('#delete-chat, #btn-delete-chat, #set-delete-chat') || 
+                        (e.target.innerText && e.target.innerText.includes('Xóa đoạn chat') ? e.target : null);
   if (btnDeleteChat) {
     if (modalChatSettings) {
       modalChatSettings.classList.add('hidden');
@@ -740,13 +728,9 @@ document.addEventListener('click', (e) => {
 
     if (state.activeRoomId) {
       showConfirmModal('Xóa đoạn chat', 'Bạn có chắc chắn muốn xóa toàn bộ lịch sử trò chuyện này không? Thao tác này không thể hoàn tác.', () => {
-        // Gửi yêu cầu xóa lên Server
         socket.emit('messages:clear', { roomId: state.activeRoomId });
-
-        // Cập nhật giao diện lập tức tại Client
         const viewport = document.getElementById('messages-viewport');
         if (viewport) viewport.innerHTML = '';
-
         state.lastMessages.delete(state.activeRoomId);
         renderChatList();
         showToast('Đã xóa toàn bộ lịch sử đoạn chat!');
@@ -755,7 +739,7 @@ document.addEventListener('click', (e) => {
     return;
   }
 
-  // 1. Lọc tab danh sách chat
+  // 2. TAB LỌC DANH SÁCH CHAT
   const tabBtn = e.target.closest('.filter-tab-btn');
   if (tabBtn) {
     const filterType = tabBtn.getAttribute('data-filter');
@@ -781,11 +765,7 @@ document.addEventListener('click', (e) => {
     return;
   }
 
-  // ==========================================
-  // MỞ / ĐÓNG CÁC MODAL CÀI ĐẶT
-  // ==========================================
-
-  // Mở Cài đặt chat 1-1
+  // 3. MỞ/ĐÓNG MODAL CÀI ĐẶT
   if (e.target.closest('#btn-chat-options')) {
     if (modalChatSettings) {
       modalChatSettings.classList.remove('hidden');
@@ -794,7 +774,6 @@ document.addEventListener('click', (e) => {
     return;
   }
 
-  // Đóng Cài đặt chat 1-1
   if (e.target.closest('#btn-close-chat-settings') || (modalChatSettings && e.target === modalChatSettings)) {
     if (modalChatSettings) {
       modalChatSettings.style.display = 'none';
@@ -803,7 +782,6 @@ document.addEventListener('click', (e) => {
     return;
   }
 
-  // Mở Cài đặt Nhóm
   if (e.target.closest('#btn-group-settings')) {
     if (modalGroupSettings) {
       modalGroupSettings.classList.remove('hidden');
@@ -813,7 +791,6 @@ document.addEventListener('click', (e) => {
     return;
   }
 
-  // Đóng Cài đặt Nhóm
   if (e.target.closest('#btn-close-group-settings') || (modalGroupSettings && e.target === modalGroupSettings)) {
     if (modalGroupSettings) {
       modalGroupSettings.style.display = 'none';
@@ -822,7 +799,6 @@ document.addEventListener('click', (e) => {
     return;
   }
   
-  // Đóng modal Tạo nhóm
   if (e.target.closest('#btn-close-group-modal') || (modalGroup && e.target === modalGroup)) {
     if (modalGroup) {
       modalGroup.style.display = 'none';
@@ -831,9 +807,7 @@ document.addEventListener('click', (e) => {
     return;
   }
 
-  // ==========================================
-  // XỬ LÝ CHỦ ĐỀ (THEMES)
-  // ==========================================
+  // 4. THAY ĐỔI CHỦ ĐỀ (THEME)
   const btnSetTheme = e.target.closest('#set-theme');
   if (btnSetTheme) {
     if (modalChatSettings) {
@@ -847,7 +821,7 @@ document.addEventListener('click', (e) => {
     return;
   }
 
-  if (e.target.closest('#btn-close-theme-modal') || (modalTheme && e.target === modalTheme)) {
+  if (e.target.closest('#btn-close-theme-modal') || e.target.closest('#btn-close-theme') || (modalTheme && e.target === modalTheme)) {
     if (modalTheme) {
       modalTheme.style.display = 'none';
       modalTheme.classList.add('hidden');
@@ -855,10 +829,10 @@ document.addEventListener('click', (e) => {
     return;
   }
 
-  const themeOptBtn = e.target.closest('.theme-option-btn');
-  if (themeOptBtn) {
-    const selectedTheme = themeOptBtn.getAttribute('data-theme-type');
-    if (state.activeRoomId) {
+  const themeOption = e.target.closest('.theme-option, .theme-option-btn');
+  if (themeOption && state.activeRoomId) {
+    const selectedTheme = themeOption.getAttribute('data-theme') || themeOption.getAttribute('data-theme-type');
+    if (selectedTheme) {
       state.roomThemes.set(state.activeRoomId, selectedTheme);
       localStorage.setItem('chat_room_themes', JSON.stringify(Array.from(state.roomThemes.entries())));
       applyRoomTheme(state.activeRoomId);
@@ -871,9 +845,7 @@ document.addEventListener('click', (e) => {
     return;
   }
 
-  // ==========================================
-  // XỬ LÝ ĐỔI BIỆT DANH
-  // ==========================================
+  // 5. ĐỔI BIỆT DANH
   const btnSetNickname = e.target.closest('#set-nickname');
   if (btnSetNickname) {
     if (modalChatSettings) {
@@ -889,7 +861,6 @@ document.addEventListener('click', (e) => {
       if (friend) {
         const inputNick = document.getElementById('nickname-input');
         const titleNick = document.getElementById('nickname-target-name');
-        const modalNickname = document.getElementById('modal-nickname');
 
         if (titleNick) titleNick.innerText = `Đổi biệt danh cho ${friend.username}`;
         if (inputNick) inputNick.value = state.nicknames.get(state.activeRoomId) || friend.username;
@@ -904,7 +875,6 @@ document.addEventListener('click', (e) => {
     return;
   }
 
-  const modalNickname = document.getElementById('modal-nickname');
   if (e.target.closest('#btn-cancel-nickname') || (modalNickname && e.target === modalNickname)) {
     if (modalNickname) {
       modalNickname.style.display = 'none';
@@ -944,9 +914,7 @@ document.addEventListener('click', (e) => {
     return;
   }
 
-  // ==========================================
-  // TẠO NHÓM MỚI
-  // ==========================================
+  // 6. TẠO NHÓM
   if (e.target.closest('#btn-open-group-modal') || e.target.closest('.btn-create-group')) {
     if (modalChatSettings) modalChatSettings.classList.add('hidden');
     if (modalGroup) {
@@ -975,7 +943,6 @@ document.addEventListener('click', (e) => {
     return;
   }
   
-  // Nút Submit tạo nhóm
   if (e.target.closest('#btn-confirm-create-group')) {
     const groupNameInput = document.getElementById('group-name-input');
     const groupName = groupNameInput ? groupNameInput.value.trim() : '';
@@ -1000,9 +967,7 @@ document.addEventListener('click', (e) => {
     return;
   }
 
-  // ==========================================
-  // XỬ LÝ CẢM XÚC NHANH
-  // ==========================================
+  // 7. CẢM XÚC NHANH
   const setEmojiBtn = e.target.closest('#set-emoji');
   if (setEmojiBtn) {
     if (modalChatSettings) {
@@ -1010,7 +975,7 @@ document.addEventListener('click', (e) => {
       modalChatSettings.style.display = 'none';
     }
     const currentEmoji = state.roomReactions?.get(state.activeRoomId) || '❤️';
-    const newEmoji = prompt('Nhập emoji cảm xúc nhanh cho đoạn chat này (Ví dụ: 👍, 😆, 😡):', currentEmoji);
+    const newEmoji = prompt('Nhập emoji cảm xúc nhanh cho đoạn chat này:', currentEmoji);
     if (newEmoji) {
       if (!state.roomReactions) state.roomReactions = new Map();
       state.roomReactions.set(state.activeRoomId, newEmoji);
@@ -1020,41 +985,26 @@ document.addEventListener('click', (e) => {
     }
     return;
   }
-});
 
-// ==========================================
-// XỬ LÝ XÓA TOÀN BỘ LỊCH SỬ CHAT (ĐÃ BỌC AN TOÀN)
-// ==========================================
-document.addEventListener('click', (e) => {
-  // 1. Bắt theo ID hoặc text hiển thị "Xóa đoạn chat"
-  const btnDeleteChat = e.target.closest('#delete-chat, #btn-delete-chat, #set-delete-chat') || 
-                        (e.target.innerText && e.target.innerText.includes('Xóa đoạn chat') ? e.target : null);
-
-  if (!btnDeleteChat) return;
-
-  // 2. Tự động tìm và đóng modal Cài đặt
-  const modalChatSettings = document.getElementById('modal-chat-settings');
-  if (modalChatSettings) {
-    modalChatSettings.classList.add('hidden');
-    modalChatSettings.style.display = 'none';
+  // 8. CÁC NÚT TRONG MODAL CONFIRM
+  if (e.target.closest('#btn-confirm-yes')) {
+    if (modalConfirm) {
+      modalConfirm.classList.add('hidden');
+      modalConfirm.style.display = 'none';
+    }
+    if (typeof confirmCallback === 'function') {
+      confirmCallback();
+      confirmCallback = null;
+    }
+    return;
   }
 
-  // 3. Xử lý xóa lịch sử tin nhắn
-  if (state && state.activeRoomId) {
-    if (confirm('Bạn có chắc chắn muốn xóa toàn bộ lịch sử đoạn chat này không?')) {
-      // Gửi lệnh xóa lên Server
-      socket.emit('messages:clear', { roomId: state.activeRoomId });
-
-      // Xóa giao diện ngay lập tức
-      const viewport = document.getElementById('messages-viewport');
-      if (viewport) viewport.innerHTML = '';
-
-      if (state.lastMessages && state.lastMessages.delete) {
-        state.lastMessages.delete(state.activeRoomId);
-      }
-
-      if (typeof renderChatList === 'function') renderChatList();
-      if (typeof showToast === 'function') showToast('Đã xóa toàn bộ lịch sử đoạn chat!');
+  if (e.target.closest('#btn-confirm-no') || e.target.closest('#btn-close-confirm')) {
+    if (modalConfirm) {
+      modalConfirm.classList.add('hidden');
+      modalConfirm.style.display = 'none';
     }
+    confirmCallback = null;
+    return;
   }
 });
