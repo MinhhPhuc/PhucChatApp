@@ -1026,17 +1026,31 @@ if (btnUnfriend) {
       modalChatSettings.style.display = 'none';
     }
     const currentEmoji = state.roomReactions?.get(state.activeRoomId) || '❤️';
-    const newEmoji = prompt('Nhập emoji cảm xúc nhanh cho đoạn chat này:', currentEmoji);
-    if (newEmoji) {
-      if (!state.roomReactions) state.roomReactions = new Map();
-      state.roomReactions.set(state.activeRoomId, newEmoji);
-      localStorage.setItem('chat_room_reactions', JSON.stringify(Array.from(state.roomReactions.entries())));
-      updateQuickReactionUI(state.activeRoomId);
-      showToast('Đã đổi cảm xúc nhanh thành công!');
-    }
+    
+    Swal.fire({
+      title: 'Cảm xúc nhanh',
+      text: 'Nhập emoji cảm xúc nhanh cho đoạn chat này:',
+      input: 'text',
+      inputValue: currentEmoji,
+      showCancelButton: true,
+      confirmButtonText: 'Xác nhận',
+      cancelButtonText: 'Hủy',
+      confirmButtonColor: '#0084ff',
+      cancelButtonColor: '#e4e6eb'
+    }).then((result) => {
+      if (result.isConfirmed && result.value) {
+        const newEmoji = result.value.trim();
+        if (newEmoji) {
+          if (!state.roomReactions) state.roomReactions = new Map();
+          state.roomReactions.set(state.activeRoomId, newEmoji);
+          localStorage.setItem('chat_room_reactions', JSON.stringify(Array.from(state.roomReactions.entries())));
+          updateQuickReactionUI(state.activeRoomId);
+          showToast('Đã đổi cảm xúc nhanh thành công!');
+        }
+      }
+    });
     return;
   }
-
   // 9. CÁC NÚT TRONG MODAL CONFIRM
   if (e.target.closest('#btn-confirm-yes')) {
     if (modalConfirm) {
