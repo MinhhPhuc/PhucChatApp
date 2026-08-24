@@ -30,7 +30,7 @@ function showToast(message, isSuccess = true) {
   }, 3000);
 }
 
-// --- HÀM HIỂN THỊ MODAL XÁC NHẬN ĐẸP MẮT ---
+// --- HÀM HIỂN THỊ MODAL XÁC NHẬN ---
 let confirmCallback = null;
 function showConfirmModal(title, message, onYes) {
   const modal = document.getElementById('modal-confirm');
@@ -154,6 +154,7 @@ if (groupAvatarFile && groupPreviewAvatar) {
   };
 }
 
+// --- XỬ LÝ ĐĂNG NHẬP / ĐĂNG KÝ ---
 if (formLogin) {
   formLogin.onsubmit = (e) => {
     e.preventDefault();
@@ -243,7 +244,7 @@ document.onclick = (e) => {
   }
 };
 
-// Xử lý sự kiện bấm vào nút cảm xúc nhanh ở góc phải thanh nhập tin nhắn
+// Sự kiện bấm vào nút cảm xúc nhanh ở góc phải thanh nhập tin nhắn
 document.getElementById('quick-reaction-trigger')?.addEventListener('click', () => {
   if (state.activeRoomId) {
     const quickEmoji = document.getElementById('quick-reaction-trigger')?.innerText || '❤️';
@@ -683,7 +684,7 @@ window.execGroupAction = function(action, targetId) {
 };
 
 // =========================================================
-// BỘ ĐIỀU KHIỂN EVENT CLICK DUY NHẤT
+// BỘ ĐIỀU KHIỂN EVENT CLICK DUY NHẤT (ĐÃ FIX LỖI MỞ MODAL)
 // =========================================================
 document.addEventListener('click', (e) => {
   const modalGroup = document.getElementById('modal-group');
@@ -692,7 +693,7 @@ document.addEventListener('click', (e) => {
   const modalGroupSettings = document.getElementById('modal-group-settings');
   const modalTheme = document.getElementById('modal-theme');
 
-  // Lọc tab
+  // 1. Lọc tab danh sách chat
   const tabBtn = e.target.closest('.filter-tab-btn');
   if (tabBtn) {
     const filterType = tabBtn.getAttribute('data-filter');
@@ -714,12 +715,63 @@ document.addEventListener('click', (e) => {
       tabBtn.style.color = 'var(--primary-color, #3182ce)';
       tabBtn.style.fontWeight = '600';
     }
-
     renderChatList();
     return;
   }
 
-  // Mở modal Tùy chỉnh chủ đề
+  // ==========================================
+  // MỞ / ĐÓNG CÁC MODAL CÀI ĐẶT
+  // ==========================================
+
+  // Mở Cài đặt chat 1-1
+  if (e.target.closest('#btn-chat-options')) {
+    if (modalChatSettings) {
+      modalChatSettings.classList.remove('hidden');
+      modalChatSettings.style.display = 'flex';
+    }
+    return;
+  }
+
+  // Đóng Cài đặt chat 1-1
+  if (e.target.closest('#btn-close-chat-settings') || (modalChatSettings && e.target === modalChatSettings)) {
+    if (modalChatSettings) {
+      modalChatSettings.style.display = 'none';
+      modalChatSettings.classList.add('hidden');
+    }
+    return;
+  }
+
+  // Mở Cài đặt Nhóm
+  if (e.target.closest('#btn-group-settings')) {
+    if (modalGroupSettings) {
+      modalGroupSettings.classList.remove('hidden');
+      modalGroupSettings.style.display = 'flex';
+      renderGroupSettingsModal();
+    }
+    return;
+  }
+
+  // Đóng Cài đặt Nhóm
+  if (e.target.closest('#btn-close-group-settings') || (modalGroupSettings && e.target === modalGroupSettings)) {
+    if (modalGroupSettings) {
+      modalGroupSettings.style.display = 'none';
+      modalGroupSettings.classList.add('hidden');
+    }
+    return;
+  }
+  
+  // Đóng modal Tạo nhóm
+  if (e.target.closest('#btn-close-group-modal') || (modalGroup && e.target === modalGroup)) {
+    if (modalGroup) {
+      modalGroup.style.display = 'none';
+      modalGroup.classList.add('hidden');
+    }
+    return;
+  }
+
+  // ==========================================
+  // XỬ LÝ CHỦ ĐỀ (THEMES)
+  // ==========================================
   const btnSetTheme = e.target.closest('#set-theme');
   if (btnSetTheme) {
     if (modalChatSettings) {
@@ -733,7 +785,6 @@ document.addEventListener('click', (e) => {
     return;
   }
 
-  // Đóng hoặc chọn chủ đề
   if (e.target.closest('#btn-close-theme-modal') || (modalTheme && e.target === modalTheme)) {
     if (modalTheme) {
       modalTheme.style.display = 'none';
@@ -758,7 +809,9 @@ document.addEventListener('click', (e) => {
     return;
   }
 
-  // Đổi biệt danh
+  // ==========================================
+  // XỬ LÝ ĐỔI BIỆT DANH
+  // ==========================================
   const btnSetNickname = e.target.closest('#set-nickname');
   if (btnSetNickname) {
     if (modalChatSettings) {
@@ -829,7 +882,9 @@ document.addEventListener('click', (e) => {
     return;
   }
 
-  // Mở tạo nhóm
+  // ==========================================
+  // TẠO NHÓM MỚI
+  // ==========================================
   if (e.target.closest('#btn-open-group-modal') || e.target.closest('.btn-create-group')) {
     if (modalChatSettings) modalChatSettings.classList.add('hidden');
     if (modalGroup) {
@@ -857,8 +912,35 @@ document.addEventListener('click', (e) => {
     }
     return;
   }
+  
+  // Nút Submit tạo nhóm
+  if (e.target.closest('#btn-confirm-create-group')) {
+    const groupNameInput = document.getElementById('group-name-input');
+    const groupName = groupNameInput ? groupNameInput.value.trim() : '';
+    const checkedBoxes = document.querySelectorAll('.group-member-checkbox:checked');
+    const memberIds = Array.from(checkedBoxes).map(cb => cb.value);
+    
+    if (!groupName) return showToast('Vui lòng nhập tên nhóm!', false);
+    if (memberIds.length === 0) return showToast('Vui lòng chọn ít nhất 1 thành viên!', false);
+    
+    socket.emit('group:create', {
+        name: groupName,
+        avatar: state.selectedGroupAvatar,
+        members: memberIds
+    });
+    
+    if (modalGroup) {
+        modalGroup.style.display = 'none';
+        modalGroup.classList.add('hidden');
+    }
+    if (groupNameInput) groupNameInput.value = '';
+    showToast('Đang tạo nhóm...');
+    return;
+  }
 
-  // Nút mở Cảm xúc nhanh từ menu tùy chọn chat 1-1
+  // ==========================================
+  // XỬ LÝ CẢM XÚC NHANH
+  // ==========================================
   const setEmojiBtn = e.target.closest('#set-emoji');
   if (setEmojiBtn) {
     if (modalChatSettings) {
@@ -866,7 +948,7 @@ document.addEventListener('click', (e) => {
       modalChatSettings.style.display = 'none';
     }
     const currentEmoji = state.roomReactions?.get(state.activeRoomId) || '❤️';
-    const newEmoji = prompt('Nhập emoji cảm xúc nhanh cho đoạn chat này:', currentEmoji);
+    const newEmoji = prompt('Nhập emoji cảm xúc nhanh cho đoạn chat này (Ví dụ: 👍, 😆, 😡):', currentEmoji);
     if (newEmoji) {
       if (!state.roomReactions) state.roomReactions = new Map();
       state.roomReactions.set(state.activeRoomId, newEmoji);
