@@ -5,6 +5,7 @@ let state = {
   activeRoomId: null,
   theme: localStorage.getItem('chat_theme') || 'dark',
   roomThemes: new Map(JSON.parse(localStorage.getItem('chat_room_themes') || '[]')),
+  roomReactions: new Map(JSON.parse(localStorage.getItem('chat_room_reactions') || '[]')),
   friends: [],
   requests: [],
   allUsers: [],
@@ -65,27 +66,30 @@ if (btnToggleTheme) {
 applyTheme(state.theme);
 
 // --- QUẢN LÝ CHỦ ĐỀ RIÊNG CHO TỪNG PHÒNG CHAT ---
-// --- QUẢN LÝ CHỦ ĐỀ RIÊNG CHO TỪNG PHÒNG CHAT ---
 function applyRoomTheme(roomId) {
-  // Tìm linh hoạt các phần tử có khả năng là khung chat hoặc màn hình chat
   const chatViewport = document.getElementById('messages-viewport') || document.querySelector('.chat-messages') || document.querySelector('.messages-container');
   const chatScreen = document.getElementById('chat-screen') || document.querySelector('.chat-area');
   
   if (!chatViewport && !chatScreen) return;
   
-  // Danh sách các theme cần xóa
   const themes = ['theme-love', 'theme-coffee', 'theme-monochrome', 'theme-nature'];
   
-  // Xóa các class chủ đề cũ ở cả viewport lẫn màn hình chat chính
   if (chatViewport) chatViewport.classList.remove(...themes);
   if (chatScreen) chatScreen.classList.remove(...themes);
   
   const currentTheme = state.roomThemes.get(roomId) || 'default';
   if (currentTheme !== 'default') {
-    // Thêm class theme mới vào đúng phần tử hiển thị
     if (chatViewport) chatViewport.classList.add(`theme-${currentTheme}`);
     if (chatScreen) chatScreen.classList.add(`theme-${currentTheme}`);
   }
+}
+
+// --- CẬP NHẬT GIAO DIỆN CẢM XÚC NHANH TRÊN THANH CHAT ---
+function updateQuickReactionUI(roomId) {
+  const trigger = document.getElementById('quick-reaction-trigger');
+  if (!trigger) return;
+  const roomEmoji = state.roomReactions?.get(roomId) || '❤️';
+  trigger.innerText = roomEmoji;
 }
 
 // --- TAB ĐĂNG NHẬP / ĐĂNG KÝ ---
@@ -238,6 +242,14 @@ document.onclick = (e) => {
     emojiPicker.classList.add('hidden');
   }
 };
+
+// Xử lý sự kiện bấm vào nút cảm xúc nhanh ở góc phải thanh nhập tin nhắn
+document.getElementById('quick-reaction-trigger')?.addEventListener('click', () => {
+  if (state.activeRoomId) {
+    const quickEmoji = document.getElementById('quick-reaction-trigger')?.innerText || '❤️';
+    socket.emit('message:send', { roomId: state.activeRoomId, content: quickEmoji, type: 'text' });
+  }
+});
 
 const imageUploadInput = document.getElementById('image-upload-input');
 if (imageUploadInput) {
@@ -508,6 +520,7 @@ function openRoom(roomId, name, avatar, status) {
   
   socket.emit('messages:get', { roomId });
   applyRoomTheme(roomId);
+  updateQuickReactionUI(roomId);
   renderChatList();
 }
 
@@ -555,12 +568,9 @@ function appendMessage(msg) {
   div.className = `msg ${isSelf ? 'self' : 'other'}`;
 
   let bodyContent = '';
-  
   if (msg.type === 'image') {
     bodyContent = `<img src="${msg.content}" class="chat-image-sent" alt="Hình ảnh">`;
   } else {
-    // Nếu nội dung chứa cấu trúc xem trước link (có thể do hệ thống hoặc thẻ HTML tạo ra)
-    // Ta đưa vào một thẻ bọc để ép phần tử con bên trong kế thừa màu sắc hoặc hiển thị gọn gàng hơn
     bodyContent = `<div class="msg-text-content">${msg.content}</div>`;
   }
 
@@ -568,6 +578,7 @@ function appendMessage(msg) {
   viewport.appendChild(div);
   viewport.scrollTop = viewport.scrollHeight;
 }
+
 // =========================================================
 // CÁC HÀM XỬ LÝ GIAO DIỆN NHÓM & CẬP NHẬT
 // =========================================================
@@ -836,222 +847,33 @@ document.addEventListener('click', (e) => {
       modalChatSettings.style.display = 'none';
     }
 
-    if (modalGroup) {
+    if (modalGroup && state.activeRoomId && state.activeRoomId.includes('_DM_')) {
+      const parts = state.activeRoomId.split('_DM_');
+      const targetFriendId = parts.find(id => id !== state.currentUser.id);
+      
       modalGroup.classList.remove('hidden');
       modalGroup.style.display = 'flex';
-    }
-
-    let targetFriendId = null;
-    if (state.activeRoomId && state.activeRoomId.includes('_DM_') && state.currentUser) {
-      const parts = state.activeRoomId.split('_DM_');
-      targetFriendId = parts.find(id => id !== state.currentUser.id);
-    }
-
-    renderGroupMembersCheckbox(targetFriendId);
-    return;
-  }
-
-  if (e.target.closest('#btn-close-group-modal')) {
-    if (modalGroup) {
-      modalGroup.classList.add('hidden');
-      modalGroup.style.display = 'none';
+      renderGroupMembersCheckbox(targetFriendId);
     }
     return;
   }
 
-  if (e.target.closest('#btn-submit-group')) {
-    const groupNameInput = document.getElementById('group-name-input');
-    const groupName = groupNameInput ? groupNameInput.value.trim() : '';
-    if (!groupName) {
-      showToast('Vui lòng nhập tên nhóm!', false);
-      return;
-    }
-    const checkboxes = document.querySelectorAll('.group-member-checkbox:checked');
-    const memberIds = Array.from(checkboxes).map(cb => cb.value);
-    
-    socket.emit('group:create', {
-      name: groupName,
-      avatar: state.selectedGroupAvatar,
-      memberIds: memberIds
-    });
-    
-    if (groupNameInput) groupNameInput.value = '';
-    if (modalGroup) {
-      modalGroup.classList.add('hidden');
-      modalGroup.style.display = 'none';
-    }
-    showToast('Đang tạo nhóm...');
-    return;
-  }
-
-  // Cài đặt chat bạn bè & báo cáo
-  if (e.target.closest('#btn-chat-options')) {
-    if (modalChatSettings) {
-      modalChatSettings.classList.remove('hidden');
-      modalChatSettings.style.display = 'flex';
-    }
-    return;
-  }
-  if (e.target.closest('#btn-close-chat-settings')) {
+  // Nút mở Cảm xúc nhanh từ menu tùy chọn chat 1-1
+  const setEmojiBtn = e.target.closest('#set-emoji');
+  if (setEmojiBtn) {
     if (modalChatSettings) {
       modalChatSettings.classList.add('hidden');
       modalChatSettings.style.display = 'none';
     }
-    return;
-  }
-  if (e.target.closest('#set-report')) {
-    if (modalChatSettings) modalChatSettings.classList.add('hidden');
-    if (modalReport) {
-      modalReport.classList.remove('hidden');
-      modalReport.style.display = 'flex';
+    const currentEmoji = state.roomReactions?.get(state.activeRoomId) || '❤️';
+    const newEmoji = prompt('Nhập emoji cảm xúc nhanh cho đoạn chat này:', currentEmoji);
+    if (newEmoji) {
+      if (!state.roomReactions) state.roomReactions = new Map();
+      state.roomReactions.set(state.activeRoomId, newEmoji);
+      localStorage.setItem('chat_room_reactions', JSON.stringify(Array.from(state.roomReactions.entries())));
+      updateQuickReactionUI(state.activeRoomId);
+      showToast('Đã đổi cảm xúc nhanh thành công!');
     }
     return;
-  }
-  if (e.target.closest('#btn-cancel-report')) {
-    if (modalReport) modalReport.classList.add('hidden');
-    return;
-  }
-  if (e.target.closest('#btn-submit-report')) {
-    const reasonSelect = document.getElementById('report-reason-select');
-    const reason = reasonSelect ? reasonSelect.value : 'Vi phạm';
-    showToast("Đã gửi báo cáo thành công với lý do: " + reason, true);
-    if (modalReport) modalReport.classList.add('hidden');
-    return;
-  }
-
-  // Cài đặt nhóm chat
-  if (e.target.closest('#btn-group-settings')) {
-    renderGroupSettingsModal();
-    if (modalGroupSettings) {
-      modalGroupSettings.classList.remove('hidden');
-      modalGroupSettings.style.display = 'flex';
-    }
-    return;
-  }
-  if (e.target.closest('#btn-close-group-settings')) {
-    if (modalGroupSettings) {
-      modalGroupSettings.style.display = 'none';
-      modalGroupSettings.classList.add('hidden');
-      const addSection = document.getElementById('add-member-section');
-      if (addSection) addSection.classList.add('hidden');
-    }
-    return;
-  }
-
-  if (e.target.closest('#btn-leave-group')) {
-    showConfirmModal(
-      'Xác nhận rời nhóm',
-      'Bạn có chắc chắn muốn rời khỏi nhóm này không?',
-      () => execGroupAction('leave', null)
-    );
-    return;
-  }
-
-  if (e.target.closest('#btn-delete-group')) {
-    showConfirmModal(
-      'Xác nhận giải tán nhóm',
-      'Bạn có chắc chắn muốn giải tán nhóm này không? Tất cả thành viên sẽ bị đưa ra ngoài.',
-      () => execGroupAction('delete_group', null)
-    );
-    return;
-  }
-
-  if (e.target.closest('#setting-btn-add-member')) {
-    const addSection = document.getElementById('add-member-section');
-    if (addSection) {
-      addSection.classList.toggle('hidden');
-      if (!addSection.classList.contains('hidden')) {
-        renderAddMembersCheckbox();
-      }
-    }
-    return;
-  }
-
-  if (e.target.closest('#btn-confirm-add-members')) {
-    const checkboxes = document.querySelectorAll('.add-member-checkbox:checked');
-    const newMemberIds = Array.from(checkboxes).map(cb => cb.value);
-    
-    if (newMemberIds.length === 0) {
-      showToast('Vui lòng chọn ít nhất một thành viên!', false);
-      return;
-    }
-
-    socket.emit('group:add_members', {
-      groupId: state.activeRoomId,
-      newMemberIds: newMemberIds
-    });
-
-    const addSection = document.getElementById('add-member-section');
-    if (addSection) addSection.classList.add('hidden');
-    showToast('Đã thêm thành viên vào nhóm thành công!');
-    return;
-  }
-});
-
-// --- XỬ LÝ MODAL XÁC NHẬN CHUNG ---
-const modalConfirm = document.getElementById('modal-confirm');
-const btnConfirmYes = document.getElementById('confirm-yes');
-const btnConfirmNo = document.getElementById('confirm-no');
-
-if (btnConfirmYes) {
-  btnConfirmYes.onclick = () => {
-    if (confirmCallback) confirmCallback();
-    if (modalConfirm) {
-      modalConfirm.classList.add('hidden');
-      modalConfirm.style.display = 'none';
-    }
-    confirmCallback = null;
-  };
-}
-
-if (btnConfirmNo) {
-  btnConfirmNo.onclick = () => {
-    if (modalConfirm) {
-      modalConfirm.classList.add('hidden');
-      modalConfirm.style.display = 'none';
-    }
-    confirmCallback = null;
-  };
-}
-
-function renderAddMembersCheckbox() {
-  const container = document.getElementById('add-members-checkbox-list');
-  if (!container) return;
-  container.innerHTML = '';
-  
-  const currentGroup = state.groups.find(g => g.id === state.activeRoomId);
-  const currentMemberIds = new Set(currentGroup && currentGroup.members ? currentGroup.members.map(m => m.id) : []);
-
-  const availableFriends = state.friends.filter(f => !currentMemberIds.has(f.id));
-
-  if (availableFriends.length === 0) {
-    container.innerHTML = '<p style="font-size: 13px; color: #718096; text-align: center; padding: 10px;">Không còn bạn bè nào để thêm</p>';
-    return;
-  }
-
-  availableFriends.forEach(f => {
-    container.innerHTML += `
-      <label style="display: flex; align-items: center; gap: 10px; padding: 6px 0; cursor: pointer;">
-        <input type="checkbox" value="${f.id}" class="add-member-checkbox" style="width: 16px; height: 16px;">
-        <img src="${f.avatar}" style="width: 28px; height: 28px; border-radius: 50%; object-fit: cover;">
-        <span style="font-size: 14px; font-weight: 500;">${f.username}</span>
-      </label>
-    `;
-  });
-}
-
-// Xử lý sự kiện bấm vào nút cảm xúc nhanh ở thanh nhập tin nhắn
-document.getElementById('quick-reaction-trigger')?.addEventListener('click', () => {
-  const msgInput = document.getElementById('msg-input');
-  const quickEmoji = document.getElementById('quick-reaction-trigger').innerText || '❤️';
-  
-  // Nếu có hàm gửi tin nhắn sẵn trong app.js của bạn, gọi trực tiếp:
-  if (typeof sendMessage === 'function') {
-    // Gửi emoji cảm xúc nhanh
-    sendMessage(quickEmoji);
-  } else {
-    // Hoặc gán trực tiếp vào ô input và kích hoạt gửi
-    msgInput.value = quickEmoji;
-    document.getElementById('btn-send')?.click();
   }
 });
