@@ -55,7 +55,6 @@ body, html { width: 100%; height: 100%; background: var(--bg-main); color: var(-
 
 /* Chat Screen */
 .chat-screen { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: var(--bg-main); z-index: 100; display: flex; flex-direction: column; }
-/* Xóa bỏ dòng: .hidden { display: none !important; } cũ đi và thay bằng: */
 .hidden {
   display: none !important;
 }
@@ -74,12 +73,11 @@ body, html { width: 100%; height: 100%; background: var(--bg-main); color: var(-
   top: 0; left: 0; width: 100%; height: 100%;
   background: rgba(0,0,0,0.7);
   z-index: 200;
-  display: flex; /* Mặc định là flex, nhưng nếu bị thêm class .hidden thì sẽ ẩn đi */
+  display: flex;
   justify-content: center;
   align-items: center;
 }
 
-/* Khi có class hidden thì ẩn đi */
 .modal.hidden {
   display: none;
 }
@@ -90,10 +88,9 @@ body, html { width: 100%; height: 100%; background: var(--bg-main); color: var(-
 /* Khắc phục lỗi chiều cao trên trình duyệt điện thoại */
 body, html {
   height: 100%;
-  height: 100dvh; /* Dùng dvh để tự động co giãn theo bàn phím và thanh công cụ mobile */
+  height: 100dvh;
 }
 
-/* Đảm bảo các nút icon, nút gửi hiển thị đúng bên trong thanh chat */
 .chat-input-bar {
   display: flex;
   align-items: center;
@@ -101,7 +98,7 @@ body, html {
   padding: 8px 12px;
   border-top: 1px solid var(--border);
   background: var(--bg-main);
-  flex-shrink: 0; /* Tránh việc thanh chat bị bóp méo khi bàn phím hiện lên */
+  flex-shrink: 0;
 }
 
 .chat-input-bar input {
@@ -112,10 +109,9 @@ body, html {
   border-radius: 20px;
   color: var(--text-main);
   outline: none;
-  font-size: 14px; /* Tránh tự động zoom trên iOS khi focus input */
+  font-size: 14px;
 }
 
-/* Định dạng chuẩn cho các nút icon / nút gửi nằm trong khung chat */
 .chat-input-bar button, 
 .chat-input-bar .icon-btn {
   background: transparent;
@@ -130,24 +126,90 @@ body, html {
   height: 36px;
 }
 
-/* Nút gửi nổi bật hơn nếu cần */
 .chat-input-bar .send-btn {
   color: var(--bg-bubble-self);
 }
 
-/* --- CẬP NHẬT CSS CHO PHẦN XEM TRƯỚC LINK ĐỂ KHÔNG BỊ TRẮNG NỮA --- */
+/* ========================================== */
+/* --- CÁC CHỦ ĐỀ ĐOẠN CHAT (THEMES) --- */
+/* ========================================== */
 
-/* Ép phần preview link bên trong tin nhắn tự động đổi màu theo bong bóng chat */
+/* 1. Chủ đề Tình yêu (Love) */
+.chat-screen.theme-love {
+  background: linear-gradient(135deg, #ffe4e6 0%, #fecdd3 100%) !important;
+}
+.chat-screen.theme-love .messages-viewport {
+  background: transparent !important;
+}
+.chat-screen.theme-love .msg.self {
+  background-color: #e11d48 !important;
+  color: #ffffff !important;
+}
+.chat-screen.theme-love .msg.other {
+  background-color: #ffffff !important;
+  color: #1f2937 !important;
+}
+
+/* 2. Chủ đề Cà phê (Coffee) */
+.chat-screen.theme-coffee {
+  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%) !important;
+}
+.chat-screen.theme-coffee .messages-viewport {
+  background: transparent !important;
+}
+.chat-screen.theme-coffee .msg.self {
+  background-color: #b45309 !important;
+  color: #ffffff !important;
+}
+.chat-screen.theme-coffee .msg.other {
+  background-color: #fffbeb !important;
+  color: #451a03 !important;
+}
+
+/* 3. Chủ đề Đơn sắc (Monochrome) */
+.chat-screen.theme-monochrome {
+  background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%) !important;
+}
+.chat-screen.theme-monochrome .messages-viewport {
+  background: transparent !important;
+}
+.chat-screen.theme-monochrome .msg.self {
+  background-color: #334155 !important;
+  color: #ffffff !important;
+}
+.chat-screen.theme-monochrome .msg.other {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+}
+
+/* 4. Chủ đề Thả thính / Nature */
+.chat-screen.theme-nature {
+  background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%) !important;
+}
+.chat-screen.theme-nature .messages-viewport {
+  background: transparent !important;
+}
+.chat-screen.theme-nature .msg.self {
+  background-color: #059669 !important;
+  color: #ffffff !important;
+}
+.chat-screen.theme-nature .msg.other {
+  background-color: #ffffff !important;
+  color: #064e3b !important;
+}
+
+/* ========================================== */
+/* --- TINH CHỈNH PHẦN XEM TRƯỚC LINK --- */
+/* ========================================== */
 .msg.self div, 
 .msg.self a {
   color: inherit !important;
 }
 
-/* Xóa bỏ nền trắng cố định và làm cho phần khung link trong suốt, hài hòa với màu hồng/chủ đề */
 .msg.self > div:not(:first-child),
 .msg.self .link-preview, 
 .msg.self .preview-container {
-  background-color: rgba(0, 0, 0, 0.1) !important; /* Tạo lớp nền mờ tối nhẹ trên nền hồng đậm */
+  background-color: rgba(0, 0, 0, 0.1) !important;
   color: #ffffff !important;
   border-radius: 0 0 12px 12px;
   padding: 6px 10px;
@@ -157,7 +219,7 @@ body, html {
 .msg.other > div:not(:first-child),
 .msg.other .link-preview, 
 .msg.other .preview-container {
-  background-color: rgba(0, 0, 0, 0.05) !important; /* Lớp nền mờ nhẹ cho tin nhắn của bạn bè */
+  background-color: rgba(0, 0, 0, 0.05) !important;
   color: #1f2937 !important;
   border-radius: 0 0 12px 12px;
   padding: 6px 10px;

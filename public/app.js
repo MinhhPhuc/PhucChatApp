@@ -65,16 +65,26 @@ if (btnToggleTheme) {
 applyTheme(state.theme);
 
 // --- QUẢN LÝ CHỦ ĐỀ RIÊNG CHO TỪNG PHÒNG CHAT ---
+// --- QUẢN LÝ CHỦ ĐỀ RIÊNG CHO TỪNG PHÒNG CHAT ---
 function applyRoomTheme(roomId) {
-  const chatViewport = document.getElementById('messages-viewport');
-  if (!chatViewport) return;
+  // Tìm linh hoạt các phần tử có khả năng là khung chat hoặc màn hình chat
+  const chatViewport = document.getElementById('messages-viewport') || document.querySelector('.chat-messages') || document.querySelector('.messages-container');
+  const chatScreen = document.getElementById('chat-screen') || document.querySelector('.chat-area');
   
-  // Xóa các class chủ đề cũ
-  chatViewport.classList.remove('theme-love', 'theme-monochrome', 'theme-nature');
+  if (!chatViewport && !chatScreen) return;
+  
+  // Danh sách các theme cần xóa
+  const themes = ['theme-love', 'theme-coffee', 'theme-monochrome', 'theme-nature'];
+  
+  // Xóa các class chủ đề cũ ở cả viewport lẫn màn hình chat chính
+  if (chatViewport) chatViewport.classList.remove(...themes);
+  if (chatScreen) chatScreen.classList.remove(...themes);
   
   const currentTheme = state.roomThemes.get(roomId) || 'default';
   if (currentTheme !== 'default') {
-    chatViewport.classList.add(`theme-${currentTheme}`);
+    // Thêm class theme mới vào đúng phần tử hiển thị
+    if (chatViewport) chatViewport.classList.add(`theme-${currentTheme}`);
+    if (chatScreen) chatScreen.classList.add(`theme-${currentTheme}`);
   }
 }
 
