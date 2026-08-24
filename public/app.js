@@ -399,23 +399,30 @@ function renderChatList() {
   const query = state.searchQuery || '';
   const filter = state.activeFilter || 'all';
 
-  // 1. Lời mời kết bạn (hiển thị gọn ở đầu nếu có)
-  if (state.requests.length > 0 && !query && filter === 'all') {
+  // 1. Xử lý hiển thị danh sách Lời mời kết bạn (nếu chọn filter là 'requests' hoặc đang ở 'all')
+  if ((filter === 'all' || filter === 'requests') && state.requests.length > 0 && !query) {
+    if (filter === 'requests') {
+      list.innerHTML += `<div style="padding: 8px 16px; font-weight: 600; color: var(--text-main);">Lời mời kết bạn (${state.requests.length})</div>`;
+    }
     state.requests.forEach(req => {
       list.innerHTML += `
-        <div class="chat-item">
+        <div class="chat-item request-item">
           <img class="avatar" src="${req.fromAvatar}">
-          <div style="flex:1;"><b>${req.fromUsername}</b> muốn kết bạn</div>
-          <button class="btn-action green" onclick="acceptFriend('${req.id}')">Đồng Ý</button>
+          <div style="flex:1; overflow:hidden; padding: 0 8px;">
+            <div style="font-weight: 600; color: var(--text-main);">${req.fromUsername}</div>
+            <div style="font-size: 12px; color: var(--text-sub);">Muốn kết bạn với bạn</div>
+          </div>
+          <button class="btn-action green" onclick="acceptFriend('${req.id}')">Đồng ý</button>
         </div>
       `;
     });
   }
 
-  // 2 & 3. Gộp chung Nhóm chat và Bạn bè vào một mảng duy nhất để sắp xếp theo thời gian tin nhắn
+  if (filter === 'requests') return; // Nếu đang ở tab Lời mời thì dừng ở đây không render chat nữa
+
+  // 2 & 3. Gộp chung Nhóm chat và Bạn bè để sắp xếp theo tin nhắn mới nhất
   let combinedChats = [];
 
-  // Thêm nhóm chat vào mảng gộp
   if ((filter === 'all' || filter === 'groups') && !query) {
     const sortedGroups = [...state.groups];
     const displayedGroups = filter === 'unread' 
@@ -429,7 +436,6 @@ function renderChatList() {
     });
   }
 
-  // Thêm bạn bè vào mảng gộp
   if ((filter === 'all' || filter === 'unread' || filter === 'friends') && state.currentUser) {
     const filteredFriends = (state.friends || []).filter(f => {
       const matchesQuery = f.username.toLowerCase().includes(query.toLowerCase());
@@ -447,12 +453,10 @@ function renderChatList() {
     });
   }
 
-  // Sắp xếp toàn bộ nhóm và bạn bè theo thời gian mới nhất (giảm dần)
   combinedChats.sort((a, b) => b.timeVal - a.timeVal);
 
-  // Render danh sách gộp liền mạch không có tiêu đề phân cách
   if (combinedChats.length === 0 && state.requests.length === 0) {
-    list.innerHTML += `<div class="empty-hint">Không có cuộc trò chuyện nào</div>`;
+    list.innerHTML += `<div class="empty-hint" style="text-align:center; padding:30px; color:var(--text-sub);">Không có cuộc trò chuyện nào</div>`;
   } else {
     combinedChats.forEach(entry => {
       if (entry.kind === 'group') {
@@ -526,7 +530,7 @@ function renderChatList() {
     });
   }
 
-  // 4. Người dùng khác (khi thực hiện tìm kiếm)
+  // 4. Người dùng khác (khi tìm kiếm)
   if (query && state.currentUser) {
     const friendIds = new Set((state.friends || []).map(f => f.id));
     const strangers = (state.allUsers || []).filter(u => 
@@ -538,13 +542,13 @@ function renderChatList() {
     if (strangers.length > 0) {
       strangers.forEach(u => {
         list.innerHTML += `
-          <div class="chat-item">
+          <div class="chat-item" style="padding: 10px 14px;">
             <img class="avatar" src="${u.avatar}">
-            <div style="flex:1;">
-              <h4 style="margin:0;">${u.username}</h4>
-              <span style="font-size:12px; color:var(--text-secondary);">Chưa kết bạn</span>
+            <div style="flex:1; padding-left: 8px;">
+              <h4 style="margin:0; font-size: 14px;">${u.username}</h4>
+              <span style="font-size:12px; color:var(--text-sub);">Chưa kết bạn</span>
             </div>
-            <button class="btn-action blue" onclick="sendFriendRequest('${u.id}')">Kết Bạn</button>
+            <button class="btn-action blue" onclick="sendFriendRequest('${u.id}')" style="background:#0084ff; color:#fff; border:none; padding:6px 12px; border-radius:16px; font-weight:600; cursor:pointer;">Kết Bạn</button>
           </div>
         `;
       });

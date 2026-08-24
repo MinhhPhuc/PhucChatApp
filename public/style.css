@@ -327,3 +327,56 @@ div[class*="emoji"] {
   margin-top: 4px;
   cursor: pointer;
 }
+
+/* --- LÀM ĐẸP NÚT KẾT BẠN & ĐỒNG Ý --- */
+.filter-btn-request {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  color: var(--text-main);
+  padding: 6px 12px;
+  border-radius: 16px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.filter-btn-request:hover {
+  background: var(--border);
+}
+.filter-btn-request.active {
+  background: var(--bg-bubble-self);
+  color: #fff;
+  border-color: transparent;
+}
+
+/* Nút Đồng ý kết bạn hiện đại, bo tròn */
+.btn-action.green, .btn-accept {
+  background: #0084ff !important; /* Dùng màu xanh đặc trưng Messenger hoặc #22c55e nếu thích xanh lá */
+  color: #ffffff !important;
+  border: none !important;
+  padding: 6px 16px !important;
+  border-radius: 20px !important;
+  font-weight: 600 !important;
+  font-size: 13px !important;
+  cursor: pointer;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  transition: transform 0.1s ease, opacity 0.2s ease;
+}
+.btn-action.green:hover, .btn-accept:hover {
+  opacity: 0.9;
+  transform: scale(1.03);
+}
+.btn-action.green:active, .btn-accept:active {
+  transform: scale(0.97);
+}
+
+/* Khung chứa lời mời kết bạn trong danh sách */
+.chat-item.request-item {
+  background: var(--bg-card);
+  border-radius: 12px;
+  margin: 4px 8px;
+  padding: 10px 14px;
+}
