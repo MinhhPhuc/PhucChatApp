@@ -135,74 +135,31 @@ body, html {
   color: var(--bg-bubble-self);
 }
 
-/* --- CÁC CHỦ ĐỀ ĐOẠN CHAT --- */
+/* --- CẬP NHẬT CSS CHO PHẦN XEM TRƯỚC LINK ĐỂ KHÔNG BỊ TRẮNG NỮA --- */
 
-/* 1. Chủ đề Tình yêu (Love) */
-#messages-viewport.theme-love {
-  background: linear-gradient(135deg, #ffe4e6 0%, #fecdd3 100%) !important;
+/* Ép phần preview link bên trong tin nhắn tự động đổi màu theo bong bóng chat */
+.msg.self div, 
+.msg.self a {
+  color: inherit !important;
 }
-#messages-viewport.theme-love .msg.self {
-  background-color: #e11d48 !important; /* Màu hồng đậm/đỏ hồng giống Messenger */
+
+/* Xóa bỏ nền trắng cố định và làm cho phần khung link trong suốt, hài hòa với màu hồng/chủ đề */
+.msg.self > div:not(:first-child),
+.msg.self .link-preview, 
+.msg.self .preview-container {
+  background-color: rgba(0, 0, 0, 0.1) !important; /* Tạo lớp nền mờ tối nhẹ trên nền hồng đậm */
   color: #ffffff !important;
-}
-#messages-viewport.theme-love .msg.other {
-  background-color: #ffffff !important;
-  color: #1f2937 !important;
-}
-
-/* 2. Chủ đề Cà phê (Coffee) */
-#messages-viewport.theme-coffee {
-  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%) !important;
-}
-#messages-viewport.theme-coffee .msg.self {
-  background-color: #b45309 !important; /* Màu nâu cà phê */
-  color: #ffffff !important;
-}
-#messages-viewport.theme-coffee .msg.other {
-  background-color: #fffbeb !important;
-  color: #451a03 !important;
-}
-
-/* 3. Chủ đề Đơn sắc / Lặp lại (Monochrome) */
-#messages-viewport.theme-monochrome {
-  background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%) !important;
-}
-#messages-viewport.theme-monochrome .msg.self {
-  background-color: #334155 !important; /* Màu xám đậm */
-  color: #ffffff !important;
-}
-#messages-viewport.theme-monochrome .msg.other {
-  background-color: #ffffff !important;
-  color: #0f172a !important;
-}
-
-/* 4. Chủ đề Thả thính / Goth Charms (Tùy chỉnh thêm nếu cần) */
-#messages-viewport.theme-nature {
-  background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%) !important;
-}
-#messages-viewport.theme-nature .msg.self {
-  background-color: #059669 !important; /* Màu xanh lá */
-  color: #ffffff !important;
-}
-#messages-viewport.theme-nature .msg.other {
-  background-color: #ffffff !important;
-  color: #064e3b !important;
-}
-
-/* Tùy chỉnh phần khung xem trước link (link preview) bên trong tin nhắn cho đồng bộ với chủ đề */
-.msg .link-preview, 
-.msg .preview-container,
-.msg > div:not(:first-child) {
-  background-color: rgba(255, 255, 255, 0.9) !important;
-  color: #1f2937 !important;
   border-radius: 0 0 12px 12px;
-  padding: 8px 12px;
+  padding: 6px 10px;
   margin-top: 4px;
 }
 
-/* Nếu tin nhắn là của chính mình (self), có thể làm phần preview hiển thị mềm mại hơn */
-.msg.self .link-preview, 
-.msg.self .preview-container {
-  background-color: rgba(255, 255, 255, 0.95) !important;
-  color: #111827 !important;
+.msg.other > div:not(:first-child),
+.msg.other .link-preview, 
+.msg.other .preview-container {
+  background-color: rgba(0, 0, 0, 0.05) !important; /* Lớp nền mờ nhẹ cho tin nhắn của bạn bè */
+  color: #1f2937 !important;
+  border-radius: 0 0 12px 12px;
+  padding: 6px 10px;
+  margin-top: 4px;
 }

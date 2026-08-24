@@ -544,12 +544,20 @@ function appendMessage(msg) {
   const div = document.createElement('div');
   div.className = `msg ${isSelf ? 'self' : 'other'}`;
 
-  let bodyContent = msg.type === 'image' ? `<img src="${msg.content}" class="chat-image-sent" alt="Hình ảnh">` : msg.content;
+  let bodyContent = '';
+  
+  if (msg.type === 'image') {
+    bodyContent = `<img src="${msg.content}" class="chat-image-sent" alt="Hình ảnh">`;
+  } else {
+    // Nếu nội dung chứa cấu trúc xem trước link (có thể do hệ thống hoặc thẻ HTML tạo ra)
+    // Ta đưa vào một thẻ bọc để ép phần tử con bên trong kế thừa màu sắc hoặc hiển thị gọn gàng hơn
+    bodyContent = `<div class="msg-text-content">${msg.content}</div>`;
+  }
+
   div.innerHTML = `${!isSelf ? `<strong>${msg.sender.username}</strong><br>` : ''}${bodyContent}`;
   viewport.appendChild(div);
   viewport.scrollTop = viewport.scrollHeight;
 }
-
 // =========================================================
 // CÁC HÀM XỬ LÝ GIAO DIỆN NHÓM & CẬP NHẬT
 // =========================================================
