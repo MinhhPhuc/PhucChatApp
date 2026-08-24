@@ -1051,5 +1051,4 @@ document.addEventListener('click', (e) => {
         showToast('Đã xóa toàn bộ lịch sử đoạn chat!');
       }
     }
-    return;
   }
