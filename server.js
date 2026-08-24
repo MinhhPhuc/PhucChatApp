@@ -2,7 +2,7 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const path = require('path');
-const fs = require('fs'); // [MỚI] Thêm thư viện quản lý file
+const fs = require('fs');
 const ngrok = require('ngrok');
 
 const app = express();
@@ -19,7 +19,7 @@ app.get('/admin', (req, res) => {
 });
 
 // ==========================================
-// [MỚI] HỆ THỐNG LƯU TRỮ DATABASE TỰ ĐỘNG
+// HỆ THỐNG LƯU TRỮ DATABASE TỰ ĐỘNG
 // ==========================================
 function replacer(key, value) {
   if (value instanceof Map) return { dataType: 'Map', value: Array.from(value.entries()) };
@@ -35,14 +35,14 @@ function reviver(key, value) {
   return value;
 }
 
-// Khai báo DB dùng 'let' để có thể ghi đè khi tải từ file
 let DB = {
   accounts: new Map(),       // username -> { id, username, password, avatar }
   users: new Map(),          // userId -> user status object
   friendRequests: new Map(), // reqId -> request object
   friends: new Map(),        // userId -> Set(friendUserIds)
   messages: new Map(),       // roomId -> array of messages
-  groups: new Map()          // groupId -> { id, name, avatar, members: Set() }
+  groups: new Map(),         // groupId -> { id, name, avatar, members: Set() }
+  clearedChats: new Map()    // `${userId}_${roomId}` -> timestamp (Lưu mốc xóa cá nhân)
 };
 
 function loadDB() {
@@ -50,6 +50,7 @@ function loadDB() {
     if (fs.existsSync('database.json')) {
       const data = fs.readFileSync('database.json', 'utf8');
       DB = JSON.parse(data, reviver);
+      if (!DB.clearedChats) DB.clearedChats = new Map();
       console.log('✅ Đã nạp dữ liệu cũ từ database.json');
       
       // Reset trạng thái online về offline khi khởi động lại server
@@ -70,7 +71,6 @@ function saveDB() {
   }
 }
 
-// Tải dữ liệu ngay khi khởi động
 loadDB();
 // ==========================================
 
@@ -114,10 +114,8 @@ app.delete('/api/admin/user/:id', (req, res) => {
       group.members.delete(userId);
     });
 
-    // Ép các socket đang kết nối với userId này đăng xuất ngay lập tức
     io.to(userId).emit('auth:forced_logout');
-    
-    saveDB(); // [MỚI] Lưu dữ liệu sau khi xóa tài khoản
+    saveDB();
 
     return res.json({ success: true, message: 'Đã xóa tài khoản thành công!' });
   }
@@ -127,20 +125,27 @@ app.delete('/api/admin/user/:id', (req, res) => {
 
 app.use(express.static(path.join(__dirname, 'public')));
 
-
 io.on('connection', (socket) => {
   let currentUser = null;
 
-// Thao tác xóa lịch sử nhắn tin của một phòng
-  // Thao tác xóa lịch sử nhắn tin của một phòng (Đã sửa tương thích với DB.messages)
+  // --- 1. XÓA TIN NHẮN PHÍA CÁ NHÂN (LƯU VÀO DATABASE.JSON) ---
+  socket.on('messages:clear_me', ({ roomId }) => {
+    if (!currentUser || !roomId) return;
+
+    const clearKey = `${currentUser.id}_${roomId}`;
+    DB.clearedChats.set(clearKey, Date.now());
+    saveDB(); // Lưu vết mốc thời gian vào database.json
+
+    socket.emit('messages:cleared_me', { roomId });
+  });
+
+  // --- 2. XÓA DỮ LIỆU TẤT CẢ (LỆNH TOÀN CẦU) ---
   socket.on('messages:clear', ({ roomId }) => {
     if (!roomId) return;
 
-    // 1. Xóa lịch sử trong Map dữ liệu & lưu lại vào database.json
     DB.messages.set(roomId, []);
     saveDB();
 
-    // 2. Báo về cho cả 2 người (nếu là Chat riêng) hoặc cả nhóm (nếu là Group)
     if (roomId.startsWith('grp_')) {
       io.to(roomId).emit('messages:cleared', { roomId });
     } else {
@@ -153,6 +158,23 @@ io.on('connection', (socket) => {
     }
   });
 
+  // --- 3. LẤY LỊCH SỬ TIN NHẮN (ĐÃ LỌC THEO MỐC XÓA CỦA USER) ---
+  socket.on('messages:get', ({ roomId }) => {
+    if (!currentUser) return;
+
+    const msgs = DB.messages.get(roomId) || [];
+    const clearKey = `${currentUser.id}_${roomId}`;
+    const clearedAt = DB.clearedChats.get(clearKey) || 0;
+
+    // Chỉ lấy các tin nhắn được gửi SAU thời điểm user bấm xóa cá nhân
+    const filteredMsgs = msgs.filter(m => {
+      const msgTime = typeof m.timestamp === 'number' ? m.timestamp : new Date(m.timestamp).getTime();
+      return msgTime > clearedAt;
+    });
+
+    socket.emit('messages:history', { roomId, messages: filteredMsgs });
+  });
+
   // --- CÁC THAO TÁC QUẢN LÝ NHÓM ---
   socket.on('group:action', ({ action, groupId, targetId }) => {
     if (!currentUser) return;
@@ -161,13 +183,11 @@ io.on('connection', (socket) => {
 
     const isAdmin = group.adminId === currentUser.id;
 
-    // Thành viên rời nhóm
     if (action === 'leave') {
-      // Nếu là admin và nhóm còn thành viên khác, tự động nhường quyền admin cho người đầu tiên còn lại
       if (isAdmin && group.members.size > 1) {
         group.members.delete(currentUser.id);
         const nextMemberId = Array.from(group.members)[0];
-        group.adminId = nextMemberId; // Chuyển quyền admin
+        group.adminId = nextMemberId;
       } else {
         group.members.delete(currentUser.id);
       }
@@ -184,14 +204,13 @@ io.on('connection', (socket) => {
       return;
     }
 
-    // Các quyền dưới đây chỉ Admin mới được dùng
     if (!isAdmin) return socket.emit('message:error', 'Bạn không có quyền thực hiện thao tác này!');
 
     if (action === 'delete_group') {
       const allMembers = Array.from(group.members);
       DB.groups.delete(groupId);
       allMembers.forEach(mId => io.to(mId).emit('group:kicked_out'));
-      saveDB(); // [MỚI] Lưu lại dữ liệu
+      saveDB();
       return;
     }
 
@@ -209,13 +228,10 @@ io.on('connection', (socket) => {
       group.adminId = targetId;
     }
 
-    saveDB(); // [MỚI] Lưu lại mọi thay đổi trong nhóm
-
-    // Cập nhật lại giao diện cho tất cả người trong nhóm
+    saveDB();
     Array.from(group.members).forEach(mId => io.to(mId).emit('group:updated'));
   });
 
-  // Lệnh thêm thành viên mới vào nhóm
   socket.on('group:add_members', ({ groupId, newMemberIds }) => {
     if (!currentUser || !groupId || !newMemberIds || newMemberIds.length === 0) return;
 
@@ -246,11 +262,12 @@ io.on('connection', (socket) => {
     });
 
     if (isAdded) {
-      saveDB(); // [MỚI] Lưu lại thay đổi
+      saveDB();
       io.emit('group:updated');
     }
   });
-  
+
+  // --- AUTHENTICATION ---
   socket.on('auth:register', ({ username, password, avatar }) => {
     if (!username || !password) {
       return socket.emit('auth:error', 'Vui lòng nhập đầy đủ tên tài khoản và mật khẩu!');
@@ -269,8 +286,7 @@ io.on('connection', (socket) => {
     DB.friends.set(userId, new Set());
     DB.users.set(userId, { id: userId, username: cleanUsername, avatar: userAvatar, status: 'online' });
 
-    saveDB(); // [MỚI] Lưu thông tin đăng ký
-
+    saveDB();
     socket.emit('auth:register_success', 'Tạo tài khoản thành công! Vui lòng đăng nhập.');
   });
 
@@ -294,7 +310,6 @@ io.on('connection', (socket) => {
     currentUser = user;
     socket.join(user.id);
 
-    // Join vào các nhóm mà user này là thành viên
     DB.groups.forEach((group, groupId) => {
       if (group.members.has(user.id)) {
         socket.join(groupId);
@@ -345,12 +360,12 @@ io.on('connection', (socket) => {
       name,
       avatar: groupAvatar,
       members: membersSet,
-      adminId: currentUser.id, // Đặt người tạo làm Admin
-      muted: new Set()         // Danh sách bị cấm chat
+      adminId: currentUser.id,
+      muted: new Set()
     };
 
     DB.groups.set(groupId, groupObj);
-    saveDB(); // [MỚI] Lưu nhóm mới vào database
+    saveDB();
 
     membersSet.forEach(mId => {
       io.to(mId).emit('group:updated');
@@ -358,6 +373,7 @@ io.on('connection', (socket) => {
     syncUserData(socket, currentUser.id);
   });
 
+  // --- PHẠM VI BẠN BÈ ---
   socket.on('friend:request', ({ targetUserId }) => {
     if (!currentUser || currentUser.id === targetUserId) return;
     const reqId = `freq_${currentUser.id}_${targetUserId}`;
@@ -371,8 +387,7 @@ io.on('connection', (socket) => {
       status: 'pending'
     });
 
-    saveDB(); // [MỚI] Lưu yêu cầu kết bạn
-
+    saveDB();
     io.to(targetUserId).emit('friend:incoming');
     syncUserData(socket, currentUser.id);
   });
@@ -388,23 +403,17 @@ io.on('connection', (socket) => {
     DB.friends.get(req.fromUserId).add(req.toUserId);
     DB.friends.get(req.toUserId).add(req.fromUserId);
 
-    saveDB(); // [MỚI] Lưu trạng thái đã kết bạn
-
+    saveDB();
     syncUserData(socket, req.fromUserId);
     syncUserData(socket, req.toUserId);
     io.to(req.fromUserId).emit('friend:updated');
     io.to(req.toUserId).emit('friend:updated');
   });
 
-  socket.on('messages:get', ({ roomId }) => {
-    const msgs = DB.messages.get(roomId) || [];
-    socket.emit('messages:history', { roomId, messages: msgs });
-  });
-
+  // --- GỬI TIN NHẮN ---
   socket.on('message:send', ({ roomId, content, type = 'text' }) => {
     if (!currentUser || !content) return;
 
-    // --- KIỂM TRA MUTE TRONG NHÓM ---
     if (roomId.startsWith('grp_')) {
       const group = DB.groups.get(roomId);
       if (group && group.muted.has(currentUser.id)) {
@@ -424,7 +433,7 @@ io.on('connection', (socket) => {
     if (!DB.messages.has(roomId)) DB.messages.set(roomId, []);
     DB.messages.get(roomId).push(msg);
 
-    saveDB(); // [MỚI] Lưu tin nhắn mới vào dữ liệu
+    saveDB();
 
     if (roomId.startsWith('grp_')) {
       io.to(roomId).emit('message:received', msg);
@@ -466,7 +475,6 @@ function syncUserData(socket, userId) {
   const userGroups = [];
   DB.groups.forEach(group => {
     if (group.members.has(userId)) {
-      // Lấy thông tin chi tiết từng thành viên trong nhóm
       const memberDetails = Array.from(group.members).map(mId => {
         let acc = null;
         for (let a of DB.accounts.values()) { if (a.id === mId) acc = a; }
@@ -478,8 +486,8 @@ function syncUserData(socket, userId) {
         name: group.name,
         avatar: group.avatar,
         membersCount: group.members.size,
-        adminId: group.adminId, // Trả về ID của admin
-        members: memberDetails  // Trả về danh sách thành viên
+        adminId: group.adminId,
+        members: memberDetails
       });
     }
   });   
@@ -492,12 +500,11 @@ function syncUserData(socket, userId) {
   });
 }
 
-const PORT = process.env.PORT || 3000; // Cloud sẽ tự cấp cổng qua biến môi trường
+const PORT = process.env.PORT || 3000;
 
 server.listen(PORT, async () => {
   console.log(`[*] Web Chat Engine Online on port ${PORT}`);
 
-  // Chỉ bật ngrok tự động khi chạy ở máy tính cá nhân (Local)
   if (process.env.NODE_ENV !== 'production') {
     try {
       const ngrok = require('ngrok');

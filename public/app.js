@@ -535,7 +535,13 @@ if (btnBackList) {
 
 // --- XỬ LÝ TIN NHẮN ---
 socket.on('message:received', (msg) => {
-  state.lastMessages.set(msg.roomId, { content: msg.content, timestamp: msg.timestamp, senderId: msg.sender.id, senderName: msg.sender.username, type: msg.type });
+  state.lastMessages.set(msg.roomId, { 
+    content: msg.content, 
+    timestamp: msg.timestamp, 
+    senderId: msg.sender.id, 
+    senderName: msg.sender.username, 
+    type: msg.type 
+  });
   
   if (msg.roomId === state.activeRoomId) {
     appendMessage(msg);
@@ -553,8 +559,15 @@ socket.on('messages:history', ({ roomId, messages }) => {
     messages.forEach(msg => appendMessage(msg));
   }
   
-  if (messages.length > 0) {
-    state.lastMessages.set(roomId, messages[messages.length - 1]);
+  if (messages && messages.length > 0) {
+    const lastMsg = messages[messages.length - 1];
+    state.lastMessages.set(roomId, {
+      content: lastMsg.content,
+      timestamp: lastMsg.timestamp,
+      senderId: lastMsg.sender?.id || lastMsg.senderId,
+      senderName: lastMsg.sender?.username || lastMsg.senderName,
+      type: lastMsg.type
+    });
   } else {
     state.lastMessages.delete(roomId);
   }
@@ -729,14 +742,8 @@ document.addEventListener('click', (e) => {
     if (state.activeRoomId && state.currentUser) {
       showConfirmModal('Xóa đoạn chat', 'Bạn có chắc chắn muốn xóa đoạn chat ở phía bạn không? (Người còn lại vẫn giữ tin nhắn)', () => {
         // Gửi sự kiện xóa riêng cho user hiện tại đến Server
-        socket.emit('messages:clear_me', { roomId: state.activeRoomId, userId: state.currentUser.id });
-        
-        // Cập nhật ngay màn hình Client hiện tại
-        const viewport = document.getElementById('messages-viewport');
-        if (viewport) viewport.innerHTML = '';
-        state.lastMessages.delete(state.activeRoomId);
-        renderChatList();
-        showToast('Đã xóa đoạn chat phía bạn!');
+        socket.emit('messages:clear_me', { roomId: state.activeRoomId });
+        showToast('Đang xóa đoạn chat phía bạn...');
       });
     }
     return;
@@ -958,7 +965,7 @@ document.addEventListener('click', (e) => {
     socket.emit('group:create', {
         name: groupName,
         avatar: state.selectedGroupAvatar,
-        members: memberIds
+        memberIds: memberIds
     });
     
     if (modalGroup) {
