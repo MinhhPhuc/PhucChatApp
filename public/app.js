@@ -107,9 +107,9 @@ function updateRequestBadge(requestsList) {
 
   if (count >= 1) {
     badge.innerText = count;
-    badge.style.display = 'inline-block'; // Hiện badge khi >= 1 lời mời
+    badge.style.display = 'inline-block';
   } else {
-    badge.style.display = 'none'; // Ẩn badge khi bằng 0
+    badge.style.display = 'none';
   }
 }
 
@@ -299,9 +299,9 @@ if (btnLogout) {
 // Sự kiện socket nhận danh sách lời mời kết bạn từ server
 socket.on('receive_friend_requests', (requests) => {
   if (Array.isArray(requests)) {
-    state.requests = requests; // Cập nhật dữ liệu vào state
-    updateRequestBadge(state.requests); // Cập nhật badge hiển thị
-    renderChatList(); // Render lại danh sách ra màn hình
+    state.requests = requests;
+    updateRequestBadge(state.requests);
+    renderChatList();
   }
 });
 
@@ -426,10 +426,8 @@ function renderChatList() {
   const query = state.searchQuery || '';
   const filter = state.activeFilter || 'all';
 
-  // 0. Tự động cập nhật Badge hiển thị số lời mời kết bạn
   updateRequestBadge(state.requests);
 
-  // 1. Xử lý hiển thị danh sách Lời mời kết bạn (CHỈ khi ở tab 'requests')
   if (filter === 'requests' && !query) {
     if (state.requests.length === 0) {
       list.innerHTML = `<div class="empty-hint" style="text-align:center; padding:30px; color:var(--text-sub);">Không có lời mời kết bạn nào</div>`;
@@ -449,10 +447,9 @@ function renderChatList() {
         </div>
       `;
     });
-    return; // Dừng lại ở tab Lời mời, không render danh sách chat phía dưới
+    return;
   }
 
-  // 2 & 3. Gộp chung Nhóm chat và Bạn bè để sắp xếp theo tin nhắn mới nhất
   let combinedChats = [];
 
   if ((filter === 'all' || filter === 'groups') && !query) {
@@ -562,7 +559,6 @@ function renderChatList() {
     });
   }
 
-  // 4. Người dùng khác (khi tìm kiếm)
   if (query && state.currentUser) {
     if (!state.sentRequests) state.sentRequests = new Set();
 
@@ -720,7 +716,17 @@ socket.on('messages:history', ({ roomId, messages }) => {
   renderChatList();
 });
 
+// Xóa đoạn chat thành công
 socket.on('messages:cleared_me', ({ roomId }) => {
+  if (state.activeRoomId === roomId) {
+    const viewport = document.getElementById('messages-viewport');
+    if (viewport) viewport.innerHTML = '';
+  }
+  state.lastMessages.delete(roomId);
+  renderChatList();
+});
+
+socket.on('messages:cleared', ({ roomId }) => {
   if (state.activeRoomId === roomId) {
     const viewport = document.getElementById('messages-viewport');
     if (viewport) viewport.innerHTML = '';
@@ -765,7 +771,7 @@ function appendMessage(msg) {
   viewport.scrollTop = viewport.scrollHeight;
 }
 
-// --- GIAO DIỆN VÀ QUẢN LÝ NHÓM ---
+// --- FIX LỖI 1: HIỂN THỊ DANH SÁCH THÀNH VIÊN TẠO NHÓM CHUẨN ---
 function renderGroupMembersCheckbox(preSelectedFriendId = null) {
   const container = document.getElementById('group-members-list');
   if (!container) return;
@@ -777,10 +783,10 @@ function renderGroupMembersCheckbox(preSelectedFriendId = null) {
   state.friends.forEach(f => {
     const isChecked = f.id === preSelectedFriendId ? 'checked' : '';
     container.innerHTML += `
-      <label class="member-checkbox-item" style="display: flex; align-items: center; gap: 10px; padding: 6px 0; cursor: pointer;">
-        <input type="checkbox" value="${f.id}" class="group-member-checkbox" ${isChecked} style="width: 16px; height: 16px;">
-        <img src="${f.avatar}" style="width: 28px; height: 28px; border-radius: 50%; object-fit: cover;">
-        <span style="font-size: 14px; font-weight: 500;">${f.username}</span>
+      <label class="member-checkbox-item" style="display: flex; align-items: center; justify-content: flex-start; gap: 12px; padding: 8px 10px; cursor: pointer; width: 100%; box-sizing: border-box;">
+        <input type="checkbox" value="${f.id}" class="group-member-checkbox" ${isChecked} style="width: 18px; height: 18px; margin: 0; flex-shrink: 0;">
+        <img src="${f.avatar}" style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover; flex-shrink: 0; margin: 0;">
+        <span style="font-size: 14px; font-weight: 500; text-align: left; flex: 1; margin: 0;">${f.username}</span>
       </label>
     `;
   });
@@ -866,7 +872,7 @@ window.execGroupAction = function(action, targetId) {
   }
 };
 
-// --- BỘ ĐIỀU KHIỂN EVENT CLICK HỢP NHẤT ---
+// --- BỘ ĐIỀU KHIỂN EVENT CLICK HỢP NHẤT (FIX XÓA CHAT & TẠO NHÓM) ---
 document.addEventListener('click', (e) => {
   const modalGroup = document.getElementById('modal-group');
   const modalChatSettings = document.getElementById('modal-chat-settings');
@@ -875,9 +881,11 @@ document.addEventListener('click', (e) => {
   const modalNickname = document.getElementById('modal-nickname');
   const modalConfirm = document.getElementById('modal-confirm');
 
-  // 1. XÓA ĐOẠN CHAT
-  const btnDeleteChat = e.target.closest('#delete-chat, #btn-delete-chat, #set-delete-chat');
-  if (btnDeleteChat) {
+  // 1. FIX LỖI XÓA ĐOẠN CHAT (Bổ sung linh hoạt Selector & Text)
+  const btnDeleteChat = e.target.closest('#delete-chat, #btn-delete-chat, #set-delete-chat, .btn-delete-chat');
+  const isDeleteTextClick = modalChatSettings && (modalChatSettings.style.display === 'flex' || !modalChatSettings.classList.contains('hidden')) && e.target.innerText.includes('Xóa đoạn chat');
+
+  if (btnDeleteChat || isDeleteTextClick) {
     if (modalChatSettings) {
       modalChatSettings.classList.add('hidden');
       modalChatSettings.style.display = 'none';
@@ -886,15 +894,27 @@ document.addEventListener('click', (e) => {
     if (state.activeRoomId && state.currentUser) {
       showConfirmModal('Xóa đoạn chat', 'Bạn có chắc chắn muốn xóa đoạn chat ở phía bạn không? (Người còn lại vẫn giữ tin nhắn)', () => {
         socket.emit('messages:clear_me', { roomId: state.activeRoomId });
-        showToast('Đang xóa đoạn chat phía bạn...');
+        socket.emit('messages:clear', { roomId: state.activeRoomId });
+        
+        // Xóa ngay giao diện local
+        const viewport = document.getElementById('messages-viewport');
+        if (viewport) viewport.innerHTML = '';
+        state.lastMessages.delete(state.activeRoomId);
+        renderChatList();
+
+        showToast('Đã xóa đoạn chat phía bạn!');
       });
+    } else {
+      showToast('Không thể xác định đoạn chat!', false);
     }
     return;
   }
 
   // 2. XÓA KẾT BẠN (HỦY KẾT BẠN)
   const btnUnfriend = e.target.closest('#set-unfriend, #btn-unfriend');
-  if (btnUnfriend) {
+  const isUnfriendTextClick = modalChatSettings && (modalChatSettings.style.display === 'flex' || !modalChatSettings.classList.contains('hidden')) && e.target.innerText.includes('Xóa kết bạn');
+
+  if (btnUnfriend || isUnfriendTextClick) {
     if (modalChatSettings) {
       modalChatSettings.classList.add('hidden');
       modalChatSettings.style.display = 'none';
@@ -995,7 +1015,9 @@ document.addEventListener('click', (e) => {
 
   // 5. THAY ĐỔI CHỦ ĐỀ (THEME)
   const btnSetTheme = e.target.closest('#set-theme');
-  if (btnSetTheme) {
+  const isThemeTextClick = modalChatSettings && (modalChatSettings.style.display === 'flex' || !modalChatSettings.classList.contains('hidden')) && e.target.innerText.includes('chủ đề');
+
+  if (btnSetTheme || isThemeTextClick) {
     if (modalChatSettings) {
       modalChatSettings.classList.add('hidden');
       modalChatSettings.style.display = 'none';
@@ -1033,7 +1055,9 @@ document.addEventListener('click', (e) => {
 
   // 6. ĐỔI BIỆT DANH
   const btnSetNickname = e.target.closest('#set-nickname');
-  if (btnSetNickname) {
+  const isNicknameTextClick = modalChatSettings && (modalChatSettings.style.display === 'flex' || !modalChatSettings.classList.contains('hidden')) && e.target.innerText.includes('biệt danh');
+
+  if (btnSetNickname || isNicknameTextClick) {
     if (modalChatSettings) {
       modalChatSettings.classList.add('hidden');
       modalChatSettings.style.display = 'none';
@@ -1100,53 +1124,51 @@ document.addEventListener('click', (e) => {
     return;
   }
 
-  // 7. TẠO NHÓM
-  if (e.target.closest('#btn-open-group-modal') || e.target.closest('.btn-create-group')) {
-    if (modalChatSettings) modalChatSettings.classList.add('hidden');
-    if (modalGroup) {
-      modalGroup.classList.remove('hidden');
-      modalGroup.style.display = 'flex';
-      renderGroupMembersCheckbox(null);
-    }
-    return;
-  }
+  // 7. FIX LỖI TẠO NHÓM (Mở modal & Bấm tạo nhóm)
+  const btnOpenGroupModal = e.target.closest('#btn-open-group-modal, .btn-create-group, #set-create-group');
+  const isCreateGroupOptionClick = modalChatSettings && (modalChatSettings.style.display === 'flex' || !modalChatSettings.classList.contains('hidden')) && e.target.innerText.includes('Tạo nhóm');
 
-  const createGroupBtn = e.target.closest('#set-create-group');
-  if (createGroupBtn) {
+  if (btnOpenGroupModal || isCreateGroupOptionClick) {
     if (modalChatSettings) {
       modalChatSettings.classList.add('hidden');
       modalChatSettings.style.display = 'none';
     }
-
-    if (modalGroup && state.activeRoomId && state.activeRoomId.includes('_DM_')) {
-      const parts = state.activeRoomId.split('_DM_');
-      const targetFriendId = parts.find(id => id !== state.currentUser.id);
-      
+    if (modalGroup) {
       modalGroup.classList.remove('hidden');
       modalGroup.style.display = 'flex';
-      renderGroupMembersCheckbox(targetFriendId);
+      let preSelectedFriendId = null;
+      if (state.activeRoomId && state.activeRoomId.includes('_DM_')) {
+        const parts = state.activeRoomId.split('_DM_');
+        preSelectedFriendId = parts.find(id => id !== state.currentUser?.id);
+      }
+      renderGroupMembersCheckbox(preSelectedFriendId);
     }
     return;
   }
-  
-  if (e.target.closest('#btn-confirm-create-group')) {
-    const groupNameInput = document.getElementById('group-name-input');
+
+  // Sự kiện khi bấm nút "Tạo Nhóm" trong Modal
+  const btnConfirmCreateGroup = e.target.closest('#btn-confirm-create-group, .btn-confirm-group');
+  const isCreateGroupButtonClick = modalGroup && (modalGroup.style.display === 'flex' || !modalGroup.classList.contains('hidden')) && e.target.tagName === 'BUTTON' && e.target.innerText.trim().includes('Tạo Nhóm');
+
+  if (btnConfirmCreateGroup || isCreateGroupButtonClick) {
+    e.preventDefault();
+    const groupNameInput = document.getElementById('group-name-input') || modalGroup.querySelector('input[type="text"]');
     const groupName = groupNameInput ? groupNameInput.value.trim() : '';
-    const checkedBoxes = document.querySelectorAll('.group-member-checkbox:checked');
+    const checkedBoxes = document.querySelectorAll('.group-member-checkbox:checked, .member-checkbox:checked');
     const memberIds = Array.from(checkedBoxes).map(cb => cb.value);
-    
+
     if (!groupName) return showToast('Vui lòng nhập tên nhóm!', false);
     if (memberIds.length === 0) return showToast('Vui lòng chọn ít nhất 1 thành viên!', false);
-    
+
     socket.emit('group:create', {
-        name: groupName,
-        avatar: state.selectedGroupAvatar,
-        memberIds: memberIds
+      name: groupName,
+      avatar: state.selectedGroupAvatar,
+      memberIds: memberIds
     });
-    
+
     if (modalGroup) {
-        modalGroup.style.display = 'none';
-        modalGroup.classList.add('hidden');
+      modalGroup.style.display = 'none';
+      modalGroup.classList.add('hidden');
     }
     if (groupNameInput) groupNameInput.value = '';
     showToast('Đang tạo nhóm...');
@@ -1155,7 +1177,9 @@ document.addEventListener('click', (e) => {
 
   // 8. CẢM XÚC NHANH
   const setEmojiBtn = e.target.closest('#set-emoji');
-  if (setEmojiBtn) {
+  const isEmojiTextClick = modalChatSettings && (modalChatSettings.style.display === 'flex' || !modalChatSettings.classList.contains('hidden')) && e.target.innerText.includes('Cảm xúc');
+
+  if (setEmojiBtn || isEmojiTextClick) {
     if (modalChatSettings) {
       modalChatSettings.classList.add('hidden');
       modalChatSettings.style.display = 'none';
@@ -1189,7 +1213,9 @@ document.addEventListener('click', (e) => {
   
   // 9. BÁO CÁO TỚI ADMIN 
   const reportBtn = e.target.closest('#set-report'); 
-  if (reportBtn) {
+  const isReportTextClick = modalChatSettings && (modalChatSettings.style.display === 'flex' || !modalChatSettings.classList.contains('hidden')) && e.target.innerText.includes('Báo cáo');
+
+  if (reportBtn || isReportTextClick) {
     if (modalChatSettings) {
       modalChatSettings.classList.add('hidden');
       modalChatSettings.style.display = 'none';

@@ -196,8 +196,8 @@ body, html {
 .modal-group-content, 
 .modal-card, 
 .report-modal { 
-  background: #ffffff; 
-  color: #333333;
+  background: var(--bg-card) !important; 
+  color: var(--text-main) !important;
   width: 90% !important; 
   max-width: 400px !important; 
   padding: 20px !important; 
@@ -207,7 +207,31 @@ body, html {
   gap: 12px; 
   box-sizing: border-box !important;
   overflow-x: hidden !important;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+  border: 1px solid var(--border);
+}
+
+.modal h2, .modal h3 { 
+  text-align: center; 
+  margin-top: 0; 
+  margin-bottom: 8px; 
+  font-size: 20px; 
+  color: var(--text-main) !important; 
+}
+
+.modal select, 
+.modal textarea, 
+.modal input { 
+  width: 100% !important; 
+  padding: 10px 12px !important; 
+  border: 1px solid var(--border) !important; 
+  border-radius: 8px !important; 
+  font-size: 14px !important; 
+  outline: none !important; 
+  background: var(--bg-main) !important; 
+  color: var(--text-main) !important;
+  margin-top: 4px !important; 
+  margin-bottom: 12px !important; 
 }
 
 /* Ép 100% các thẻ con bên trong Modal không bị tràn lề */
@@ -263,3 +287,55 @@ body, html {
 .btn-close { background: transparent; color: var(--text-sub); border: none; padding: 8px; cursor: pointer; }
 .btn-submit { background-color: #e53935; color: #ffffff; }
 .btn-cancel { background-color: #e0e0e0; color: #333333; }
+
+/* Sửa lỗi Avatar bị đẩy sang phải trong Modal tạo nhóm */
+#group-members-list {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 8px !important;
+  max-height: 220px !important;
+  overflow-y: auto !important;
+  padding: 6px !important;
+}
+
+.member-checkbox-item {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  gap: 12px !important;
+  width: 100% !important;
+  padding: 8px 10px !important;
+  border-radius: 8px !important;
+  cursor: pointer !important;
+  box-sizing: border-box !important;
+  transition: background 0.2s ease;
+}
+
+.member-checkbox-item:hover {
+  background-color: rgba(0, 0, 0, 0.05) !important;
+}
+
+.member-checkbox-item input[type="checkbox"] {
+  width: 18px !important;
+  height: 18px !important;
+  margin: 0 !important;
+  flex-shrink: 0 !important;
+  cursor: pointer !important;
+}
+
+.member-checkbox-item img {
+  width: 32px !important;
+  height: 32px !important;
+  border-radius: 50% !important;
+  object-fit: cover !important;
+  flex-shrink: 0 !important;
+  margin: 0 !important;
+}
+
+.member-checkbox-item span {
+  font-size: 14px !important;
+  font-weight: 500 !important;
+  text-align: left !important;
+  flex: 1 !important;
+  margin: 0 !important;
+}
