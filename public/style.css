@@ -32,9 +32,29 @@
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-body, html { width: 100%; height: 100%; background: var(--bg-main); color: var(--text-main); overflow: hidden; height: 100dvh; }
 
-.app-container { display: flex; flex-direction: column; height: 100vh; max-width: 500px; margin: 0 auto; position: relative; background: var(--bg-main); }
+body, html { 
+  width: 100%; 
+  height: 100%; 
+  height: 100dvh; 
+  background: var(--bg-main); 
+  color: var(--text-main); 
+  overflow: hidden; 
+}
+
+/* SỬA LỖI CHROME MOBILE: Dùng 100dvh thay vì 100vh cố định */
+.app-container { 
+  display: flex; 
+  flex-direction: column; 
+  height: 100%; 
+  height: 100dvh; 
+  max-width: 500px; 
+  margin: 0 auto; 
+  position: relative; 
+  background: var(--bg-main); 
+  overflow: hidden;
+}
+
 .app-header { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--border); }
 .header-user { display: flex; align-items: center; gap: 10px; }
 .avatar { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; border: 2px solid var(--bg-bubble-self); }
@@ -54,7 +74,18 @@ body, html { width: 100%; height: 100%; background: var(--bg-main); color: var(-
 .unread-badge { position: absolute; right: 16px; background: #f02849; color: #fff; font-size: 10px; font-weight: bold; padding: 2px 6px; border-radius: 10px; }
 
 /* Chat Screen */
-.chat-screen { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: var(--bg-main); z-index: 100; display: flex; flex-direction: column; }
+.chat-screen { 
+  position: absolute; 
+  top: 0; 
+  left: 0; 
+  width: 100%; 
+  height: 100%; 
+  background: var(--bg-main); 
+  z-index: 100; 
+  display: flex; 
+  flex-direction: column; 
+}
+
 .hidden { display: none !important; }
 .chat-header { display: flex; align-items: center; gap: 12px; padding: 12px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
 .messages-viewport { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 8px; background: transparent; }
@@ -62,14 +93,23 @@ body, html { width: 100%; height: 100%; background: var(--bg-main); color: var(-
 .msg.self { align-self: flex-end; background: var(--bg-bubble-self); color: #fff; border-bottom-right-radius: 4px; }
 .msg.other { align-self: flex-start; background: var(--bg-bubble-other); color: var(--text-main); border-bottom-left-radius: 4px; }
 
-/* Chat Input Bar chuẩn giao diện Messenger */
-.chat-input-bar { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-top: 1px solid var(--border); background: var(--bg-main); flex-shrink: 0; }
+/* Chat Input Bar chuẩn giao diện Messenger - Đã thêm đệm viền dưới màn hình điện thoại */
+.chat-input-bar { 
+  display: flex; 
+  align-items: center; 
+  gap: 8px; 
+  padding: 8px 12px; 
+  padding-bottom: calc(8px + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--border); 
+  background: var(--bg-main); 
+  flex-shrink: 0; 
+}
 .chat-input-bar input { flex: 1; background: var(--bg-card); border: none; padding: 10px 16px; border-radius: 20px; color: var(--text-main); outline: none; font-size: 14px; }
 .chat-input-bar button, .chat-input-bar .icon-btn { background: transparent; border: none; color: var(--text-sub); font-size: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center; min-width: 36px; height: 36px; }
 
 /* Modals */
 .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 200; display: flex; justify-content: center; align-items: center; }
-.modal.hidden { display: none; }
+.modal.hidden { display: none !important; }
 .modal-content { background: var(--bg-main); border: 1px solid var(--border); width: 90%; max-width: 400px; padding: 20px; border-radius: 16px; display: flex; flex-direction: column; gap: 12px; }
 .btn-primary { background: var(--bg-bubble-self); color: #fff; border: none; padding: 10px; border-radius: 8px; font-weight: bold; cursor: pointer; }
 .btn-close { background: transparent; color: var(--text-sub); border: none; padding: 8px; cursor: pointer; }
@@ -93,7 +133,6 @@ body, html { width: 100%; height: 100%; background: var(--bg-main); color: var(-
   background-color: #ffffff !important;
   color: #1f2937 !important;
 }
-/* Đồng bộ màu các icon và khung nhập text bên dưới giống ảnh mẫu */
 .chat-screen.theme-love .chat-input-bar {
   background: transparent !important;
   border-top-color: rgba(225, 29, 72, 0.15);
@@ -231,12 +270,4 @@ body, html { width: 100%; height: 100%; background: var(--bg-main); color: var(-
 
 .quick-reaction-btn:hover {
   transform: scale(1.2);
-}
-
-/* Đảm bảo thanh nhập chat chứa đủ không gian cho cảm xúc nhanh */
-.chat-input-bar {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 12px;
 }
