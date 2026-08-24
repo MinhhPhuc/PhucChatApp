@@ -491,6 +491,37 @@ io.on('connection', (socket) => {
     io.to(friendId).emit('friend:updated');
   });
 
+// --- XỬ LÝ BÁO CÁO VI PHẠM ---
+  socket.on('report:submit', ({ targetId, reason, description }) => {
+    if (!currentUser || !targetId) return;
+    
+    const reportId = `rep_${Math.random().toString(36).substr(2, 9)}`;
+    let targetUsername = targetId;
+    
+    for (let [uname, acc] of DB.accounts.entries()) {
+      if (acc.id === targetId) {
+        targetUsername = uname;
+        break;
+      }
+    }
+
+    const reportObj = {
+      id: reportId,
+      reporterId: currentUser.id,
+      reporterName: currentUser.username,
+      targetId: targetId,
+      targetUsername: targetUsername,
+      reason: reason || 'Spam',
+      description: description || '',
+      timestamp: Date.now()
+    };
+
+    if (!DB.reports) DB.reports = new Map();
+    DB.reports.set(reportId, reportObj);
+    saveDB();
+    socket.emit('report:success', 'Đã gửi báo cáo tới đội ngũ Admin thành công!');
+  });
+
 });
 
 function syncUserData(socket, userId) {
@@ -555,33 +586,3 @@ server.listen(PORT, async () => {
     }
   }
 });
-
-// --- XỬ LÝ BÁO CÁO VI PHẠM ---
-  socket.on('report:submit', ({ targetId, reason, description }) => {
-    if (!currentUser || !targetId) return;
-    
-    const reportId = `rep_${Math.random().toString(36).substr(2, 9)}`;
-    let targetUsername = targetId;
-    
-    for (let [uname, acc] of DB.accounts.entries()) {
-      if (acc.id === targetId) {
-        targetUsername = uname;
-        break;
-      }
-    }
-
-    const reportObj = {
-      id: reportId,
-      reporterId: currentUser.id,
-      reporterName: currentUser.username,
-      targetId: targetId,
-      targetUsername: targetUsername,
-      reason: reason || 'Spam',
-      description: description || '',
-      timestamp: Date.now()
-    };
-
-    DB.reports.set(reportId, reportObj);
-    saveDB();
-    socket.emit('report:success', 'Đã gửi báo cáo tới đội ngũ Admin thành công!');
-  });
