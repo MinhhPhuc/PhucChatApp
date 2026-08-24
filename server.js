@@ -42,7 +42,8 @@ let DB = {
   friends: new Map(),        // userId -> Set(friendUserIds)
   messages: new Map(),       // roomId -> array of messages
   groups: new Map(),         // groupId -> { id, name, avatar, members: Set() }
-  clearedChats: new Map()    // `${userId}_${roomId}` -> timestamp (Lưu mốc xóa cá nhân)
+  clearedChats: new Map(),   // `${userId}_${roomId}` -> timestamp (Lưu mốc xóa cá nhân)
+  reports: new Map()
 };
 
 function loadDB() {
@@ -74,25 +75,36 @@ function saveDB() {
 loadDB();
 // ==========================================
 
-app.get('/api/admin/data', (req, res) => {
-  const accounts = Array.from(DB.accounts.values()).map(acc => ({
-    id: acc.id,
-    username: acc.username,
-    avatar: acc.avatar,
-    status: DB.users.get(acc.id)?.status || 'offline'
-  }));
+// Lấy danh sách báo cáo cho Admin
+app.get('/api/admin/reports', (req, res) => {
+  const reportsList = Array.from(DB.reports.values());
+  res.json(reportsList);
+});
 
-  let totalMessages = 0;
-  DB.messages.forEach(msgs => { totalMessages += msgs.length; });
+// Hạn chế người dùng 24h
+app.post('/api/admin/user/:id/restrict', (req, res) => {
+  const userId = req.params.id;
+  const userObj = DB.users.get(userId);
+  if (userObj) {
+    userObj.restrictedUntil = Date.now() + 24 * 60 * 60 * 1000; // Khóa 24 giờ
+    saveDB();
+    
+    // Gửi tín hiệu thông báo trực tiếp cho user đó
+    io.to(userId).emit('auth:restricted', 'Tài khoản của bạn đã bị hạn chế nhắn tin trong 24 giờ do vi phạm nội quy.');
+    return res.json({ success: true, message: 'Đã hạn chế người dùng 24h thành công!' });
+  }
+  res.status(404).json({ success: false, message: 'Không tìm thấy người dùng!' });
+});
 
-  res.json({
-    accounts,
-    stats: {
-      totalUsers: accounts.length,
-      totalGroups: DB.groups.size,
-      totalMessages: totalMessages
-    }
-  });
+// Xóa/Giải quyết báo cáo
+app.delete('/api/admin/report/:id', (req, res) => {
+  const reportId = req.params.id;
+  if (DB.reports.has(reportId)) {
+    DB.reports.delete(reportId);
+    saveDB();
+    return res.json({ success: true, message: 'Đã xóa báo cáo!' });
+  }
+  res.status(404).json({ success: false, message: 'Không tìm thấy báo cáo!' });
 });
 
 app.delete('/api/admin/user/:id', (req, res) => {
@@ -414,6 +426,13 @@ io.on('connection', (socket) => {
   socket.on('message:send', ({ roomId, content, type = 'text' }) => {
     if (!currentUser || !content) return;
 
+  // 🆕 KIỂM TRA TRẠNG THÁI HẠN CHẾ 24H
+    const userStatus = DB.users.get(currentUser.id);
+    if (userStatus && userStatus.restrictedUntil && userStatus.restrictedUntil > Date.now()) {
+      const hoursLeft = Math.ceil((userStatus.restrictedUntil - Date.now()) / (1000 * 60 * 60));
+      return socket.emit('message:error', `Tài khoản của bạn đang bị hạn chế nhắn tin trong ${hoursLeft} giờ tới do vi phạm quy tắc!`);
+    }
+
     if (roomId.startsWith('grp_')) {
       const group = DB.groups.get(roomId);
       if (group && group.muted.has(currentUser.id)) {
@@ -536,3 +555,33 @@ server.listen(PORT, async () => {
     }
   }
 });
+
+// --- XỬ LÝ BÁO CÁO VI PHẠM ---
+  socket.on('report:submit', ({ targetId, reason, description }) => {
+    if (!currentUser || !targetId) return;
+    
+    const reportId = `rep_${Math.random().toString(36).substr(2, 9)}`;
+    let targetUsername = targetId;
+    
+    for (let [uname, acc] of DB.accounts.entries()) {
+      if (acc.id === targetId) {
+        targetUsername = uname;
+        break;
+      }
+    }
+
+    const reportObj = {
+      id: reportId,
+      reporterId: currentUser.id,
+      reporterName: currentUser.username,
+      targetId: targetId,
+      targetUsername: targetUsername,
+      reason: reason || 'Spam',
+      description: description || '',
+      timestamp: Date.now()
+    };
+
+    DB.reports.set(reportId, reportObj);
+    saveDB();
+    socket.emit('report:success', 'Đã gửi báo cáo tới đội ngũ Admin thành công!');
+  });

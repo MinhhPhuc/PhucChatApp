@@ -59,6 +59,26 @@
     </table>
   </div>
 
+  <div class="card mt-4">
+    <div class="card-header bg-warning text-dark font-weight-bold">🚨 Danh sách Báo cáo Vi phạm</div>
+    <div class="card-body">
+      <table class="table table-bordered" id="reports-table">
+        <thead>
+          <tr>
+            <th>Người báo cáo</th>
+            <th>Người bị cáo buộc</th>
+            <th>Lý do</th>
+            <th>Mô tả chi tiết</th>
+            <th>Thao tác</th>
+          </tr>
+        </thead>
+        <tbody>
+          <!-- Dữ liệu được load bằng JavaScript -->
+        </tbody>
+      </table>
+    </div>
+  </div>
+  
   <script>
     async function loadAdminData() {
       try {
@@ -110,6 +130,55 @@
     loadAdminData();
     // Tự động làm mới dữ liệu mỗi 5 giây
     setInterval(loadAdminData, 5000);
+  
+    async function loadReports() {
+    try {
+      const res = await fetch('/api/admin/reports');
+      const reports = await res.json();
+      const tbody = document.querySelector('#reports-table tbody');
+      tbody.innerHTML = '';
+
+      if (reports.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" class="text-center text-muted">Không có báo cáo vi phạm nào.</td></tr>`;
+        return;
+      }
+
+      reports.forEach(rep => {
+        tbody.innerHTML += `
+          <tr>
+            <td>${rep.reporterName}</td>
+            <td><b>${rep.targetUsername}</b></td>
+            <td><span class="badge badge-danger">${rep.reason}</span></td>
+            <td>${rep.description || 'Không có mô tả'}</td>
+            <td>
+              <button class="btn btn-sm btn-warning" onclick="restrictUser('${rep.targetId}')">Hạn chế 24h</button>
+              <button class="btn btn-sm btn-secondary" onclick="deleteReport('${rep.id}')">Xóa báo cáo</button>
+            </td>
+          </tr>
+        `;
+      });
+    } catch (err) {
+      console.error('Lỗi tải báo cáo:', err);
+    }
+  }
+
+  async function restrictUser(userId) {
+    if (!confirm('Bạn có chắc chắn muốn hạn chế nhắn tin tài khoản này trong 24 giờ?')) return;
+    const res = await fetch(`/api/admin/user/${userId}/restrict`, { method: 'POST' });
+    const data = await res.json();
+    alert(data.message);
+    loadReports();
+  }
+
+  async function deleteReport(reportId) {
+    const res = await fetch(`/api/admin/report/${reportId}`, { method: 'DELETE' });
+    loadReports();
+  }
+
+  // Gọi hàm load khi trang admin mở
+  loadReports();
+  setInterval(loadReports, 10000); // Tự động làm mới danh sách sau mỗi 10 giây
+
   </script>
 </body>
 </html>

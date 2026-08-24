@@ -193,6 +193,15 @@ socket.on('auth:success', ({ token, user }) => {
   if (myName) myName.innerText = user.username;
 });
 
+socket.on('auth:restricted', (message) => {
+  Swal.fire({
+    icon: 'warning',
+    title: 'Tài khoản bị hạn chế',
+    text: message,
+    confirmButtonColor: '#d33'
+  });
+});
+
 const savedToken = localStorage.getItem('chat_session_token');
 if (savedToken) {
   socket.emit('auth:session', { userId: savedToken });
@@ -1051,7 +1060,61 @@ if (btnUnfriend) {
     });
     return;
   }
-  // 9. CÁC NÚT TRONG MODAL CONFIRM
+  
+  // 9. BÁO CÁO TỚI ADMIN
+  const reportBtn = e.target.closest('#report-admin'); // ID nút "Báo cáo tới Admin" của bạn
+  if (reportBtn) {
+    if (modalChatSettings) {
+      modalChatSettings.classList.add('hidden');
+      modalChatSettings.style.display = 'none';
+    }
+
+    // Lấy ID người dùng đối diện trong phòng chat hiện tại (hoặc state.activeRoomId nếu là ID user)
+    const targetUserId = state.activeRoomId; 
+
+    Swal.fire({
+      title: 'Báo cáo vi phạm',
+      html: `
+        <div style="text-align: left; margin-bottom: 10px;">
+          <label style="font-weight: 600; font-size: 14px;">Chọn lý do báo cáo:</label>
+          <select id="swal-report-reason" class="swal2-input" style="margin-top: 5px; width: 100%;">
+            <option value="Spam tin nhắn">Spam tin nhắn</option>
+            <option value="Tài khoản giả mạo">Tài khoản giả mạo</option>
+            <option value="Nội dung phản cảm">Nội dung phản cảm / Đả kích</option>
+            <option value="Lý do khác">Lý do khác</option>
+          </select>
+        </div>
+        <div style="text-align: left;">
+          <label style="font-weight: 600; font-size: 14px;">Mô tả chi tiết:</label>
+          <textarea id="swal-report-desc" class="swal2-textarea" placeholder="Nhập chi tiết vi phạm (tùy chọn)..." style="margin-top: 5px; width: 100%; height: 80px;"></textarea>
+        </div>
+      `,
+      showCancelButton: true,
+      confirmButtonText: 'Gửi báo cáo',
+      cancelButtonText: 'Hủy',
+      confirmButtonColor: '#d33',
+      cancelButtonColor: '#e4e6eb',
+      preConfirm: () => {
+        return {
+          reason: document.getElementById('swal-report-reason').value,
+          description: document.getElementById('swal-report-desc').value
+        }
+      }
+    }).then((result) => {
+      if (result.isConfirmed) {
+        const { reason, description } = result.value;
+        socket.emit('report:submit', { 
+          targetId: targetUserId, 
+          reason, 
+          description 
+        });
+        showToast('Đã gửi báo cáo tới Admin thành công!');
+      }
+    });
+    return;
+  }
+  
+  // 10. CÁC NÚT TRONG MODAL CONFIRM
   if (e.target.closest('#btn-confirm-yes')) {
     if (modalConfirm) {
       modalConfirm.classList.add('hidden');
