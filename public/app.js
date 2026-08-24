@@ -399,9 +399,8 @@ function renderChatList() {
   const query = state.searchQuery || '';
   const filter = state.activeFilter || 'all';
 
-  // 1. Lời mời kết bạn
+  // 1. Lời mời kết bạn (hiển thị gọn ở đầu nếu có)
   if (state.requests.length > 0 && !query && filter === 'all') {
-    list.innerHTML += `<div class="chat-section-header">LỜI MỜI KẾT BẠN (${state.requests.length})</div>`;
     state.requests.forEach(req => {
       list.innerHTML += `
         <div class="chat-item">
@@ -413,23 +412,51 @@ function renderChatList() {
     });
   }
 
-  // 2. Nhóm chat
-  if ((filter === 'all' || filter === 'groups') && !query) {
-    const sortedGroups = [...state.groups].sort((a, b) => {
-      const msgA = state.lastMessages.get(a.id);
-      const msgB = state.lastMessages.get(b.id);
-      const timeA = msgA ? new Date(msgA.timestamp).getTime() : 0;
-      const timeB = msgB ? new Date(msgB.timestamp).getTime() : 0;
-      return timeB - timeA;
-    });
+  // 2 & 3. Gộp chung Nhóm chat và Bạn bè vào một mảng duy nhất để sắp xếp theo thời gian tin nhắn
+  let combinedChats = [];
 
+  // Thêm nhóm chat vào mảng gộp
+  if ((filter === 'all' || filter === 'groups') && !query) {
+    const sortedGroups = [...state.groups];
     const displayedGroups = filter === 'unread' 
       ? sortedGroups.filter(g => (state.unreadCounts.get(g.id) || 0) > 0)
       : sortedGroups;
 
-    if (displayedGroups.length > 0) {
-      list.innerHTML += `<div class="chat-section-header">NHÓM CHAT (${displayedGroups.length})</div>`;
-      displayedGroups.forEach(g => {
+    displayedGroups.forEach(g => {
+      const lastMsg = state.lastMessages.get(g.id);
+      const timeVal = lastMsg ? new Date(lastMsg.timestamp).getTime() : 0;
+      combinedChats.push({ kind: 'group', item: g, timeVal });
+    });
+  }
+
+  // Thêm bạn bè vào mảng gộp
+  if ((filter === 'all' || filter === 'unread' || filter === 'friends') && state.currentUser) {
+    const filteredFriends = (state.friends || []).filter(f => {
+      const matchesQuery = f.username.toLowerCase().includes(query.toLowerCase());
+      const dmRoomId = [state.currentUser.id, f.id].sort().join('_DM_');
+      const unreadCount = state.unreadCounts.get(dmRoomId) || 0;
+      if (filter === 'unread' && unreadCount === 0) return false;
+      return matchesQuery;
+    });
+
+    filteredFriends.forEach(f => {
+      const dmRoomId = [state.currentUser.id, f.id].sort().join('_DM_');
+      const lastMsg = state.lastMessages.get(dmRoomId);
+      const timeVal = lastMsg ? new Date(lastMsg.timestamp).getTime() : 0;
+      combinedChats.push({ kind: 'friend', item: f, timeVal, dmRoomId });
+    });
+  }
+
+  // Sắp xếp toàn bộ nhóm và bạn bè theo thời gian mới nhất (giảm dần)
+  combinedChats.sort((a, b) => b.timeVal - a.timeVal);
+
+  // Render danh sách gộp liền mạch không có tiêu đề phân cách
+  if (combinedChats.length === 0 && state.requests.length === 0) {
+    list.innerHTML += `<div class="empty-hint">Không có cuộc trò chuyện nào</div>`;
+  } else {
+    combinedChats.forEach(entry => {
+      if (entry.kind === 'group') {
+        const g = entry.item;
         const lastMsg = state.lastMessages.get(g.id);
         const unreadCount = state.unreadCounts.get(g.id) || 0;
         const memberCount = g.members ? g.members.length : (g.membersCount || 0);
@@ -459,35 +486,9 @@ function renderChatList() {
             </div>
           </div>
         `;
-      });
-    }
-  }
-
-  // 3. Bạn bè
-  if ((filter === 'all' || filter === 'unread' || filter === 'friends') && state.currentUser) {
-    const filteredFriends = (state.friends || []).filter(f => {
-      const matchesQuery = f.username.toLowerCase().includes(query.toLowerCase());
-      const dmRoomId = [state.currentUser.id, f.id].sort().join('_DM_');
-      const unreadCount = state.unreadCounts.get(dmRoomId) || 0;
-      if (filter === 'unread' && unreadCount === 0) return false;
-      return matchesQuery;
-    }).sort((a, b) => {
-      const dmRoomA = [state.currentUser.id, a.id].sort().join('_DM_');
-      const dmRoomB = [state.currentUser.id, b.id].sort().join('_DM_');
-      const msgA = state.lastMessages.get(dmRoomA);
-      const msgB = state.lastMessages.get(dmRoomB);
-      const timeA = msgA ? new Date(msgA.timestamp).getTime() : 0;
-      const timeB = msgB ? new Date(msgB.timestamp).getTime() : 0;
-      return timeB - timeA;
-    });
-
-    list.innerHTML += `<div class="chat-section-header">BẠN BÈ (${filteredFriends.length})</div>`;
-
-    if (filteredFriends.length === 0) {
-      list.innerHTML += `<div class="empty-hint">Không có cuộc trò chuyện nào</div>`;
-    } else {
-      filteredFriends.forEach(f => {
-        const dmRoomId = [state.currentUser.id, f.id].sort().join('_DM_');
+      } else if (entry.kind === 'friend') {
+        const f = entry.item;
+        const dmRoomId = entry.dmRoomId;
         const lastMsg = state.lastMessages.get(dmRoomId);
         const unreadCount = state.unreadCounts.get(dmRoomId) || 0;
         const customNick = state.nicknames ? state.nicknames.get(dmRoomId) : null;
@@ -521,11 +522,11 @@ function renderChatList() {
             </div>
           </div>
         `;
-      });
-    }
+      }
+    });
   }
 
-  // 4. Người dùng khác
+  // 4. Người dùng khác (khi thực hiện tìm kiếm)
   if (query && state.currentUser) {
     const friendIds = new Set((state.friends || []).map(f => f.id));
     const strangers = (state.allUsers || []).filter(u => 
@@ -535,7 +536,6 @@ function renderChatList() {
     );
 
     if (strangers.length > 0) {
-      list.innerHTML += `<div class="chat-section-header">NGƯỜI DÙNG KHÁC</div>`;
       strangers.forEach(u => {
         list.innerHTML += `
           <div class="chat-item">
