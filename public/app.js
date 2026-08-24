@@ -231,9 +231,16 @@ socket.on('message:error', (errorMsg) => {
         }).then((appealResult) => {
           if (appealResult.isConfirmed) {
             const reason = appealResult.value || 'Xin hỗ trợ gỡ hạn chế tài khoản';
-            socket.emit('appeal:restriction', { reason });
-            showToast('Đã gửi yêu cầu hỗ trợ tới Admin thành công!');
-          }
+            // Lấy thông tin user hiện tại từ biến global của bạn
+        const currentUsr = (typeof currentUser !== 'undefined' ? currentUser : null) || state.currentUser;
+
+          socket.emit('appeal:restriction', { 
+            reason: reason,
+            userId: currentUsr?.id,
+            username: currentUsr?.username
+          });
+          showToast('Đã gửi yêu cầu hỗ trợ tới Admin thành công!');
+            }
         });
       }
     });
@@ -1158,7 +1165,9 @@ if (btnUnfriend) {
         socket.emit('report:submit', { 
           targetId: targetUserId, 
           reason, 
-          description 
+          description,
+          reporterId: currentUsr?.id,
+          reporterName: currentUsr?.username
         });
         showToast('Đã gửi báo cáo tới Admin thành công!');
       }

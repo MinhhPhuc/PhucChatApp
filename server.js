@@ -92,7 +92,6 @@ loadDB();
     }
     res.json(Array.from(DB.appeals.values()));
   });
-
 // Hạn chế người dùng 24h
 app.post('/api/admin/user/:id/restrict', (req, res) => {
   const userId = req.params.id;
@@ -476,14 +475,21 @@ io.on('connection', (socket) => {
     }
   
     // --- XỬ LÝ YÊU CẦU HỖ TRỢ / KHÁNG CÁO HẠN CHẾ ---
-    socket.on('appeal:restriction', ({ reason }) => {
-      if (!currentUser) return;
+    socket.on('appeal:restriction', ({ reason, userId, username }) => {
+      // Lấy thông tin user an toàn (ưu tiên nhận từ client gửi lên, nếu không có mới lấy từ socket session)
+      const finalUserId = userId || (currentUser ? currentUser.id : null);
+      const finalUsername = username || (currentUser ? currentUser.username : 'Người dùng');
+
+      if (!finalUserId) {
+        console.log("Lỗi: Không xác định được user gửi yêu cầu hỗ trợ!");
+        return;
+      }
 
       const appealId = `apl_${Math.random().toString(36).substr(2, 9)}`;
       const appealObj = {
         id: appealId,
-        userId: currentUser.id,
-        username: currentUser.username,
+        userId: finalUserId,
+        username: finalUsername,
         reason: reason || 'Xin gỡ hạn chế',
         timestamp: Date.now(),
         status: 'pending'
@@ -493,8 +499,9 @@ io.on('connection', (socket) => {
       DB.appeals.set(appealId, appealObj);
       saveDB();
 
-      // Bắn thông báo cập nhật về cho trang Admin nếu đang mở
+      // 👉 Bắn thông báo real-time về cho trang Admin ngay lập tức
       io.emit('admin:new-appeal', Array.from(DB.appeals.values()));
+      console.log("Đã nhận và lưu yêu cầu hỗ trợ từ:", finalUsername);
     });
   
   });
@@ -527,14 +534,23 @@ io.on('connection', (socket) => {
   });
 
 // --- XỬ LÝ BÁO CÁO VI PHẠM ---
-  socket.on('report:submit', ({ targetId, reason, description }) => {
-    if (!currentUser || !targetId) return;
+  socket.on('report:submit', ({ targetId, reason, description, reporterId, reporterName }) => {
+    const finalReporterId = reporterId || (currentUser ? currentUser.id : null);
+    const finalReporterName = reporterName || (currentUser ? currentUser.username : 'Người dùng');
+
+    if (!finalReporterId || !targetId) return;
     
+    let cleanTargetId = targetId;
+    if (cleanTargetId.includes('_DM_')) {
+      const parts = cleanTargetId.split('_DM_');
+      cleanTargetId = parts.find(id => id !== finalReporterId) || parts[0];
+    }
+
     const reportId = `rep_${Math.random().toString(36).substr(2, 9)}`;
-    let targetUsername = targetId;
+    let targetUsername = cleanTargetId;
     
     for (let [uname, acc] of DB.accounts.entries()) {
-      if (acc.id === targetId) {
+      if (acc.id === cleanTargetId) {
         targetUsername = uname;
         break;
       }
@@ -542,9 +558,9 @@ io.on('connection', (socket) => {
 
     const reportObj = {
       id: reportId,
-      reporterId: currentUser.id,
-      reporterName: currentUser.username,
-      targetId: targetId,
+      reporterId: finalReporterId,
+      reporterName: finalReporterName,
+      targetId: cleanTargetId,
       targetUsername: targetUsername,
       reason: reason || 'Spam',
       description: description || '',
@@ -554,7 +570,8 @@ io.on('connection', (socket) => {
     if (!DB.reports) DB.reports = new Map();
     DB.reports.set(reportId, reportObj);
     saveDB();
-    socket.emit('report:success', 'Đã gửi báo cáo tới đội ngũ Admin thành công!');
+
+    io.emit('admin:new-report', Array.from(DB.reports.values()));
   });
 
 });
