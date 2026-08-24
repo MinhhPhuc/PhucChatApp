@@ -285,6 +285,29 @@ if (btnLogout) {
   };
 }
 
+const btnOpenDeleteChat = document.getElementById('btnOpenDeleteChat'); // Nút "Xóa đoạn chat" trong menu
+const confirmDeleteModal = document.getElementById('confirmDeleteModal'); // Hộp thoại xác nhận xóa (như hình 2)
+
+if (btnOpenDeleteChat && confirmDeleteModal) {
+  btnOpenDeleteChat.addEventListener('click', (e) => {
+    e.stopPropagation(); // Ngăn sự kiện nổi bọt lên các lớp cha
+    chatSettingsModal.style.display = 'none'; // Đóng menu cài đặt lại
+    confirmDeleteModal.style.display = 'flex'; // Hiển thị bảng xác nhận xóa đoạn chat
+  });
+}
+
+const chatSettingsModal = document.getElementById('chatSettingsModal'); // ID của khung cài đặt tổng
+
+if (chatSettingsModal) {
+  chatSettingsModal.addEventListener('click', function(e) {
+    // Chỉ đóng modal khi người dùng bấm chính xác vào vùng nền tối bên ngoài, 
+    // không bấm vào hộp nội dung bên trong
+    if (e.target === chatSettingsModal) {
+      chatSettingsModal.style.display = 'none'; // Ẩn bảng cài đặt đi
+    }
+  });
+}
+
 // --- TÌM KIẾM ---
 const searchInput = document.getElementById('search-input');
 const btnClearSearch = document.getElementById('btn-clear-search');
