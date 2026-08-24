@@ -339,3 +339,70 @@ body, html {
   flex: 1 !important;
   margin: 0 !important;
 }
+
+/* Tự động căn chỉnh 5 ô thống kê nằm ngang */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.stat-card {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  padding: 14px;
+  border-radius: 10px;
+  text-align: center;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+}
+
+.stat-card.alert-report { background: #fff5f5; border-color: #feb2b2; }
+.stat-card.alert-appeal { background: #f0fff4; border-color: #9ae6b4; }
+
+.stat-card h3 { font-size: 13px; color: #64748b; margin-bottom: 6px; }
+.stat-card p { font-size: 22px; font-weight: bold; color: #0f172a; margin: 0; }
+
+/* Thanh tab điều hướng nhanh */
+.admin-tabs {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 16px;
+  border-bottom: 2px solid #e2e8f0;
+  padding-bottom: 10px;
+}
+
+.tab-btn {
+  padding: 8px 16px;
+  border: none;
+  background: #f1f5f9;
+  color: #475569;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tab-btn.active {
+  background: #2563eb;
+  color: #ffffff;
+}
+
+.badge {
+  background: #ef4444;
+  color: #ffffff;
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 10px;
+}
+
+.admin-tab-content { display: none; }
+.admin-tab-content.active { display: block; }

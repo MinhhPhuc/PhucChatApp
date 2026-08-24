@@ -99,6 +99,82 @@
       </tbody>
     </table>
   </div>
+
+    <!-- HÀNG THỐNG KÊ (5 Ô HÀNG NGANG) -->
+  <div class="stats-grid">
+    <div class="stat-card">
+      <h3>Tổng số tài khoản</h3>
+      <p id="stat-users">8</p>
+    </div>
+    <div class="stat-card">
+      <h3>Tổng số nhóm chat</h3>
+      <p id="stat-groups">2</p>
+    </div>
+    <div class="stat-card">
+      <h3>Tổng số tin nhắn</h3>
+      <p id="stat-messages">8</p>
+    </div>
+    <div class="stat-card alert-report" onclick="switchAdminTab('reports')">
+      <h3>🚨 Báo cáo vi phạm</h3>
+      <p id="stat-reports">0</p>
+    </div>
+    <div class="stat-card alert-appeal" onclick="switchAdminTab('appeals')">
+      <h3>📩 Yêu cầu kháng cáo</h3>
+      <p id="stat-appeals">0</p>
+    </div>
+  </div>
+
+  <!-- THANH NÚT CHUYỂN TAB ĐỂ KHÔNG PHẢI CUỘN TRANG -->
+  <div class="admin-tabs">
+    <button class="tab-btn active" onclick="switchAdminTab('users')">👥 Người Dùng</button>
+    <button class="tab-btn" onclick="switchAdminTab('reports')">
+      🚨 Báo Cáo Vi Phạm <span id="badge-reports" class="badge">0</span>
+    </button>
+    <button class="tab-btn" onclick="switchAdminTab('appeals')">
+      ⚖️ Yêu Cầu Kháng Cáo <span id="badge-appeals" class="badge">0</span>
+    </button>
+  </div>
+
+  <!-- TẬP HỢP NỘI DUNG DẠNG TAB -->
+  <div id="tab-users" class="admin-tab-content active">
+    <h2>Danh Sách Người Dùng</h2>
+    <!-- Chèn bảng Danh sách người dùng hiện tại của bạn vào đây -->
+  </div>
+
+  <div id="tab-reports" class="admin-tab-content">
+    <h2>Danh Sách Báo Cáo Vi Phạm</h2>
+    <table class="admin-table">
+      <thead>
+        <tr>
+          <th>Người Báo Cáo</th>
+          <th>Đối Tượng</th>
+          <th>Lý Do</th>
+          <th>Mô Tả</th>
+          <th>Thao Tác</th>
+        </tr>
+      </thead>
+      <tbody id="reports-list-tbody">
+        <!-- Dữ liệu JS tự động điền -->
+      </tbody>
+    </table>
+  </div>
+
+  <div id="tab-appeals" class="admin-tab-content">
+    <h2>Danh Sách Yêu Cầu Kháng Cáo</h2>
+    <table class="admin-table">
+      <thead>
+        <tr>
+          <th>Tài Khoản</th>
+          <th>Nội Dung Kháng Cáo</th>
+          <th>Thời Gian</th>
+          <th>Thao Tác</th>
+        </tr>
+      </thead>
+      <tbody id="appeals-list-tbody">
+        <!-- Dữ liệu JS tự động điền -->
+      </tbody>
+    </table>
+  </div>
   
   <script src="/socket.io/socket.io.js"></script>
   <script>
@@ -261,6 +337,24 @@
       loadReports();
       loadAppeals();
     });
+
+  function switchAdminTab(tabName) {
+    // Ẩn tất cả nội dung tab
+    document.querySelectorAll('.admin-tab-content').forEach(el => el.classList.remove('active'));
+    // Bỏ active nút cũ
+    document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+
+    // Hiển thị tab được bấm
+    const targetTab = document.getElementById(`tab-${tabName}`);
+    if (targetTab) targetTab.classList.add('active');
+
+    // Đánh dấu active nút tương ứng
+    const activeBtn = Array.from(document.querySelectorAll('.tab-btn')).find(btn => 
+      btn.getAttribute('onclick')?.includes(tabName)
+    );
+    if (activeBtn) activeBtn.classList.add('active');
+  }
+
   </script>
 </body>
 </html>
