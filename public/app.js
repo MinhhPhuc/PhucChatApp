@@ -729,6 +729,43 @@ document.addEventListener('click', (e) => {
   const modalTheme = document.getElementById('modal-theme');
   const modalNickname = document.getElementById('modal-nickname');
   const modalConfirm = document.getElementById('modal-confirm');
+  
+  // --- XÓA KẾT BẠN (HỦY KẾT BẠN) ---
+  const btnUnfriend = e.target.closest('#set-unfriend, #btn-unfriend') || 
+                      (e.target.innerText && e.target.innerText.includes('Xóa kết bạn') ? e.target : null);
+
+  if (btnUnfriend) {
+    if (modalChatSettings) {
+      modalChatSettings.classList.add('hidden');
+      modalChatSettings.style.display = 'none';
+    }
+
+    if (state.activeRoomId && state.activeRoomId.includes('_DM_') && state.currentUser) {
+      const parts = state.activeRoomId.split('_DM_');
+      const targetFriendId = parts.find(id => id !== state.currentUser.id);
+      const friend = state.friends.find(f => f.id === targetFriendId);
+
+      const friendName = friend ? friend.username : 'người dùng này';
+
+      showConfirmModal(
+        'Xóa kết bạn',
+        `Bạn có chắc chắn muốn xóa kết bạn với ${friendName}?`,
+        () => {
+          // Gửi sự kiện hủy kết bạn lên Server
+          socket.emit('friend:unfriend', { friendId: targetFriendId });
+          
+          // Đóng màn hình chat hiện tại
+          const chatScreen = document.getElementById('chat-screen');
+          if (chatScreen) chatScreen.classList.add('hidden');
+          state.activeRoomId = null;
+          
+          showToast(`Đã xóa kết bạn với ${friendName}!`);
+        }
+      );
+    }
+    return;
+  }
+
 
   // 1. XÓA ĐOẠN CHAT (CHỈ Ở PHÍA CÁ NHÂN HIỆN TẠI)
   const btnDeleteChat = e.target.closest('#delete-chat, #btn-delete-chat, #set-delete-chat') || 
