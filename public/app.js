@@ -202,6 +202,17 @@ socket.on('auth:restricted', (message) => {
   });
 });
 
+// Lắng nghe thông báo lỗi khi gửi tin nhắn (bao gồm cả thông báo tài khoản bị hạn chế)
+socket.on('message:error', (errorMsg) => {
+  Swal.fire({
+    icon: 'warning',
+    title: 'Thông báo',
+    text: errorMsg,
+    confirmButtonColor: '#d33',
+    confirmButtonText: 'Đã hiểu'
+  });
+});
+
 const savedToken = localStorage.getItem('chat_session_token');
 if (savedToken) {
   socket.emit('auth:session', { userId: savedToken });
