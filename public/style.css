@@ -188,3 +188,21 @@ body, html {
   background-color: #ffffff !important;
   color: #064e3b !important;
 }
+
+/* Tùy chỉnh phần khung xem trước link (link preview) bên trong tin nhắn cho đồng bộ với chủ đề */
+.msg .link-preview, 
+.msg .preview-container,
+.msg > div:not(:first-child) {
+  background-color: rgba(255, 255, 255, 0.9) !important;
+  color: #1f2937 !important;
+  border-radius: 0 0 12px 12px;
+  padding: 8px 12px;
+  margin-top: 4px;
+}
+
+/* Nếu tin nhắn là của chính mình (self), có thể làm phần preview hiển thị mềm mại hơn */
+.msg.self .link-preview, 
+.msg.self .preview-container {
+  background-color: rgba(255, 255, 255, 0.95) !important;
+  color: #111827 !important;
+}
