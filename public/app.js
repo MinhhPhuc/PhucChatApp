@@ -30,6 +30,19 @@ function showToast(message, isSuccess = true) {
   }, 3000);
 }
 
+// Gửi yêu cầu kháng cáo từ phía người dùng bị hạn chế
+function submitRestrictionAppeal(reasonText) {
+    const currentUser = JSON.parse(localStorage.getItem('user')) || {};
+
+    socket.emit('appeal:submit', {
+        userId: currentUser.id,
+        username: currentUser.username,
+        reason: reasonText
+    });
+
+    showToast('Đã gửi yêu cầu hỗ trợ tới Quản trị viên!');
+}
+
 // --- MODAL XÁC NHẬN ---
 let confirmCallback = null;
 function showConfirmModal(title, message, onYes) {

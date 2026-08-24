@@ -42,8 +42,9 @@ let DB = {
   friends: new Map(),        // userId -> Set(friendUserIds)
   messages: new Map(),       // roomId -> array of messages
   groups: new Map(),         // groupId -> { id, name, avatar, members: Set() }
-  clearedChats: new Map(),   // `${userId}_${roomId}` -> timestamp (Lưu mốc xóa cá nhân)
-  reports: new Map()
+  clearedChats: new Map(),   // `${userId}_${roomId}` -> timestamp
+  reports: new Map(),        // reportId -> report object
+  appeals: new Map()         // appealId -> appeal object
 };
 
 function loadDB() {
@@ -52,6 +53,8 @@ function loadDB() {
       const data = fs.readFileSync('database.json', 'utf8');
       DB = JSON.parse(data, reviver);
       if (!DB.clearedChats) DB.clearedChats = new Map();
+      if (!DB.reports) DB.reports = new Map();
+      if (!DB.appeals) DB.appeals = new Map();
       console.log('✅ Đã nạp dữ liệu cũ từ database.json');
       
       // Reset trạng thái online về offline khi khởi động lại server
@@ -75,39 +78,61 @@ function saveDB() {
 loadDB();
 // ==========================================
 
-// Lấy danh sách báo cáo vi phạm
-  app.get('/api/admin/reports', (req, res) => {
-    // Nếu chưa có DB.reports (chưa có ai báo cáo), trả về mảng rỗng để tránh lỗi
-    if (!DB.reports) {
-      return res.json([]);
-    }
-    res.json(Array.from(DB.reports.values()));
-  });
+// --- API QUẢN TRỊ VIÊN (ADMIN) ---
+app.get('/api/admin/reports', (req, res) => {
+  if (!DB.reports) return res.json([]);
+  res.json(Array.from(DB.reports.values()));
+});
 
-  // Lấy danh sách yêu cầu hỗ trợ / kháng cáo
-  app.get('/api/admin/appeals', (req, res) => {
-    // Nếu chưa có DB.appeals, trả về mảng rỗng
-    if (!DB.appeals) {
-      return res.json([]);
-    }
-    res.json(Array.from(DB.appeals.values()));
-  });
+app.get('/api/admin/appeals', (req, res) => {
+  if (!DB.appeals) return res.json([]);
+  res.json(Array.from(DB.appeals.values()));
+});
+
 // Hạn chế người dùng 24h
 app.post('/api/admin/user/:id/restrict', (req, res) => {
   const userId = req.params.id;
   const userObj = DB.users.get(userId);
   if (userObj) {
-    userObj.restrictedUntil = Date.now() + 24 * 60 * 60 * 1000; // Khóa 24 giờ
+    userObj.restrictedUntil = Date.now() + 24 * 60 * 60 * 1000;
     saveDB();
-    
-    // Gửi tín hiệu thông báo trực tiếp cho user đó
     io.to(userId).emit('auth:restricted', 'Tài khoản của bạn đã bị hạn chế nhắn tin trong 24 giờ do vi phạm nội quy.');
     return res.json({ success: true, message: 'Đã hạn chế người dùng 24h thành công!' });
   }
   res.status(404).json({ success: false, message: 'Không tìm thấy người dùng!' });
 });
 
-// Xóa/Giải quyết báo cáo
+// Gỡ hoàn toàn hạn chế
+app.post('/api/admin/user/:id/lift-restriction', (req, res) => {
+  const userId = req.params.id;
+  const userObj = DB.users.get(userId);
+  if (userObj) {
+    delete userObj.restrictedUntil;
+    saveDB();
+    io.to(userId).emit('auth:unrestricted', 'Tài khoản của bạn đã được gỡ hạn chế nhắn tin.');
+    return res.json({ success: true, message: 'Đã gỡ hạn chế thành công!' });
+  }
+  res.status(404).json({ success: false, message: 'Không tìm thấy người dùng!' });
+});
+
+// Giảm thời gian hạn chế
+app.post('/api/admin/user/:id/reduce-restriction', (req, res) => {
+  const userId = req.params.id;
+  const { hours } = req.body;
+  const userObj = DB.users.get(userId);
+  if (userObj && userObj.restrictedUntil) {
+    const reduceMs = (hours || 0) * 60 * 60 * 1000;
+    userObj.restrictedUntil = Math.max(Date.now(), userObj.restrictedUntil - reduceMs);
+    if (userObj.restrictedUntil <= Date.now()) {
+      delete userObj.restrictedUntil;
+    }
+    saveDB();
+    return res.json({ success: true, message: `Đã giảm ${hours} giờ hạn chế thành công!` });
+  }
+  res.status(404).json({ success: false, message: 'Không tìm thấy người dùng hoặc tài khoản không có hạn chế!' });
+});
+
+// Xóa báo cáo
 app.delete('/api/admin/report/:id', (req, res) => {
   const reportId = req.params.id;
   if (DB.reports.has(reportId)) {
@@ -118,6 +143,7 @@ app.delete('/api/admin/report/:id', (req, res) => {
   res.status(404).json({ success: false, message: 'Không tìm thấy báo cáo!' });
 });
 
+// Xóa tài khoản
 app.delete('/api/admin/user/:id', (req, res) => {
   const userId = req.params.id;
   let targetUsername = null;
@@ -133,13 +159,10 @@ app.delete('/api/admin/user/:id', (req, res) => {
     DB.accounts.delete(targetUsername);
     DB.users.delete(userId);
     DB.friends.delete(userId);
-    DB.groups.forEach(group => {
-      group.members.delete(userId);
-    });
+    DB.groups.forEach(group => { group.members.delete(userId); });
 
     io.to(userId).emit('auth:forced_logout');
     saveDB();
-
     return res.json({ success: true, message: 'Đã xóa tài khoản thành công!' });
   }
 
@@ -148,24 +171,31 @@ app.delete('/api/admin/user/:id', (req, res) => {
 
 app.use(express.static(path.join(__dirname, 'public')));
 
+// ==========================================
+// SOCKET.IO REAL-TIME HANDLING
+// ==========================================
 io.on('connection', (socket) => {
   let currentUser = null;
 
-  // --- 1. XÓA TIN NHẮN PHÍA CÁ NHÂN (LƯU VÀO DATABASE.JSON) ---
+  // Cho phép Admin join vào phòng quản trị riêng
+  socket.on('join_admin_room', (userData) => {
+    if (userData && userData.isAdmin) {
+      socket.join('admin_room');
+    }
+  });
+
+  // --- XÓA TIN NHẮN PHÍA CÁ NHÂN ---
   socket.on('messages:clear_me', ({ roomId }) => {
     if (!currentUser || !roomId) return;
-
     const clearKey = `${currentUser.id}_${roomId}`;
     DB.clearedChats.set(clearKey, Date.now());
-    saveDB(); // Lưu vết mốc thời gian vào database.json
-
+    saveDB();
     socket.emit('messages:cleared_me', { roomId });
   });
 
-  // --- 2. XÓA DỮ LIỆU TẤT CẢ (LỆNH TOÀN CẦU) ---
+  // --- XÓA TOÀN BỘ TIN NHẮN ---
   socket.on('messages:clear', ({ roomId }) => {
     if (!roomId) return;
-
     DB.messages.set(roomId, []);
     saveDB();
 
@@ -181,15 +211,13 @@ io.on('connection', (socket) => {
     }
   });
 
-  // --- 3. LẤY LỊCH SỬ TIN NHẮN (ĐÃ LỌC THEO MỐC XÓA CỦA USER) ---
+  // --- LẤY LỊCH SỬ TIN NHẮN ---
   socket.on('messages:get', ({ roomId }) => {
     if (!currentUser) return;
-
     const msgs = DB.messages.get(roomId) || [];
     const clearKey = `${currentUser.id}_${roomId}`;
     const clearedAt = DB.clearedChats.get(clearKey) || 0;
 
-    // Chỉ lấy các tin nhắn được gửi SAU thời điểm user bấm xóa cá nhân
     const filteredMsgs = msgs.filter(m => {
       const msgTime = typeof m.timestamp === 'number' ? m.timestamp : new Date(m.timestamp).getTime();
       return msgTime > clearedAt;
@@ -198,7 +226,7 @@ io.on('connection', (socket) => {
     socket.emit('messages:history', { roomId, messages: filteredMsgs });
   });
 
-  // --- CÁC THAO TÁC QUẢN LÝ NHÓM ---
+  // --- QUẢN LÝ NHÓM ---
   socket.on('group:action', ({ action, groupId, targetId }) => {
     if (!currentUser) return;
     const group = DB.groups.get(groupId);
@@ -219,10 +247,7 @@ io.on('connection', (socket) => {
       io.to(currentUser.id).emit('group:kicked_out'); 
       Array.from(group.members).forEach(mId => io.to(mId).emit('group:updated'));
       
-      if (group.members.size === 0) {
-        DB.groups.delete(groupId);
-      }
-      
+      if (group.members.size === 0) DB.groups.delete(groupId);
       saveDB();
       return;
     }
@@ -257,29 +282,13 @@ io.on('connection', (socket) => {
 
   socket.on('group:add_members', ({ groupId, newMemberIds }) => {
     if (!currentUser || !groupId || !newMemberIds || newMemberIds.length === 0) return;
-
-    let group = null;
-    if (DB.groups instanceof Map) {
-      group = DB.groups.get(groupId);
-    } else if (Array.isArray(DB.groups)) {
-      group = DB.groups.find(g => String(g.id) === String(groupId));
-    }
-
+    const group = DB.groups.get(groupId);
     if (!group) return;
+
     let isAdded = false;
-
     newMemberIds.forEach(rawId => {
-      const membersList = Array.from(group.members || []);
-      const alreadyInGroup = membersList.some(mId => String(mId) === String(rawId));
-
-      if (!alreadyInGroup) {
-        if (Array.isArray(group.members)) {
-          group.members.push(rawId);
-        } else if (group.members instanceof Set) {
-          group.members.add(rawId);
-        } else {
-          group.members = [rawId];
-        }
+      if (!group.members.has(rawId)) {
+        group.members.add(rawId);
         isAdded = true;
       }
     });
@@ -298,7 +307,7 @@ io.on('connection', (socket) => {
     
     const cleanUsername = username.trim();
     if (DB.accounts.has(cleanUsername)) {
-      return socket.emit('auth:error', 'Tài khoản này đã tồn tại, vui lòng chọn tên khác!');
+      return socket.emit('auth:error', 'Tài khoản này đã tồn tại!');
     }
 
     const userId = `usr_${Math.random().toString(36).substr(2, 9)}`;
@@ -310,7 +319,7 @@ io.on('connection', (socket) => {
     DB.users.set(userId, { id: userId, username: cleanUsername, avatar: userAvatar, status: 'online' });
 
     saveDB();
-    socket.emit('auth:register_success', 'Tạo tài khoản thành công! Vui lòng đăng nhập.');
+    socket.emit('auth:register_success', 'Tạo tài khoản thành công!');
   });
 
   socket.on('auth:login', ({ username, password }) => {
@@ -334,9 +343,7 @@ io.on('connection', (socket) => {
     socket.join(user.id);
 
     DB.groups.forEach((group, groupId) => {
-      if (group.members.has(user.id)) {
-        socket.join(groupId);
-      }
+      if (group.members.has(user.id)) socket.join(groupId);
     });
 
     socket.emit('auth:success', { token: user.id, user });
@@ -361,9 +368,7 @@ io.on('connection', (socket) => {
     socket.join(user.id);
 
     DB.groups.forEach((group, groupId) => {
-      if (group.members.has(user.id)) {
-        socket.join(groupId);
-      }
+      if (group.members.has(user.id)) socket.join(groupId);
     });
 
     socket.emit('auth:success', { token: user.id, user });
@@ -390,13 +395,11 @@ io.on('connection', (socket) => {
     DB.groups.set(groupId, groupObj);
     saveDB();
 
-    membersSet.forEach(mId => {
-      io.to(mId).emit('group:updated');
-    });
+    membersSet.forEach(mId => io.to(mId).emit('group:updated'));
     syncUserData(socket, currentUser.id);
   });
 
-  // --- PHẠM VI BẠN BÈ ---
+  // --- BẠN BÈ ---
   socket.on('friend:request', ({ targetUserId }) => {
     if (!currentUser || currentUser.id === targetUserId) return;
     const reqId = `freq_${currentUser.id}_${targetUserId}`;
@@ -433,21 +436,33 @@ io.on('connection', (socket) => {
     io.to(req.toUserId).emit('friend:updated');
   });
 
+  socket.on('friend:unfriend', ({ friendId }) => {
+    if (!currentUser || !friendId) return;
+    const currentUserId = currentUser.id;
+
+    if (DB.friends.has(currentUserId)) DB.friends.get(currentUserId).delete(friendId);
+    if (DB.friends.has(friendId)) DB.friends.get(friendId).delete(currentUserId);
+
+    saveDB();
+    syncUserData(socket, currentUserId);
+    io.to(friendId).emit('friend:updated');
+  });
+
   // --- GỬI TIN NHẮN ---
   socket.on('message:send', ({ roomId, content, type = 'text' }) => {
     if (!currentUser || !content) return;
 
-  // 🆕 KIỂM TRA TRẠNG THÁI HẠN CHẾ 24H
+    // Kiểm tra trạng thái hạn chế 24h
     const userStatus = DB.users.get(currentUser.id);
     if (userStatus && userStatus.restrictedUntil && userStatus.restrictedUntil > Date.now()) {
       const hoursLeft = Math.ceil((userStatus.restrictedUntil - Date.now()) / (1000 * 60 * 60));
-      return socket.emit('message:error', `Tài khoản của bạn đang bị hạn chế nhắn tin trong ${hoursLeft} giờ tới do vi phạm quy tắc!`);
+      return socket.emit('message:error', `Tài khoản của bạn đang bị hạn chế nhắn tin trong ${hoursLeft} giờ tới!`);
     }
 
     if (roomId.startsWith('grp_')) {
       const group = DB.groups.get(roomId);
       if (group && group.muted.has(currentUser.id)) {
-        return socket.emit('message:error', 'Bạn đã bị quản trị viên cấm chat trong nhóm này!');
+        return socket.emit('message:error', 'Bạn đã bị cấm chat trong nhóm này!');
       }
     }
     
@@ -462,7 +477,6 @@ io.on('connection', (socket) => {
 
     if (!DB.messages.has(roomId)) DB.messages.set(roomId, []);
     DB.messages.get(roomId).push(msg);
-
     saveDB();
 
     if (roomId.startsWith('grp_')) {
@@ -473,67 +487,13 @@ io.on('connection', (socket) => {
         io.to(parts[0]).to(parts[1]).emit('message:received', msg);
       }
     }
+  });
+
+  // ========================================================
+  // --- XỬ LÝ SỰ KIỆN BÁO CÁO & KHÁNG CÁO (ĐÃ SỬA VỊ TRÍ) ---
+  // ========================================================
   
-    // --- XỬ LÝ YÊU CẦU HỖ TRỢ / KHÁNG CÁO HẠN CHẾ ---
-    socket.on('appeal:restriction', ({ reason, userId, username }) => {
-      // Lấy thông tin user an toàn (ưu tiên nhận từ client gửi lên, nếu không có mới lấy từ socket session)
-      const finalUserId = userId || (currentUser ? currentUser.id : null);
-      const finalUsername = username || (currentUser ? currentUser.username : 'Người dùng');
-
-      if (!finalUserId) {
-        console.log("Lỗi: Không xác định được user gửi yêu cầu hỗ trợ!");
-        return;
-      }
-
-      const appealId = `apl_${Math.random().toString(36).substr(2, 9)}`;
-      const appealObj = {
-        id: appealId,
-        userId: finalUserId,
-        username: finalUsername,
-        reason: reason || 'Xin gỡ hạn chế',
-        timestamp: Date.now(),
-        status: 'pending'
-      };
-
-      if (!DB.appeals) DB.appeals = new Map();
-      DB.appeals.set(appealId, appealObj);
-      saveDB();
-
-      // 👉 Bắn thông báo real-time về cho trang Admin ngay lập tức
-      io.emit('admin:new-appeal', Array.from(DB.appeals.values()));
-      console.log("Đã nhận và lưu yêu cầu hỗ trợ từ:", finalUsername);
-    });
-  
-  });
-
-  socket.on('disconnect', () => {
-    if (currentUser) {
-      currentUser.status = 'offline';
-      io.emit('users:sync', Array.from(DB.users.values()));
-    }
-  });
-
-  socket.on('friend:unfriend', ({ friendId }) => {
-    if (!currentUser || !friendId) return;
-    const currentUserId = currentUser.id;
-
-    // 1. Xóa bỏ ID của nhau trong cấu trúc DB.friends (Map của bạn)
-    if (DB.friends.has(currentUserId)) {
-      DB.friends.get(currentUserId).delete(friendId);
-    }
-    if (DB.friends.has(friendId)) {
-      DB.friends.get(friendId).delete(currentUserId);
-    }
-
-    // 2. Lưu lại thay đổi vào file database.json
-    saveDB();
-
-    // 3. Đồng bộ lại dữ liệu ngay lập tức cho người đang thao tác và người bạn bị xóa
-    syncUserData(socket, currentUserId);
-    io.to(friendId).emit('friend:updated');
-  });
-
-// --- XỬ LÝ BÁO CÁO VI PHẠM ---
+  // 1. Nhận báo cáo vi phạm từ user
   socket.on('report:submit', ({ targetId, reason, description, reporterId, reporterName }) => {
     const finalReporterId = reporterId || (currentUser ? currentUser.id : null);
     const finalReporterName = reporterName || (currentUser ? currentUser.username : 'Người dùng');
@@ -571,11 +531,61 @@ io.on('connection', (socket) => {
     DB.reports.set(reportId, reportObj);
     saveDB();
 
+    // Bắn realtime về trang Admin
     io.emit('admin:new-report', Array.from(DB.reports.values()));
+    io.to('admin_room').emit('admin_notification', {
+      type: 'new_report',
+      title: 'Báo cáo vi phạm mới',
+      data: reportObj
+    });
   });
 
+  // 2. Nhận yêu cầu hỗ trợ / kháng cáo từ user bị hạn chế
+  socket.on('appeal:restriction', ({ reason, userId, username }) => {
+    const finalUserId = userId || (currentUser ? currentUser.id : null);
+    const finalUsername = username || (currentUser ? currentUser.username : 'Người dùng');
+
+    if (!finalUserId) return;
+
+    const appealId = `apl_${Math.random().toString(36).substr(2, 9)}`;
+    const appealObj = {
+      id: appealId,
+      userId: finalUserId,
+      username: finalUsername,
+      reason: reason || 'Xin gỡ hạn chế',
+      timestamp: Date.now(),
+      status: 'pending'
+    };
+
+    if (!DB.appeals) DB.appeals = new Map();
+    DB.appeals.set(appealId, appealObj);
+    saveDB();
+
+    // Phát sự kiện realtime về trang Admin
+    io.emit('admin:new-appeal', Array.from(DB.appeals.values()));
+    io.to('admin_room').emit('admin_notification', {
+      type: 'restriction_appeal',
+      title: 'Yêu cầu gỡ/giảm hạn chế mới',
+      data: appealObj
+    });
+  });
+
+  // Hỗ trợ alias thêm sự kiện 'appeal:submit' nếu client đang gọi tên này
+  socket.on('appeal:submit', (data) => {
+    socket.emit('appeal:restriction', data);
+  });
+
+  // --- DISCONNECT ---
+  socket.on('disconnect', () => {
+    if (currentUser) {
+      currentUser.status = 'offline';
+      io.to('admin_room').emit('admin_notification', { type: 'user_offline', userId: currentUser.id });
+      io.emit('users:sync', Array.from(DB.users.values()));
+    }
+  });
 });
 
+// Hàm sync dữ liệu người dùng
 function syncUserData(socket, userId) {
   const friendSet = DB.friends.get(userId) || new Set();
   const friendsList = Array.from(friendSet).map(id => {
@@ -630,7 +640,6 @@ server.listen(PORT, async () => {
 
   if (process.env.NODE_ENV !== 'production') {
     try {
-      const ngrok = require('ngrok');
       const url = await ngrok.connect({ addr: PORT, authtoken_from_env: true });
       console.log(`> 🌐 Link Ngrok (Local): ${url}`);
     } catch (error) {
