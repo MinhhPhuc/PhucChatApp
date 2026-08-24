@@ -79,7 +79,18 @@
     </div>
   </div>
   
+  <!-- BẮT BUỘC PHẢI CÓ THƯ VIỆN SOCKET.IO NÀY TRƯỚC THẺ SCRIPT -->
+  <script src="/socket.io/socket.io.js"></script>
+  
   <script>
+    // 1. Khởi tạo kết nối Socket.io và đăng ký phòng Admin
+    const socket = io();
+
+    socket.on('connect', () => {
+        console.log("Đã kết nối Socket thành công với Server!");
+        socket.emit('join_admin_room', { isAdmin: true });
+    });
+
     async function loadAdminData() {
       try {
         const res = await fetch('/api/admin/data');
@@ -128,87 +139,72 @@
     }
 
     loadAdminData();
-    // Tự động làm mới dữ liệu mỗi 5 giây
     setInterval(loadAdminData, 5000);
   
     async function loadReports() {
-    try {
-      const res = await fetch('/api/admin/reports');
-      const reports = await res.json();
-      const tbody = document.querySelector('#reports-table tbody');
-      tbody.innerHTML = '';
+      try {
+        const res = await fetch('/api/admin/reports');
+        const reports = await res.json();
+        const tbody = document.querySelector('#reports-table tbody');
+        tbody.innerHTML = '';
 
-      if (reports.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="5" class="text-center text-muted">Không có báo cáo vi phạm nào.</td></tr>`;
-        return;
+        if (reports.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="5" class="text-center text-muted" style="text-align:center; color:#718096;">Không có báo cáo vi phạm nào.</td></tr>`;
+          return;
+        }
+
+        reports.forEach(rep => {
+          tbody.innerHTML += `
+            <tr>
+              <td>${rep.reporterName}</td>
+              <td><b>${rep.targetUsername}</b></td>
+              <td><span class="badge" style="background:#fed7d7; color:#9b2c2c;">${rep.reason}</span></td>
+              <td>${rep.description || 'Không có mô tả'}</td>
+              <td>
+                <button class="btn btn-sm btn-warning" onclick="restrictUser('${rep.targetId}')" style="background:#d69e2e; color:white; border:none; padding:5px 10px; border-radius:4px; cursor:pointer;">Hạn chế 24h</button>
+                <button class="btn btn-sm btn-secondary" onclick="deleteReport('${rep.id}')" style="background:#718096; color:white; border:none; padding:5px 10px; border-radius:4px; cursor:pointer;">Xóa</button>
+              </td>
+            </tr>
+          `;
+        });
+      } catch (err) {
+        console.error('Lỗi tải báo cáo:', err);
       }
-
-      reports.forEach(rep => {
-        tbody.innerHTML += `
-          <tr>
-            <td>${rep.reporterName}</td>
-            <td><b>${rep.targetUsername}</b></td>
-            <td><span class="badge badge-danger">${rep.reason}</span></td>
-            <td>${rep.description || 'Không có mô tả'}</td>
-            <td>
-              <button class="btn btn-sm btn-warning" onclick="restrictUser('${rep.targetId}')">Hạn chế 24h</button>
-              <button class="btn btn-sm btn-secondary" onclick="deleteReport('${rep.id}')">Xóa báo cáo</button>
-            </td>
-          </tr>
-        `;
-      });
-    } catch (err) {
-      console.error('Lỗi tải báo cáo:', err);
     }
-  }
 
-  async function restrictUser(userId) {
-    if (!confirm('Bạn có chắc chắn muốn hạn chế nhắn tin tài khoản này trong 24 giờ?')) return;
-    const res = await fetch(`/api/admin/user/${userId}/restrict`, { method: 'POST' });
-    const data = await res.json();
-    alert(data.message);
+    async function restrictUser(userId) {
+      if (!confirm('Bạn có chắc chắn muốn hạn chế nhắn tin tài khoản này trong 24 giờ?')) return;
+      const res = await fetch(`/api/admin/user/${userId}/restrict`, { method: 'POST' });
+      const data = await res.json();
+      alert(data.message);
+      loadReports();
+    }
+
+    async function deleteReport(reportId) {
+      await fetch(`/api/admin/report/${reportId}`, { method: 'DELETE' });
+      loadReports();
+    }
+
     loadReports();
-  }
 
-  async function deleteReport(reportId) {
-    const res = await fetch(`/api/admin/report/${reportId}`, { method: 'DELETE' });
-    loadReports();
-  }
-
-  // Gọi hàm load khi trang admin mở
-  loadReports();
-  setInterval(loadReports, 10000); // Tự động làm mới danh sách sau mỗi 10 giây
-
-  // Lắng nghe sự kiện có báo cáo mới đẩy về từ server
-  if (typeof socket !== 'undefined') {
+    // ==========================================
+    // LẮNG NGHE SỰ KIỆN REAL-TIME TỪ SERVER
+    // ==========================================
     socket.on('admin:new-report', (reportsList) => {
-      console.log("Đã nhận được báo cáo mới, đang cập nhật giao diện...");
-      
-      // Nếu trang Admin của bạn có hàm load lại bảng danh sách báo cáo (ví dụ: renderReportsTable), hãy gọi nó ở đây:
-      if (typeof fetchAdminData === 'function') {
-        fetchAdminData(); // Hàm gọi lại API lấy dữ liệu trang admin
-      } else {
-        // Hoặc tự động reload nhẹ trang để cập nhật dữ liệu mới nhất mà người dùng không cần bấm F5 thủ công
-        location.reload(); 
-      }
+      console.log("Đã nhận được báo cáo mới qua Socket!");
+      loadReports(); // Tự động load lại bảng báo cáo ngay lập tức
     });
-  }
-  
-  // Lắng nghe yêu cầu hỗ trợ / kháng cáo mới từ người dùng đẩy về real-time
-  if (typeof socket !== 'undefined') {
-    socket.on('admin:new-appeal', (appealsList) => {
-      console.log("Đã nhận được yêu cầu hỗ trợ mới:", appealsList);
-      
-      // Nếu trang Admin của bạn có hàm tải lại dữ liệu, hãy gọi nó ở đây:
-      if (typeof fetchAdminData === 'function') {
-        fetchAdminData(); 
-      } else {
-        // Hoặc tự động tải lại trang để hiển thị ngay yêu cầu mới mà không cần F5 thủ công
-        location.reload(); 
-      }
-    });
-  }
 
+    socket.on('admin:new-appeal', (appealsList) => {
+      console.log("Đã nhận được kháng cáo mới qua Socket!");
+      loadReports(); // Hoặc cập nhật giao diện hiển thị kháng cáo tương ứng
+    });
+
+    socket.on('admin_notification', (notification) => {
+      console.log("Thông báo hệ thống:", notification);
+      loadReports();
+      loadAdminData();
+    });
   </script>
 </body>
 </html>
