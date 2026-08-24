@@ -281,15 +281,23 @@ if (btnLogout) {
   };
 }
 
-const badge = document.getElementById('request-count-badge');
-const count = friendRequests.length; // Hoặc biến đếm số lượng của bạn
-
-if (count > 0) {
-  badge.innerText = count;
-  badge.style.display = 'inline-block'; // Hiện badge khi có lời mời
-} else {
-  badge.style.display = 'none'; // Ẩn badge khi bằng 0
-}
+// Tìm sự kiện socket nhận danh sách hoặc số lượng lời mời
+socket.on('receive_friend_requests', (requests) => {
+    // requests ở đây là mảng dữ liệu thật từ server gửi về
+    const count = requests.length; 
+    const badge = document.getElementById('request-count-badge');
+    
+    if (badge) {
+        if (count > 0) {
+            badge.innerText = count;
+            badge.style.display = 'inline-block'; // Hiện màu đỏ khi có người mời
+        } else {
+            badge.style.display = 'none'; // Ẩn đi khi số lượng = 0
+        }
+    }
+    
+    // ... code render danh sách lời mời ra màn hình của bạn
+});
 
 // Xử lý click ra ngoài modal cài đặt chat để đóng an toàn
 const modalChatSettings = document.getElementById('modal-chat-settings');
