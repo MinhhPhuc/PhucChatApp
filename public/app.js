@@ -729,8 +729,26 @@ document.addEventListener('click', (e) => {
   const modalTheme = document.getElementById('modal-theme');
   const modalNickname = document.getElementById('modal-nickname');
   const modalConfirm = document.getElementById('modal-confirm');
-  
-  // --- XÓA KẾT BẠN (HỦY KẾT BẠN) ---
+
+  // 1. XÓA ĐOẠN CHAT (CHỈ Ở PHÍA CÁ NHÂN HIỆN TẠI)
+  const btnDeleteChat = e.target.closest('#delete-chat, #btn-delete-chat, #set-delete-chat') || 
+                        (e.target.innerText && e.target.innerText.includes('Xóa đoạn chat') ? e.target : null);
+  if (btnDeleteChat) {
+    if (modalChatSettings) {
+      modalChatSettings.classList.add('hidden');
+      modalChatSettings.style.display = 'none';
+    }
+
+    if (state.activeRoomId && state.currentUser) {
+      showConfirmModal('Xóa đoạn chat', 'Bạn có chắc chắn muốn xóa đoạn chat ở phía bạn không? (Người còn lại vẫn giữ tin nhắn)', () => {
+        socket.emit('messages:clear_me', { roomId: state.activeRoomId });
+        showToast('Đang xóa đoạn chat phía bạn...');
+      });
+    }
+    return;
+  }
+
+  // 2. XÓA KẾT BẠN (HỦY KẾT BẠN)
   const btnUnfriend = e.target.closest('#set-unfriend, #btn-unfriend') || 
                       (e.target.innerText && e.target.innerText.includes('Xóa kết bạn') ? e.target : null);
 
@@ -751,14 +769,10 @@ document.addEventListener('click', (e) => {
         'Xóa kết bạn',
         `Bạn có chắc chắn muốn xóa kết bạn với ${friendName}?`,
         () => {
-          // Gửi sự kiện hủy kết bạn lên Server
           socket.emit('friend:unfriend', { friendId: targetFriendId });
-          
-          // Đóng màn hình chat hiện tại
           const chatScreen = document.getElementById('chat-screen');
           if (chatScreen) chatScreen.classList.add('hidden');
           state.activeRoomId = null;
-          
           showToast(`Đã xóa kết bạn với ${friendName}!`);
         }
       );
@@ -766,27 +780,7 @@ document.addEventListener('click', (e) => {
     return;
   }
 
-
-  // 1. XÓA ĐOẠN CHAT (CHỈ Ở PHÍA CÁ NHÂN HIỆN TẠI)
-  const btnDeleteChat = e.target.closest('#delete-chat, #btn-delete-chat, #set-delete-chat') || 
-                        (e.target.innerText && e.target.innerText.includes('Xóa đoạn chat') ? e.target : null);
-  if (btnDeleteChat) {
-    if (modalChatSettings) {
-      modalChatSettings.classList.add('hidden');
-      modalChatSettings.style.display = 'none';
-    }
-
-    if (state.activeRoomId && state.currentUser) {
-      showConfirmModal('Xóa đoạn chat', 'Bạn có chắc chắn muốn xóa đoạn chat ở phía bạn không? (Người còn lại vẫn giữ tin nhắn)', () => {
-        // Gửi sự kiện xóa riêng cho user hiện tại đến Server
-        socket.emit('messages:clear_me', { roomId: state.activeRoomId });
-        showToast('Đang xóa đoạn chat phía bạn...');
-      });
-    }
-    return;
-  }
-
-  // 2. TAB LỌC DANH SÁCH CHAT
+  // 3. TAB LỌC DANH SÁCH CHAT
   const tabBtn = e.target.closest('.filter-tab-btn');
   if (tabBtn) {
     const filterType = tabBtn.getAttribute('data-filter');
@@ -812,7 +806,7 @@ document.addEventListener('click', (e) => {
     return;
   }
 
-  // 3. MỞ/ĐÓNG MODAL CÀI ĐẶT
+  // 4. MỞ/ĐÓNG MODAL CÀI ĐẶT
   if (e.target.closest('#btn-chat-options')) {
     if (modalChatSettings) {
       modalChatSettings.classList.remove('hidden');
@@ -854,7 +848,7 @@ document.addEventListener('click', (e) => {
     return;
   }
 
-  // 4. THAY ĐỔI CHỦ ĐỀ (THEME)
+  // 5. THAY ĐỔI CHỦ ĐỀ (THEME)
   const btnSetTheme = e.target.closest('#set-theme');
   if (btnSetTheme) {
     if (modalChatSettings) {
@@ -892,7 +886,7 @@ document.addEventListener('click', (e) => {
     return;
   }
 
-  // 5. ĐỔI BIỆT DANH
+  // 6. ĐỔI BIỆT DANH
   const btnSetNickname = e.target.closest('#set-nickname');
   if (btnSetNickname) {
     if (modalChatSettings) {
@@ -961,7 +955,7 @@ document.addEventListener('click', (e) => {
     return;
   }
 
-  // 6. TẠO NHÓM
+  // 7. TẠO NHÓM
   if (e.target.closest('#btn-open-group-modal') || e.target.closest('.btn-create-group')) {
     if (modalChatSettings) modalChatSettings.classList.add('hidden');
     if (modalGroup) {
@@ -1014,7 +1008,7 @@ document.addEventListener('click', (e) => {
     return;
   }
 
-  // 7. CẢM XÚC NHANH
+  // 8. CẢM XÚC NHANH
   const setEmojiBtn = e.target.closest('#set-emoji');
   if (setEmojiBtn) {
     if (modalChatSettings) {
@@ -1033,7 +1027,7 @@ document.addEventListener('click', (e) => {
     return;
   }
 
-  // 8. CÁC NÚT TRONG MODAL CONFIRM
+  // 9. CÁC NÚT TRONG MODAL CONFIRM
   if (e.target.closest('#btn-confirm-yes')) {
     if (modalConfirm) {
       modalConfirm.classList.add('hidden');
