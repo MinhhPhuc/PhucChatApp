@@ -899,11 +899,9 @@ function endCallCleanUp() {
 // ==========================================
 if (typeof socket !== 'undefined') {
   socket.on('incoming_call', (data) => {
-    console.log('[CALL] Incoming call received:', data);
+    console.log('[CALL] Incoming call:', data);
 
     incomingCallDataGlobal = data;
-
-    // Server gửi fromSocketId, không phải from
     currentCallTargetId = data.fromSocketId;
 
     const callerNameDisplay = document.getElementById('caller-name-display');
@@ -912,20 +910,20 @@ if (typeof socket !== 'undefined') {
     }
 
     const callerAvatar = document.getElementById('caller-avatar');
-    if (callerAvatar && data.callerAvatar) {
-      callerAvatar.src = data.callerAvatar;
+    if (callerAvatar) {
+      callerAvatar.src =
+        data.callerAvatar ||
+        'https://api.dicebear.com/7.x/avataaars/svg?seed=incoming-call';
     }
 
     const popup = document.getElementById('incoming-call-popup');
 
     if (popup) {
-      // Xóa hidden trước, vì CSS .hidden có thể có display:none
       popup.classList.remove('hidden');
-
       popup.style.display = 'flex';
-      popup.style.visibility = 'visible';
-      popup.style.opacity = '1';
-      popup.style.zIndex = '99999';
+      popup.visibility = 'visible';
+      popup.opacity = '1';
+      popup.style.zIndex = '10000';
     }
 
     console.log('[CALL] Popup displayed');
