@@ -655,21 +655,33 @@ function openRoom(roomId, name, avatar, status) {
   state.activeRoomId = roomId;
   state.unreadCounts.set(roomId, 0);
 
+  const chatHeader = document.querySelector('.chat-header');
+
+  if (chatHeader) {
+    chatHeader.dataset.username = name;
+    chatHeader.dataset.avatar = avatar;
+  }
+
   let displayStatus = status;
+
   if (roomId.startsWith('grp_')) {
     const currentGroup = state.groups.find(g => g.id === roomId);
     if (currentGroup) {
-      const count = currentGroup.members ? currentGroup.members.length : (currentGroup.membersCount || 0);
+      const count = currentGroup.members
+        ? currentGroup.members.length
+        : (currentGroup.membersCount || 0);
+
       displayStatus = `${count} thành viên`;
     }
   }
 
   let displayName = name;
+
   if (roomId.includes('_DM_')) {
     const customNick = state.nicknames.get(roomId);
     if (customNick) displayName = customNick;
   }
- 
+
   const chatNameEl = document.getElementById('active-chat-name');
   const chatStatusEl = document.getElementById('active-chat-status');
   const chatScreen = document.getElementById('chat-screen');
@@ -678,7 +690,7 @@ function openRoom(roomId, name, avatar, status) {
   if (chatStatusEl) chatStatusEl.innerText = displayStatus;
   if (chatScreen) chatScreen.classList.remove('hidden');
   if (emojiPicker) emojiPicker.classList.add('hidden');
-  
+
   const btnSettings = document.getElementById('btn-group-settings');
   const btnChatOptions = document.getElementById('btn-chat-options');
 
@@ -689,7 +701,7 @@ function openRoom(roomId, name, avatar, status) {
     if (btnSettings) btnSettings.classList.add('hidden');
     if (btnChatOptions) btnChatOptions.classList.remove('hidden');
   }
-  
+
   socket.emit('messages:get', { roomId });
   applyRoomTheme(roomId);
   updateQuickReactionUI(roomId);
