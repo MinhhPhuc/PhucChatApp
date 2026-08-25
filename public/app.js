@@ -839,9 +839,17 @@ async function startVideoCall(targetUserId, isVideo) {
     });
 
     peer.on('signal', (signalData) => {
-      socket.emit('call_accepted', {
-        toSocketId: incomingCallDataGlobal.fromSocketId,
-        signal: signalData
+      if (!targetUserId) {
+        console.error('[CALL] Missing target user ID');
+        return;
+      }
+
+      socket.emit('call_user', {
+        targetUserId,
+        signal: signalData,
+        isVideo,
+        callerName: currentUser?.username || 'Người dùng',
+        callerAvatar: currentUser?.avatar || ''
       });
     });
 
@@ -1588,11 +1596,16 @@ function answerCall() {
     });
 
     peer.on('signal', (signalData) => {
+      if (!targetUserId) {
+        console.error('[CALL] Missing target user ID');
+        return;
+      }
+
       socket.emit('call_user', {
         targetUserId,
         signal: signalData,
         isVideo,
-        callerName: currentUser?.username || 'Ai đó',
+        callerName: currentUser?.username || 'Người dùng',
         callerAvatar: currentUser?.avatar || ''
       });
     });
