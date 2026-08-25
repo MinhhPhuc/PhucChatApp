@@ -793,7 +793,7 @@ async function startVideoCall(targetUserId, isVideo) {
   // (Bạn có thể điều chỉnh cách lấy này cho khớp với cấu trúc DOM lưu thông tin user của bạn)
   const activeChatHeader = document.querySelector('.chat-header') || {};
   const targetName = activeChatHeader.dataset?.username || 'Người dùng';
-  const targetAvatar = 'c:\Users\MinhPhuc\Pictures\Saved Pictures\hinh-nen-may-tinh-vo-tri-2.jpg'; // Thay bằng một link ảnh bất kỳ hoặc ảnh tĩnh của bạn
+  const targetAvatar = 'https://cdn-icons-png.flaticon.com/512/149/149071.png';
 
   // Cập nhật thông tin lên màn hình chờ gọi
   const nameEl = document.getElementById('call-target-name');
@@ -1547,13 +1547,13 @@ document.addEventListener('click', (e) => {
 });
 
 // ==========================================
-// CÁC HÀM ĐIỀU KHIỂN THIẾT BỊ TRONG CUỘC GỌI
+// ĐIỀU KHIỂN THIẾT BỊ VÀ GÁN GLOBAL WINDOW
 // ==========================================
 
+// Khai báo biến trạng thái ở đầu (tránh lỗi Temporal Dead Zone)
 let isAudioMuted = false;
 let isVideoMuted = false;
 
-// 1. Bật / Tắt Micro
 function toggleAudioTrack() {
   if (localStream) {
     const audioTrack = localStream.getAudioTracks()[0];
@@ -1561,7 +1561,6 @@ function toggleAudioTrack() {
       isAudioMuted = !isAudioMuted;
       audioTrack.enabled = !isAudioMuted;
       
-      // Đổi màu nút bấm để nhận biết trạng thái (Đỏ khi tắt, xám/bình thường khi bật)
       const btn = document.getElementById('btn-toggle-mic');
       if (btn) {
         btn.style.background = isAudioMuted ? '#ff3b30' : '#2c2c2c';
@@ -1570,7 +1569,6 @@ function toggleAudioTrack() {
   }
 }
 
-// 2. Bật / Tắt Camera
 function toggleVideoTrack() {
   if (localStream) {
     const videoTrack = localStream.getVideoTracks()[0];
@@ -1583,7 +1581,6 @@ function toggleVideoTrack() {
         btn.style.background = isVideoMuted ? '#ff3b30' : '#2c2c2c';
       }
 
-      // Ẩn/hiện video của chính mình trên giao diện
       const localVideoEl = document.getElementById('local-video');
       if (localVideoEl) {
         localVideoEl.style.display = isVideoMuted ? 'none' : 'block';
@@ -1592,7 +1589,7 @@ function toggleVideoTrack() {
   }
 }
 
-// Đảm bảo các hàm đều được gán toàn cục để HTML onclick gọi được không bị lỗi ReferenceError
+// Bắt buộc gán tất cả các hàm ra window ở dòng cuối cùng của file app.js
 window.toggleAudioTrack = toggleAudioTrack;
 window.toggleVideoTrack = toggleVideoTrack;
 window.answerCall = answerCall;
