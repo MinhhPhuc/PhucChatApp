@@ -3,11 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <meta http-equiv="Content-Security-Policy" content="script-src 'self' 'unsafe-eval' 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net;">
+  <!-- Cấu hình CSP hỗ trợ WebRTC, Socket.io, FontAwesome và SimplePeer -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval' https: data: blob: wss: ws:; media-src 'self' blob: data:;">
+  
   <title>Messenger Web Chat Pro</title>
   <link rel="stylesheet" href="style.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  
   <style>
     /* Reset kích thước chuẩn chống tràn khung */
     *, *::before, *::after {
@@ -80,7 +83,7 @@
 
     .modal textarea {
       min-height: 90px;
-      resize: vertical; /* Cấm kéo giãn ngang */
+      resize: vertical;
     }
 
     .modal-actions {
@@ -106,7 +109,7 @@
       cursor: pointer;
     }
 
-    /* --- GIAO DIỆN LỜI MỜI KẾT BẠN & NÚT ĐỒNG Ý --- */
+    /* GIAO DIỆN LỜI MỜI KẾT BẠN & NÚT ĐỒNG Ý */
     .btn-accept-friend, .btn-action.green {
       background: #0084ff !important;
       color: #ffffff !important;
@@ -142,7 +145,7 @@
   <!-- Toast Thông Báo -->
   <div id="toast-notification">Thành công!</div>
 
-  <!-- MODAL XÁC NHẬN ĐẸP MẮT -->
+  <!-- MODAL XÁC NHẬN -->
   <div id="modal-confirm" class="modal hidden" style="display: none; z-index: 1200;">
     <div class="modal-content" style="text-align: center;">
       <h3 id="confirm-title" style="margin-top: 0; margin-bottom: 12px; font-size: 18px; color: #2d3748;">Xác nhận</h3>
@@ -198,8 +201,14 @@
             <span id="active-chat-status" class="status-text">Đang kết nối...</span>
           </div>
         </div>
-        <button id="btn-chat-options" class="icon-btn" title="Tùy chọn đoạn chat" style="position: relative; z-index: 10; cursor: pointer;"><i class="fa-solid fa-ellipsis"></i></button>
-        <button id="btn-group-settings" class="icon-btn hidden" title="Cài đặt nhóm" style="position: relative; z-index: 10; cursor: pointer;"><i class="fa-solid fa-gear"></i></button>
+        
+        <!-- NÚT GỌI THOẠI, GỌI VIDEO VÀ CÀI ĐẶT -->
+        <div class="chat-header-actions" style="display: flex; align-items: center; gap: 10px;">
+          <button id="btn-voice-call" class="icon-btn" title="Gọi thoại" style="cursor: pointer;"><i class="fa-solid fa-phone"></i></button>
+          <button id="btn-video-call" class="icon-btn" title="Gọi Video" style="cursor: pointer;"><i class="fa-solid fa-video"></i></button>
+          <button id="btn-chat-options" class="icon-btn" title="Tùy chọn đoạn chat" style="position: relative; z-index: 10; cursor: pointer;"><i class="fa-solid fa-ellipsis"></i></button>
+          <button id="btn-group-settings" class="icon-btn hidden" title="Cài đặt nhóm" style="position: relative; z-index: 10; cursor: pointer;"><i class="fa-solid fa-gear"></i></button>
+        </div>
       </header>
 
       <div class="messages-viewport" id="messages-viewport"></div>
@@ -336,7 +345,7 @@
       </div>
     </div>
 
-    <!-- MODAL BÁO CÁO VI PHẠM (ĐÃ KHẮC PHỤC CÂN XỨNG & CÓ CHỖ NHẬP MÔ TẢ) -->
+    <!-- MODAL BÁO CÁO VI PHẠM -->
     <div id="modal-report" class="modal hidden" style="z-index:1100;">
       <div class="modal-group-content" style="max-width: 400px;">
         <h3 style="margin-top: 0; text-align: center; color: #2d3748; margin-bottom: 16px; font-size: 20px;">Báo cáo vi phạm</h3>
@@ -372,7 +381,7 @@
       </div>
     </div>
 
-    <!-- MODAL TỦY CHỈNH CHỦ ĐỀ -->
+    <!-- MODAL TÙY CHỈNH CHỦ ĐỀ -->
     <div id="modal-theme" class="modal hidden">
       <div class="modal-content" style="max-width: 340px;">
         <h3 style="margin-top: 0; margin-bottom: 15px; font-size: 18px; color: var(--text-main);">Chọn chủ đề đoạn chat</h3>
@@ -387,29 +396,24 @@
     </div>
 
   </div>
-  
-  <script src="/socket.io/socket.io.js"></script>
-  <script src="app.js"></script>
-    <!-- Thêm thư viện Simple-Peer wrapper cho WebRTC -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/simple-peer/9.11.1/simplepeer.min.js"></script>
 
-    <!-- GIAO DIỆN MÀN HÌNH CUỘC GỌI -->
+  <!-- GIAO DIỆN MÀN HÌNH CUỘC GỌI -->
   <div id="video-call-container" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.9); z-index: 9999; justify-content: center; align-items: center; flex-direction: column;">
       <div style="position: relative; width: 90%; max-width: 800px; aspect-ratio: 16/9; background: #222; border-radius: 12px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
-          <!-- Video của người kia -->
+          <!-- Video người nhận -->
           <video id="remote-video" autoplay playsinline style="width: 100%; height: 100%; object-fit: cover;"></video>
-          <!-- Video của mình (nhỏ ở góc) -->
+          <!-- Video người gọi (nhỏ ở góc) -->
           <video id="local-video" autoplay muted playsinline style="position: absolute; bottom: 20px; right: 20px; width: 120px; height: 160px; object-fit: cover; border: 3px solid white; border-radius: 10px; background: #000;"></video>
       </div>
       
       <div style="margin-top: 25px; display: flex; gap: 20px;">
-          <button onclick="endCall()" style="background: #e53e3e; color: white; padding: 15px 30px; border: none; border-radius: 50px; font-size: 16px; font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 10px;">
+          <button id="btn-end-call-action" onclick="endCall()" style="background: #e53e3e; color: white; padding: 15px 30px; border: none; border-radius: 50px; font-size: 16px; font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 10px;">
               <i class="fa-solid fa-phone-slash"></i> Kết thúc cuộc gọi
           </button>
       </div>
   </div>
 
-  <!-- POPUP KHI CÓ CUỘC GỌI ĐẾN (Ẩn mặc định) -->
+  <!-- POPUP CUỘC GỌI ĐẾN -->
   <div id="incoming-call-popup" style="display: none; position: fixed; top: 20px; right: 20px; background: white; padding: 20px 25px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); z-index: 10000; text-align: center; border-left: 5px solid #38a169;">
       <h4 style="margin: 0 0 10px 0; color: #2d3748;"><i class="fa-solid fa-video" style="color: #38a169;"></i> Cuộc gọi Video đến</h4>
       <p style="margin-bottom: 15px; font-size: 15px;"><b id="caller-name-display" style="color: #2b6cb0;">Ai đó</b> đang gọi cho bạn...</p>
@@ -423,5 +427,9 @@
       </div>
   </div>
 
+  <!-- THƯ VIỆN & SCRIPTS XỬ LÝ -->
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/simple-peer/9.11.1/simplepeer.min.js"></script>
+  <script src="app.js"></script>
 </body>
 </html>

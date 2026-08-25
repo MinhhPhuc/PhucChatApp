@@ -195,42 +195,96 @@ app.delete('/api/admin/user/:id', (req, res) => {
 app.use(express.static(path.join(__dirname, 'public')));
 
 // ==========================================
+// HÀM ĐỒNG BỘ DỮ LIỆU NGƯỜI DÙNG CHUẨN HOÁ
+// ==========================================
+function syncUserData(target, userId) {
+  if (!target || !userId) return;
+
+  const friendSet = DB.friends.get(userId) || new Set();
+  const friendsList = Array.from(friendSet).map(id => {
+    let acc = null;
+    for (let a of DB.accounts.values()) { if (a.id === id) acc = a; }
+    const statusObj = DB.users.get(id);
+    return acc ? { ...acc, status: statusObj ? statusObj.status : 'offline' } : null;
+  }).filter(Boolean);
+
+  const incomingRequests = Array.from(DB.friendRequests.values())
+    .filter(r => r.toUserId === userId && r.status === 'pending');
+
+  const allRegisteredUsers = Array.from(DB.accounts.values()).map(a => ({
+    id: a.id,
+    username: a.username,
+    avatar: a.avatar,
+    status: DB.users.get(a.id)?.status || 'offline'
+  }));
+
+  const userGroups = [];
+  DB.groups.forEach(group => {
+    if (group.members.has(userId)) {
+      const memberDetails = Array.from(group.members).map(mId => {
+        let acc = null;
+        for (let a of DB.accounts.values()) { if (a.id === mId) acc = a; }
+        return acc ? { id: mId, username: acc.username, avatar: acc.avatar, isMuted: group.muted.has(mId) } : null;
+      }).filter(Boolean);
+
+      userGroups.push({
+        id: group.id,
+        name: group.name,
+        avatar: group.avatar,
+        membersCount: group.members.size,
+        adminId: group.adminId,
+        members: memberDetails
+      });
+    }
+  });   
+
+  const payload = {
+    friends: friendsList,
+    requests: incomingRequests,
+    allUsers: allRegisteredUsers,
+    groups: userGroups
+  };
+
+  if (typeof target.emit === 'function') {
+    target.emit('data:sync', payload);
+    target.emit('receive_friend_requests', incomingRequests);
+  } else {
+    io.to(userId).emit('data:sync', payload);
+    io.to(userId).emit('receive_friend_requests', incomingRequests);
+  }
+}
+
+// ==========================================
 // SOCKET.IO REAL-TIME HANDLING
 // ==========================================
 io.on('connection', (socket) => {
   let currentUser = null;
 
   // --- LOGIC VIDEO CALL ---
-
-  //  Người gọi phát tín hiệu yêu cầu kết nối
   socket.on("call_user", (data) => {
-      // data gồm: userToCall (ID người nhận), signalData (mã SDP), callerName (tên người gọi)
-      io.to(data.userToCall).emit("incoming_call", { 
-          signal: data.signalData, 
-          from: socket.id, 
-          name: data.callerName 
-      });
+    io.to(data.userToCall).emit("incoming_call", { 
+      signal: data.signalData, 
+      from: socket.id, 
+      name: data.callerName 
+    });
   });
 
-  //  Người nhận chấp nhận cuộc gọi và gửi lại tín hiệu
   socket.on("answer_call", (data) => {
-      // data gồm: to (ID người gọi gốc), signal (mã SDP trả lời)
-      io.to(data.to).emit("call_accepted", data.signal);
+    io.to(data.to).emit("call_accepted", data.signal);
   });
 
-  //  Một trong hai người cúp máy
   socket.on("end_call", (data) => {
-      io.to(data.to).emit("call_ended");
+    io.to(data.to).emit("call_ended");
   });
   
-  // Cho phép Admin join vào phòng quản trị riêng
+  // Admin Room
   socket.on('join_admin_room', (userData) => {
     if (userData && userData.isAdmin) {
       socket.join('admin_room');
     }
   });
 
-  // --- XÓA TIN NHẮN PHÍA CÁ NHÂN ---
+  // --- XÓA TIN NHẮN ---
   socket.on('messages:clear_me', ({ roomId }) => {
     if (!currentUser || !roomId) return;
     const clearKey = `${currentUser.id}_${roomId}`;
@@ -239,7 +293,6 @@ io.on('connection', (socket) => {
     socket.emit('messages:cleared_me', { roomId });
   });
 
-  // --- XÓA TOÀN BỘ TIN NHẮN ---
   socket.on('messages:clear', ({ roomId }) => {
     if (!roomId) return;
     DB.messages.set(roomId, []);
@@ -462,13 +515,7 @@ io.on('connection', (socket) => {
 
     saveDB();
     io.to(finalTargetId).emit('friend:incoming');
-    
-    // Gửi trực tiếp danh sách lời mời cập nhật tới người nhận
-    const recipientSocket = io.sockets.sockets.get([...io.sockets.adapter.rooms.get(finalTargetId) || []][0]);
-    if (recipientSocket) {
-      syncUserData(recipientSocket, finalTargetId);
-    }
-    
+    syncUserData(io, finalTargetId);
     syncUserData(socket, currentUser.id);
   });
 
@@ -482,11 +529,7 @@ io.on('connection', (socket) => {
       saveDB();
 
       syncUserData(socket, currentUser.id);
-      
-      const targetSocket = io.sockets.sockets.get([...io.sockets.adapter.rooms.get(finalTargetId) || []][0]);
-      if (targetSocket) {
-        syncUserData(targetSocket, finalTargetId);
-      }
+      syncUserData(io, finalTargetId);
     }
   });
 
@@ -503,9 +546,7 @@ io.on('connection', (socket) => {
 
     saveDB();
     
-    const fromSocket = io.sockets.sockets.get([...io.sockets.adapter.rooms.get(req.fromUserId) || []][0]);
-    if (fromSocket) syncUserData(fromSocket, req.fromUserId);
-    
+    syncUserData(io, req.fromUserId);
     syncUserData(socket, req.toUserId);
 
     io.to(req.fromUserId).emit('friend:updated');
@@ -521,9 +562,7 @@ io.on('connection', (socket) => {
 
     saveDB();
     syncUserData(socket, currentUserId);
-    
-    const friendSocket = io.sockets.sockets.get([...io.sockets.adapter.rooms.get(friendId) || []][0]);
-    if (friendSocket) syncUserData(friendSocket, friendId);
+    syncUserData(io, friendId);
 
     io.to(friendId).emit('friend:updated');
   });
@@ -657,58 +696,6 @@ io.on('connection', (socket) => {
   });
 });
 
-// Hàm sync dữ liệu người dùng
-function syncUserData(socket, userId) {
-  if (!socket) return;
-  const friendSet = DB.friends.get(userId) || new Set();
-  const friendsList = Array.from(friendSet).map(id => {
-    let acc = null;
-    for (let a of DB.accounts.values()) { if (a.id === id) acc = a; }
-    const statusObj = DB.users.get(id);
-    return acc ? { ...acc, status: statusObj ? statusObj.status : 'offline' } : null;
-  }).filter(Boolean);
-
-  const incomingRequests = Array.from(DB.friendRequests.values())
-    .filter(r => r.toUserId === userId && r.status === 'pending');
-
-  const allRegisteredUsers = Array.from(DB.accounts.values()).map(a => ({
-    id: a.id,
-    username: a.username,
-    avatar: a.avatar,
-    status: DB.users.get(a.id)?.status || 'offline'
-  }));
-
-  const userGroups = [];
-  DB.groups.forEach(group => {
-    if (group.members.has(userId)) {
-      const memberDetails = Array.from(group.members).map(mId => {
-        let acc = null;
-        for (let a of DB.accounts.values()) { if (a.id === mId) acc = a; }
-        return acc ? { id: mId, username: acc.username, avatar: acc.avatar, isMuted: group.muted.has(mId) } : null;
-      }).filter(Boolean);
-
-      userGroups.push({
-        id: group.id,
-        name: group.name,
-        avatar: group.avatar,
-        membersCount: group.members.size,
-        adminId: group.adminId,
-        members: memberDetails
-      });
-    }
-  });   
-
-  socket.emit('data:sync', {
-    friends: friendsList,
-    requests: incomingRequests,
-    allUsers: allRegisteredUsers,
-    groups: userGroups
-  });
-  
-  // Bắn trực tiếp danh sách lời mời kết bạn để app.js nhận ngay
-  socket.emit('receive_friend_requests', incomingRequests);
-}
-
 const PORT = process.env.PORT || 3000;
 
 server.listen(PORT, async () => {
@@ -719,7 +706,7 @@ server.listen(PORT, async () => {
       const url = await ngrok.connect({ addr: PORT, authtoken_from_env: true });
       console.log(`> 🌐 Link Ngrok (Local): ${url}`);
     } catch (error) {
-      console.log('Không bật ngrok (chạy trên cloud hoặc lỗi token).');
+      console.log('Không bật ngrok (chạy trên cloud hoặc chưa cấu hình token).');
     }
   }
 });

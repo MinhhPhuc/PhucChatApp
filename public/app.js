@@ -20,6 +20,11 @@ let state = {
   selectedGroupAvatar: 'https://api.dicebear.com/7.x/identicon/svg?seed=group'
 };
 
+// --- HÀM HỖ TRỢ TRUY XUẤT USER HIỆN TẠI ---
+function getCurrentUser() {
+  return state.currentUser || JSON.parse(localStorage.getItem('user')) || {};
+}
+
 function showToast(message, isSuccess = true) {
   const toast = document.getElementById('toast-notification');
   if (!toast) return;
@@ -33,15 +38,15 @@ function showToast(message, isSuccess = true) {
 
 // Gửi yêu cầu kháng cáo từ phía người dùng bị hạn chế
 function submitRestrictionAppeal(reasonText) {
-    const currentUser = JSON.parse(localStorage.getItem('user')) || {};
+  const currentUser = getCurrentUser();
 
-    socket.emit('appeal:submit', {
-        userId: currentUser.id,
-        username: currentUser.username,
-        reason: reasonText
-    });
+  socket.emit('appeal:submit', {
+    userId: currentUser.id,
+    username: currentUser.username,
+    reason: reasonText
+  });
 
-    showToast('Đã gửi yêu cầu hỗ trợ tới Quản trị viên!');
+  showToast('Đã gửi yêu cầu hỗ trợ tới Quản trị viên!');
 }
 
 // --- MODAL XÁC NHẬN ---
@@ -213,6 +218,7 @@ socket.on('auth:register_success', (msg) => {
 socket.on('auth:success', ({ token, user }) => {
   state.currentUser = user;
   localStorage.setItem('chat_session_token', token);
+  localStorage.setItem('user', JSON.stringify(user));
   const modalAuth = document.getElementById('modal-auth');
   if (modalAuth) modalAuth.classList.add('hidden');
   const myAvatar = document.getElementById('my-avatar');
@@ -257,7 +263,7 @@ socket.on('message:error', (errorMsg) => {
         }).then((appealResult) => {
           if (appealResult.isConfirmed) {
             const reason = appealResult.value || 'Xin hỗ trợ gỡ hạn chế tài khoản';
-            const currentUsr = (typeof currentUser !== 'undefined' ? currentUser : null) || state.currentUser;
+            const currentUsr = getCurrentUser();
 
             socket.emit('appeal:restriction', { 
               reason: reason,
@@ -292,6 +298,7 @@ const btnLogout = document.getElementById('btn-logout');
 if (btnLogout) {
   btnLogout.onclick = () => {
     localStorage.removeItem('chat_session_token');
+    localStorage.removeItem('user');
     location.reload();
   };
 }
@@ -414,17 +421,19 @@ socket.on('friend:updated', () => { if(state.currentUser) socket.emit('auth:sess
 socket.on('group:updated', () => { if(state.currentUser) socket.emit('auth:session', { userId: state.currentUser.id }); });
 socket.on('auth:forced_logout', () => {
   localStorage.removeItem('chat_session_token');
+  localStorage.removeItem('user');
   alert('Tài khoản của bạn đã bị quản trị viên xóa!');
   location.reload();
 });
 
-// --- RENDER DANH SÁCH CHAT ---
+// --- RENDER DANH SÁCH CHAT (OPTIMIZED DOM RENDERING) ---
 function renderChatList() {
   const list = document.getElementById('chat-list');
   if (!list) return;
-  list.innerHTML = '';
+  
   const query = state.searchQuery || '';
   const filter = state.activeFilter || 'all';
+  let html = '';
 
   updateRequestBadge(state.requests);
 
@@ -434,9 +443,9 @@ function renderChatList() {
       return;
     }
 
-    list.innerHTML += `<div style="padding: 8px 16px; font-weight: 600; color: var(--text-main);">Lời mời kết bạn (${state.requests.length})</div>`;
+    html += `<div style="padding: 8px 16px; font-weight: 600; color: var(--text-main);">Lời mời kết bạn (${state.requests.length})</div>`;
     state.requests.forEach(req => {
-      list.innerHTML += `
+      html += `
         <div class="chat-item request-item">
           <img class="avatar" src="${req.fromAvatar}">
           <div style="flex:1; overflow:hidden; padding: 0 8px;">
@@ -447,6 +456,7 @@ function renderChatList() {
         </div>
       `;
     });
+    list.innerHTML = html;
     return;
   }
 
@@ -485,7 +495,7 @@ function renderChatList() {
   combinedChats.sort((a, b) => b.timeVal - a.timeVal);
 
   if (combinedChats.length === 0 && !query) {
-    list.innerHTML += `<div class="empty-hint" style="text-align:center; padding:30px; color:var(--text-sub);">Không có cuộc trò chuyện nào</div>`;
+    html += `<div class="empty-hint" style="text-align:center; padding:30px; color:var(--text-sub);">Không có cuộc trò chuyện nào</div>`;
   } else {
     combinedChats.forEach(entry => {
       if (entry.kind === 'group') {
@@ -502,7 +512,7 @@ function renderChatList() {
           previewText = lastMsg.type === 'image' ? `${prefix}[Hình ảnh]` : `${prefix}${lastMsg.content}`;
         }
 
-        list.innerHTML += `
+        html += `
           <div class="chat-item ${unreadCount > 0 ? 'unread' : ''}" onclick="openRoom('${g.id}', '${g.name}', '${g.avatar}', '${memberCount} thành viên')">
             <div class="avatar-wrapper">
               <img class="avatar" src="${g.avatar}">
@@ -537,7 +547,7 @@ function renderChatList() {
           previewText = lastMsg.type === 'image' ? `${prefix}[Hình ảnh]` : `${prefix}${lastMsg.content}`;
         }
 
-        list.innerHTML += `
+        html += `
           <div class="chat-item ${unreadCount > 0 ? 'unread' : ''}" onclick="openRoom('${dmRoomId}', '${f.username}', '${f.avatar}', '${f.status === 'online' ? '🟢 Online' : '⚪ Offline'}')">
             <div class="avatar-wrapper">
               <img class="avatar" src="${f.avatar}">
@@ -580,7 +590,7 @@ function renderChatList() {
           actionButton = `<button class="btn-action blue" onclick="sendFriendRequest('${u.id}')" style="background:#0084ff; color:#fff; border:none; padding:6px 12px; border-radius:16px; font-weight:600; cursor:pointer;">Kết Bạn</button>`;
         }
 
-        list.innerHTML += `
+        html += `
           <div class="chat-item" style="padding: 10px 14px;">
             <img class="avatar" src="${u.avatar}">
             <div style="flex:1; padding-left: 8px;">
@@ -593,6 +603,8 @@ function renderChatList() {
       });
     }
   }
+
+  list.innerHTML = html;
 }
 
 function sendFriendRequest(userId) {
@@ -728,134 +740,142 @@ const remoteVideo = document.getElementById("remote-video");
 
 // Cấu hình STUN Server (giúp kết nối xuyên tường lửa)
 const peerConfig = {
-    iceServers: [
-        { urls: 'stun:stun.l.google.com:19302' },
-        { urls: 'stun:global.stun.twilio.com:3478' }
-    ]
+  iceServers: [
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:global.stun.twilio.com:3478' }
+  ]
 };
 
 // --- HÀM 1: BẮT ĐẦU GỌI AI ĐÓ ---
-// Gọi hàm này khi bấm nút [Gọi Video] trong khung chat. Ví dụ: onclick="startVideoCall('ID_nguoi_nhan')"
 async function startVideoCall(targetUserId) {
-    callTargetId = targetUserId;
-    try {
-        // Yêu cầu quyền mở Camera & Micro
-        localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-        localVideo.srcObject = localStream;
-        
-        // Hiện màn hình gọi
-        videoContainer.style.display = 'flex';
+  callTargetId = targetUserId;
+  const currentUsr = getCurrentUser();
 
-        // Khởi tạo người gọi (initiator = true)
-        peer = new SimplePeer({
-            initiator: true,
-            stream: localStream,
-            config: peerConfig
-        });
+  try {
+    // Yêu cầu quyền mở Camera & Micro
+    localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+    if (localVideo) localVideo.srcObject = localStream;
+    
+    // Hiện màn hình gọi
+    if (videoContainer) videoContainer.style.display = 'flex';
 
-        // Khi có tín hiệu mã hóa, gửi qua Socket cho người nhận
-        peer.on('signal', (data) => {
-            socket.emit('call_user', {
-                userToCall: targetUserId,
-                signalData: data,
-                callerName: myUsername // Biến lưu tên của bạn (cần điều chỉnh theo code hiện tại của bạn)
-            });
-        });
+    // Khởi tạo người gọi (initiator = true)
+    peer = new SimplePeer({
+      initiator: true,
+      stream: localStream,
+      config: peerConfig
+    });
 
-        // Khi nhận được luồng Video của người kia
-        peer.on('stream', (stream) => {
-            remoteVideo.srcObject = stream;
-        });
+    // Khi có tín hiệu mã hóa, gửi qua Socket cho người nhận
+    peer.on('signal', (data) => {
+      socket.emit('call_user', {
+        userToCall: targetUserId,
+        signalData: data,
+        callerName: currentUsr.username || 'Người dùng'
+      });
+    });
 
-        peer.on('close', destroyCall);
+    // Khi nhận được luồng Video của người kia
+    peer.on('stream', (stream) => {
+      if (remoteVideo) remoteVideo.srcObject = stream;
+    });
 
-    } catch (err) {
-        alert("Không thể truy cập Camera/Microphone! Hãy kiểm tra lại quyền.");
-        console.error(err);
-    }
+    peer.on('close', destroyCall);
+
+  } catch (err) {
+    alert("Không thể truy cập Camera/Microphone! Hãy kiểm tra lại quyền.");
+    console.error(err);
+  }
 }
 
 // --- HÀM 2: LẮNG NGHE CUỘC GỌI ĐẾN ---
 socket.on("incoming_call", (data) => {
-    currentCaller = data;
-    document.getElementById("caller-name-display").innerText = data.name;
-    incomingPopup.style.display = 'block'; // Hiện popup
+  currentCaller = data;
+  const nameDisplay = document.getElementById("caller-name-display");
+  if (nameDisplay) nameDisplay.innerText = data.callerName || data.name || 'Người dùng';
+  if (incomingPopup) incomingPopup.style.display = 'block';
 });
 
 // --- HÀM 3: NHẤN NÚT NGHE ---
 async function answerCall() {
-    incomingPopup.style.display = 'none';
-    callTargetId = currentCaller.from;
+  if (incomingPopup) incomingPopup.style.display = 'none';
+  if (!currentCaller) return;
+  callTargetId = currentCaller.from;
 
-    try {
-        localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-        localVideo.srcObject = localStream;
-        videoContainer.style.display = 'flex';
+  try {
+    localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+    if (localVideo) localVideo.srcObject = localStream;
+    if (videoContainer) videoContainer.style.display = 'flex';
 
-        peer = new SimplePeer({
-            initiator: false, // Người nhận
-            stream: localStream,
-            config: peerConfig
-        });
+    peer = new SimplePeer({
+      initiator: false, // Người nhận
+      stream: localStream,
+      config: peerConfig
+    });
 
-        peer.on('signal', (data) => {
-            socket.emit('answer_call', {
-                signal: data,
-                to: currentCaller.from
-            });
-        });
+    peer.on('signal', (data) => {
+      socket.emit('answer_call', {
+        signal: data,
+        to: currentCaller.from
+      });
+    });
 
-        peer.on('stream', (stream) => {
-            remoteVideo.srcObject = stream;
-        });
+    peer.on('stream', (stream) => {
+      if (remoteVideo) remoteVideo.srcObject = stream;
+    });
 
-        // Xử lý mã SDP của người gọi tới
-        peer.signal(currentCaller.signal);
-        
-        peer.on('close', destroyCall);
+    // Xử lý mã SDP của người gọi tới
+    peer.signal(currentCaller.signal);
+    
+    peer.on('close', destroyCall);
 
-    } catch (err) {
-        alert("Không thể truy cập Camera/Microphone!");
-    }
+  } catch (err) {
+    alert("Không thể truy cập Camera/Microphone!");
+    console.error(err);
+  }
 }
 
 // --- HÀM 4: XỬ LÝ KHI NGƯỜI KIA CHẤP NHẬN ---
 socket.on("call_accepted", (signal) => {
-    if (peer) {
-        peer.signal(signal); // Hoàn tất bắt tay WebRTC
-    }
+  if (peer) {
+    peer.signal(signal);
+  }
 });
 
 // --- HÀM 5: KẾT THÚC / TỪ CHỐI CUỘC GỌI ---
 function rejectCall() {
-    incomingPopup.style.display = 'none';
+  if (incomingPopup) incomingPopup.style.display = 'none';
+  if (currentCaller) {
     socket.emit('end_call', { to: currentCaller.from });
-    currentCaller = null;
+  }
+  currentCaller = null;
 }
 
 function endCall() {
+  if (callTargetId) {
     socket.emit('end_call', { to: callTargetId });
-    destroyCall();
+  }
+  destroyCall();
 }
 
 socket.on("call_ended", () => {
-    destroyCall();
-    alert("Cuộc gọi đã kết thúc.");
+  destroyCall();
+  alert("Cuộc gọi đã kết thúc.");
 });
 
 // Dọn dẹp Video & Camera
 function destroyCall() {
-    if (peer) {
-        peer.destroy();
-        peer = null;
-    }
-    if (localStream) {
-        localStream.getTracks().forEach(track => track.stop()); // Tắt đèn Camera
-        localStream = null;
-    }
-    videoContainer.style.display = 'none';
-    incomingPopup.style.display = 'none';
-    callTargetId = null;
+  if (peer) {
+    peer.destroy();
+    peer = null;
+  }
+  if (localStream) {
+    localStream.getTracks().forEach(track => track.stop());
+    localStream = null;
+  }
+  if (videoContainer) videoContainer.style.display = 'none';
+  if (incomingPopup) incomingPopup.style.display = 'none';
+  callTargetId = null;
 }
 
 // Xóa đoạn chat thành công
@@ -913,18 +933,20 @@ function appendMessage(msg) {
   viewport.scrollTop = viewport.scrollHeight;
 }
 
-// --- FIX LỖI 1: HIỂN THỊ DANH SÁCH THÀNH VIÊN TẠO NHÓM CHUẨN ---
+// --- RENDERING THÀNH VIÊN TẠO NHÓM CHUẨN ---
 function renderGroupMembersCheckbox(preSelectedFriendId = null) {
   const container = document.getElementById('group-members-list');
   if (!container) return;
-  container.innerHTML = '';
+
   if (state.friends.length === 0) {
     container.innerHTML = '<p style="font-size: 13px; color: #718096; text-align: center; padding: 10px;">Chưa có bạn bè để thêm</p>';
     return;
   }
+
+  let html = '';
   state.friends.forEach(f => {
     const isChecked = f.id === preSelectedFriendId ? 'checked' : '';
-    container.innerHTML += `
+    html += `
       <label class="member-checkbox-item" style="display: flex; align-items: center; justify-content: flex-start; gap: 12px; padding: 8px 10px; cursor: pointer; width: 100%; box-sizing: border-box;">
         <input type="checkbox" value="${f.id}" class="group-member-checkbox" ${isChecked} style="width: 18px; height: 18px; margin: 0; flex-shrink: 0;">
         <img src="${f.avatar}" style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover; flex-shrink: 0; margin: 0;">
@@ -932,6 +954,7 @@ function renderGroupMembersCheckbox(preSelectedFriendId = null) {
       </label>
     `;
   });
+  container.innerHTML = html;
 }
 
 function renderGroupSettingsModal() {
@@ -951,8 +974,8 @@ function renderGroupSettingsModal() {
 
   const listContainer = document.getElementById('setting-members-list');
   if (!listContainer) return;
-  listContainer.innerHTML = '';
 
+  let html = '';
   if (group.members) {
     group.members.forEach(m => {
       const isMemberAdmin = m.id === group.adminId;
@@ -972,7 +995,7 @@ function renderGroupSettingsModal() {
         `;
       }
 
-      listContainer.innerHTML += `
+      html += `
         <div style="padding: 10px; border-bottom: 1px solid #edf2f7;">
           <div style="display: flex; align-items: center; justify-content: space-between;">
             <div style="display: flex; align-items: center; gap: 10px;">
@@ -990,6 +1013,7 @@ function renderGroupSettingsModal() {
       `;
     });
   }
+  listContainer.innerHTML = html;
 }
 
 window.execGroupAction = function(action, targetId) {
@@ -1042,7 +1066,6 @@ document.addEventListener('click', (e) => {
     if (state.activeRoomId && state.currentUser) {
       showConfirmModal('Xóa đoạn chat', 'Bạn có chắc chắn muốn xóa đoạn chat ở phía bạn không? (Người còn lại vẫn giữ tin nhắn)', () => {
         socket.emit('messages:clear_me', { roomId: state.activeRoomId });
-        socket.emit('messages:clear', { roomId: state.activeRoomId });
         
         const viewport = document.getElementById('messages-viewport');
         if (viewport) viewport.innerHTML = '';
@@ -1382,10 +1405,10 @@ document.addEventListener('click', (e) => {
     }
 
     let targetUserId = state.activeRoomId; 
+    const currentUsr = getCurrentUser();
     if (targetUserId && targetUserId.includes('_DM_')) {
       const parts = targetUserId.split('_DM_');
-      const myId = (typeof currentUser !== 'undefined' ? currentUser?.id : null) || state.currentUser?.id;
-      targetUserId = parts.find(id => id !== myId) || parts[0];
+      targetUserId = parts.find(id => id !== currentUsr?.id) || parts[0];
     }
 
     Swal.fire({
@@ -1414,19 +1437,18 @@ document.addEventListener('click', (e) => {
         return {
           reason: document.getElementById('swal-report-reason').value,
           description: document.getElementById('swal-report-desc').value
-        }
+        };
       }
     }).then((result) => {
       if (result.isConfirmed) {
         const { reason, description } = result.value;
-        const currentUsr = JSON.parse(localStorage.getItem('user')) || {};
 
         socket.emit('report:submit', { 
-            targetId: targetUserId, 
-            reason, 
-            description,
-            reporterId: currentUsr?.id,
-            reporterName: currentUsr?.username
+          targetId: targetUserId, 
+          reason, 
+          description,
+          reporterId: currentUsr?.id,
+          reporterName: currentUsr?.username
         });
         
         showToast('Đã gửi báo cáo tới Admin thành công!');
