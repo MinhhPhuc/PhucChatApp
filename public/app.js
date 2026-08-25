@@ -1014,7 +1014,7 @@ window.execGroupAction = function(action, targetId) {
   }
 };
 
-// --- BỘ ĐIỀU KHIỂN EVENT CLICK HỢP NHẤT (FIX XÓA CHAT & TẠO NHÓM) ---
+// --- BỘ ĐIỀU KHIỂN EVENT CLICK HỢP NHẤT ---
 document.addEventListener('click', (e) => {
   const modalGroup = document.getElementById('modal-group');
   const modalChatSettings = document.getElementById('modal-chat-settings');
@@ -1023,9 +1023,15 @@ document.addEventListener('click', (e) => {
   const modalNickname = document.getElementById('modal-nickname');
   const modalConfirm = document.getElementById('modal-confirm');
 
-  // 1. FIX LỖI XÓA ĐOẠN CHAT (Bổ sung linh hoạt Selector & Text)
+  // Bắt phần tử dạng nút bấm hoặc item menu gần nhất được click
+  const clickedTarget = e.target.closest('button, .setting-item, .menu-item, [id^="set-"], [id^="btn-"]');
+  const targetText = clickedTarget ? clickedTarget.innerText.trim() : '';
+
+  // 1. XÓA ĐOẠN CHAT
   const btnDeleteChat = e.target.closest('#delete-chat, #btn-delete-chat, #set-delete-chat, .btn-delete-chat');
-  const isDeleteTextClick = modalChatSettings && (modalChatSettings.style.display === 'flex' || !modalChatSettings.classList.contains('hidden')) && e.target.innerText.includes('Xóa đoạn chat');
+  const isDeleteTextClick = modalChatSettings && 
+    (modalChatSettings.style.display === 'flex' || !modalChatSettings.classList.contains('hidden')) && 
+    clickedTarget && targetText.includes('Xóa đoạn chat');
 
   if (btnDeleteChat || isDeleteTextClick) {
     if (modalChatSettings) {
@@ -1038,7 +1044,6 @@ document.addEventListener('click', (e) => {
         socket.emit('messages:clear_me', { roomId: state.activeRoomId });
         socket.emit('messages:clear', { roomId: state.activeRoomId });
         
-        // Xóa ngay giao diện local
         const viewport = document.getElementById('messages-viewport');
         if (viewport) viewport.innerHTML = '';
         state.lastMessages.delete(state.activeRoomId);
@@ -1054,7 +1059,9 @@ document.addEventListener('click', (e) => {
 
   // 2. XÓA KẾT BẠN (HỦY KẾT BẠN)
   const btnUnfriend = e.target.closest('#set-unfriend, #btn-unfriend');
-  const isUnfriendTextClick = modalChatSettings && (modalChatSettings.style.display === 'flex' || !modalChatSettings.classList.contains('hidden')) && e.target.innerText.includes('Xóa kết bạn');
+  const isUnfriendTextClick = modalChatSettings && 
+    (modalChatSettings.style.display === 'flex' || !modalChatSettings.classList.contains('hidden')) && 
+    clickedTarget && targetText.includes('Xóa kết bạn');
 
   if (btnUnfriend || isUnfriendTextClick) {
     if (modalChatSettings) {
@@ -1157,7 +1164,9 @@ document.addEventListener('click', (e) => {
 
   // 5. THAY ĐỔI CHỦ ĐỀ (THEME)
   const btnSetTheme = e.target.closest('#set-theme');
-  const isThemeTextClick = modalChatSettings && (modalChatSettings.style.display === 'flex' || !modalChatSettings.classList.contains('hidden')) && e.target.innerText.includes('chủ đề');
+  const isThemeTextClick = modalChatSettings && 
+    (modalChatSettings.style.display === 'flex' || !modalChatSettings.classList.contains('hidden')) && 
+    clickedTarget && targetText.includes('chủ đề');
 
   if (btnSetTheme || isThemeTextClick) {
     if (modalChatSettings) {
@@ -1197,7 +1206,9 @@ document.addEventListener('click', (e) => {
 
   // 6. ĐỔI BIỆT DANH
   const btnSetNickname = e.target.closest('#set-nickname');
-  const isNicknameTextClick = modalChatSettings && (modalChatSettings.style.display === 'flex' || !modalChatSettings.classList.contains('hidden')) && e.target.innerText.includes('biệt danh');
+  const isNicknameTextClick = modalChatSettings && 
+    (modalChatSettings.style.display === 'flex' || !modalChatSettings.classList.contains('hidden')) && 
+    clickedTarget && targetText.includes('biệt danh');
 
   if (btnSetNickname || isNicknameTextClick) {
     if (modalChatSettings) {
@@ -1266,9 +1277,11 @@ document.addEventListener('click', (e) => {
     return;
   }
 
-  // 7. FIX LỖI TẠO NHÓM (Mở modal & Bấm tạo nhóm)
+  // 7. TẠO NHÓM
   const btnOpenGroupModal = e.target.closest('#btn-open-group-modal, .btn-create-group, #set-create-group');
-  const isCreateGroupOptionClick = modalChatSettings && (modalChatSettings.style.display === 'flex' || !modalChatSettings.classList.contains('hidden')) && e.target.innerText.includes('Tạo nhóm');
+  const isCreateGroupOptionClick = modalChatSettings && 
+    (modalChatSettings.style.display === 'flex' || !modalChatSettings.classList.contains('hidden')) && 
+    clickedTarget && targetText.includes('Tạo nhóm');
 
   if (btnOpenGroupModal || isCreateGroupOptionClick) {
     if (modalChatSettings) {
@@ -1288,9 +1301,10 @@ document.addEventListener('click', (e) => {
     return;
   }
 
-  // Sự kiện khi bấm nút "Tạo Nhóm" trong Modal
   const btnConfirmCreateGroup = e.target.closest('#btn-confirm-create-group, .btn-confirm-group');
-  const isCreateGroupButtonClick = modalGroup && (modalGroup.style.display === 'flex' || !modalGroup.classList.contains('hidden')) && e.target.tagName === 'BUTTON' && e.target.innerText.trim().includes('Tạo Nhóm');
+  const isCreateGroupButtonClick = modalGroup && 
+    (modalGroup.style.display === 'flex' || !modalGroup.classList.contains('hidden')) && 
+    clickedTarget && targetText.includes('Tạo Nhóm');
 
   if (btnConfirmCreateGroup || isCreateGroupButtonClick) {
     e.preventDefault();
@@ -1319,7 +1333,9 @@ document.addEventListener('click', (e) => {
 
   // 8. CẢM XÚC NHANH
   const setEmojiBtn = e.target.closest('#set-emoji');
-  const isEmojiTextClick = modalChatSettings && (modalChatSettings.style.display === 'flex' || !modalChatSettings.classList.contains('hidden')) && e.target.innerText.includes('Cảm xúc');
+  const isEmojiTextClick = modalChatSettings && 
+    (modalChatSettings.style.display === 'flex' || !modalChatSettings.classList.contains('hidden')) && 
+    clickedTarget && targetText.includes('Cảm xúc');
 
   if (setEmojiBtn || isEmojiTextClick) {
     if (modalChatSettings) {
@@ -1355,7 +1371,9 @@ document.addEventListener('click', (e) => {
   
   // 9. BÁO CÁO TỚI ADMIN 
   const reportBtn = e.target.closest('#set-report'); 
-  const isReportTextClick = modalChatSettings && (modalChatSettings.style.display === 'flex' || !modalChatSettings.classList.contains('hidden')) && e.target.innerText.includes('Báo cáo');
+  const isReportTextClick = modalChatSettings && 
+    (modalChatSettings.style.display === 'flex' || !modalChatSettings.classList.contains('hidden')) && 
+    clickedTarget && targetText.includes('Báo cáo');
 
   if (reportBtn || isReportTextClick) {
     if (modalChatSettings) {
