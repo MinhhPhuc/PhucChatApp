@@ -734,6 +734,8 @@ socket.on('messages:history', ({ roomId, messages }) => {
 let peer = null;
 let localStream = null;
 let callTargetId = null;
+let isAudioMuted = false;
+let isVideoMuted = false;
 
 // Cấu hình STUN server miễn phí của Google để thông NAT
 const peerConfig = {
@@ -743,7 +745,7 @@ const peerConfig = {
   ]
 };
 
-// Lấy các phần tử DOM liên quan đến Video Call
+// Lấy các phần tử DOM liên quan đến Call
 const localVideo = document.getElementById('localVideo');
 const remoteVideo = document.getElementById('remoteVideo');
 const videoContainer = document.getElementById('videoCallContainer');
@@ -766,7 +768,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Nút Kết thúc cuộc gọi
   document.getElementById('btn-end-call')?.addEventListener('click', () => {
-    socket.emit('end_call', { targetId: callTargetId });
+    if (callTargetId) {
+      socket.emit('end_call', { targetId: callTargetId });
+    }
     destroyCall();
   });
 
@@ -775,19 +779,29 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Nút Từ chối cuộc gọi đến
   document.getElementById('btn-reject-call')?.addEventListener('click', rejectCall);
+
+  // Nút Tắt/Bật Micro (Mute Audio)
+  document.getElementById('btn-toggle-mic')?.addEventListener('click', toggleMicrophone);
+
+  // Nút Tắt/Bật Camera (Toggle Video)
+  document.getElementById('btn-toggle-cam')?.addEventListener('click', toggleCamera);
 });
 
 // Kiểm tra điều kiện trước khi khởi tạo cuộc gọi
 function initiateCall(isVideoCall) {
-  if (!state.activeRoomId) return;
+  if (!state.activeRoomId) {
+    return showToast('Vui lòng chọn một cuộc trò chuyện để gọi!', false);
+  }
 
   if (state.activeRoomId.includes('_DM_')) {
+    const currentUser = getCurrentUser();
     const parts = state.activeRoomId.split('_DM_');
-    const targetUserId = parts.find(id => id !== state.currentUser?.id);
+    const targetUserId = parts.find(id => id !== currentUser?.id);
     const targetUser = state.friends?.find(f => f.id === targetUserId);
 
-    if (!targetUser || targetUser.status === 'offline') {
-      return showToast('Người dùng này hiện không Online!', false);
+    // Cho phép gọi ngay cả khi status chưa cập nhật kịp thời, ưu tiên check ID
+    if (!targetUserId) {
+      return showToast('Không tìm thấy thông tin người nhận!', false);
     }
 
     startVideoCall(targetUserId, isVideoCall);
@@ -803,16 +817,25 @@ function initiateCall(isVideoCall) {
 // Khởi tạo cuộc gọi (Người gọi)
 async function startVideoCall(targetUserId, isVideo = true) {
   callTargetId = targetUserId;
-  const currentUsr = state.currentUser;
+  const currentUser = getCurrentUser();
 
   try {
     localStream = await navigator.mediaDevices.getUserMedia({
-      video: isVideo,
+      video: isVideo ? { width: 1280, height: 720 } : false,
       audio: true
     });
 
-    if (localVideo) localVideo.srcObject = localStream;
-    if (videoContainer) videoContainer.style.display = 'flex';
+    if (localVideo) {
+      localVideo.srcObject = isVideo ? localStream : null;
+      localVideo.style.display = isVideo ? 'block' : 'none';
+    }
+    
+    if (videoContainer) {
+      videoContainer.style.display = 'flex';
+      // Cập nhật nhãn tiêu đề gọi thoại hay gọi video
+      const callTypeLabel = document.getElementById('call-type-title');
+      if (callTypeLabel) callTypeLabel.innerText = isVideo ? 'Đang gọi Video...' : 'Đang gọi Thoại...';
+    }
 
     peer = new SimplePeer({
       initiator: true,
@@ -825,7 +848,7 @@ async function startVideoCall(targetUserId, isVideo = true) {
       socket.emit('call_user', {
         userToCall: targetUserId,
         signalData: data,
-        callerName: currentUsr?.username || 'Người dùng',
+        callerName: currentUser?.username || 'Người dùng',
         isVideo: isVideo
       });
     });
@@ -835,10 +858,14 @@ async function startVideoCall(targetUserId, isVideo = true) {
     });
 
     peer.on('close', destroyCall);
-    peer.on('error', (err) => console.error('Peer error:', err));
+    peer.on('error', (err) => {
+      console.error('Peer error:', err);
+      showToast('Lỗi kết nối cuộc gọi!', false);
+      destroyCall();
+    });
 
   } catch (err) {
-    showToast('Không thể truy cập Microphone hoặc Camera!', false);
+    showToast('Không thể truy cập Microphone hoặc Camera! Vui lòng cấp quyền.', false);
     console.error(err);
     destroyCall();
   }
@@ -848,14 +875,28 @@ async function startVideoCall(targetUserId, isVideo = true) {
 async function acceptCall() {
   if (incomingCallModal) incomingCallModal.style.display = 'none';
 
+  if (!state.incomingCallData) {
+    return showToast('Không tìm thấy thông tin cuộc gọi đến!', false);
+  }
+
+  const isVideo = state.incomingCallData.isVideo;
+
   try {
     localStream = await navigator.mediaDevices.getUserMedia({
-      video: state.incomingCallData.isVideo,
+      video: isVideo ? { width: 1280, height: 720 } : false,
       audio: true
     });
 
-    if (localVideo) localVideo.srcObject = localStream;
-    if (videoContainer) videoContainer.style.display = 'flex';
+    if (localVideo) {
+      localVideo.srcObject = isVideo ? localStream : null;
+      localVideo.style.display = isVideo ? 'block' : 'none';
+    }
+
+    if (videoContainer) {
+      videoContainer.style.display = 'flex';
+      const callTypeLabel = document.getElementById('call-type-title');
+      if (callTypeLabel) callTypeLabel.innerText = isVideo ? 'Đang gọi Video...' : 'Đang gọi Thoại...';
+    }
 
     peer = new SimplePeer({
       initiator: false,
@@ -876,7 +917,10 @@ async function acceptCall() {
     });
 
     peer.on('close', destroyCall);
-    peer.on('error', (err) => console.error('Peer error:', err));
+    peer.on('error', (err) => {
+      console.error('Peer error:', err);
+      destroyCall();
+    });
 
     peer.signal(state.incomingCallData.signal);
 
@@ -896,10 +940,46 @@ function rejectCall() {
   state.incomingCallData = null;
 }
 
+// Bật/Tắt Micro trong cuộc gọi
+function toggleMicrophone() {
+  if (localStream) {
+    const audioTrack = localStream.getAudioTracks()[0];
+    if (audioTrack) {
+      isAudioMuted = !isAudioMuted;
+      audioTrack.enabled = !isAudioMuted;
+      const micBtn = document.getElementById('btn-toggle-mic');
+      if (micBtn) {
+        micBtn.innerHTML = isAudioMuted ? '<i class="fa-solid fa-microphone-slash"></i>' : '<i class="fa-solid fa-microphone"></i>';
+        micBtn.style.background = isAudioMuted ? '#e53e3e' : '';
+      }
+    }
+  }
+}
+
+// Bật/Tắt Camera trong cuộc gọi
+function toggleCamera() {
+  if (localStream) {
+    const videoTrack = localStream.getVideoTracks()[0];
+    if (videoTrack) {
+      isVideoMuted = !isVideoMuted;
+      videoTrack.enabled = !isVideoMuted;
+      const camBtn = document.getElementById('btn-toggle-cam');
+      if (camBtn) {
+        camBtn.innerHTML = isVideoMuted ? '<i class="fa-solid fa-video-slash"></i>' : '<i class="fa-solid fa-video"></i>';
+        camBtn.style.background = isVideoMuted ? '#e53e3e' : '';
+      }
+    }
+  }
+}
+
 // Dọn dẹp tài nguyên khi cuộc gọi kết thúc
 function destroyCall() {
   if (peer) {
-    peer.destroy();
+    try {
+      peer.destroy();
+    } catch (e) {
+      console.error(e);
+    }
     peer = null;
   }
 
@@ -915,15 +995,15 @@ function destroyCall() {
 
   callTargetId = null;
   state.incomingCallData = null;
+  isAudioMuted = false;
+  isVideoMuted = false;
 }
 
 // ==========================================
 // 4. LẮNG NGHE TÍN HIỆU TỪ SOCKET.IO
 // ==========================================
 
-// Khi có người gọi tới
 socket.on('incoming_call', (data) => {
-  // data bao gồm: { from, signal, callerName, isVideo }
   state.incomingCallData = data;
   callTargetId = data.from;
 
@@ -935,26 +1015,26 @@ socket.on('incoming_call', (data) => {
   }
 });
 
-// Khi người nghe chấp nhận cuộc gọi
 socket.on('call_accepted', (signal) => {
   if (peer) {
-    peer.signal(signal);
+    try {
+      peer.signal(signal);
+    } catch (err) {
+      console.error('Error signaling peer:', err);
+    }
   }
 });
 
-// Khi cuộc gọi bị từ chối
 socket.on('call_rejected', () => {
   destroyCall();
   showToast('Người dùng đã từ chối cuộc gọi!', false);
 });
 
-// Khi đối phương ngắt kết nối/dập máy
 socket.on('call_ended', () => {
   destroyCall();
   showToast('Cuộc gọi đã kết thúc.', true);
 });
 
-// Khi gặp lỗi từ server (ví dụ: người dùng bận)
 socket.on('call_error', (data) => {
   destroyCall();
   showToast(data.message || 'Lỗi cuộc gọi!', false);
