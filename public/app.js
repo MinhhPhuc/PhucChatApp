@@ -785,35 +785,31 @@ function initiateCall(isVideo) {
   startVideoCall(targetUserId, isVideo);
 }
 
-// 1. KHỞI TẠO CUỘC GỌI (Đã sửa lỗi khai báo targetAvatar và loại bỏ placeholder)
+// 1. KHỞI TẠO CUỘC GỌI
 async function startVideoCall(targetUserId, isVideo) {
   currentCallTargetId = targetUserId;
   const currentUser = typeof getCurrentUser === 'function' ? getCurrentUser() : null;
 
-  // Khai báo an toàn tên và avatar (tránh lỗi is not defined)
   const activeChatHeader = document.querySelector('.chat-header') || {};
   const targetName = activeChatHeader.dataset?.username || 'Người dùng';
   const targetAvatar = activeChatHeader.dataset?.avatar || 'https://cdn-icons-png.flaticon.com/512/149/149071.png';
 
-  // Cập nhật thông tin lên màn hình chờ gọi
   const nameEl = document.getElementById('call-target-name');
   const avatarEl = document.getElementById('call-target-avatar');
   const statusEl = document.getElementById('call-status-text');
   const waitingView = document.getElementById('call-waiting-view');
 
   if (nameEl) nameEl.textContent = targetName;
-  if (avatarEl) avatarEl.src = targetAvatar; // Đã có biến targetAvatar nên không còn báo lỗi
+  if (avatarEl) avatarEl.src = targetAvatar;
   if (statusEl) statusEl.textContent = 'Đang gọi...';
   if (waitingView) waitingView.style.display = 'flex';
 
   try {
-    // Xin quyền truy cập thiết bị (Micro / Camera)
     localStream = await navigator.mediaDevices.getUserMedia({
       video: isVideo ? { width: 1280, height: 720 } : false,
       audio: true
     });
 
-    // Hiển thị khung giao diện cuộc gọi
     const videoContainer = document.getElementById('video-call-container');
     if (videoContainer) videoContainer.style.display = 'flex';
 
@@ -823,7 +819,6 @@ async function startVideoCall(targetUserId, isVideo) {
       localVideoEl.style.display = isVideo ? 'block' : 'none';
     }
 
-    // Khởi tạo SimplePeer ở phía gọi (initiator: true)
     peer = new SimplePeer({
       initiator: true,
       trickle: false,
@@ -844,7 +839,6 @@ async function startVideoCall(targetUserId, isVideo) {
     });
 
     peer.on('stream', (remoteStream) => {
-      // Khi người bên kia bắt máy, ẩn màn hình chờ (avatar/tên) để hiện video/kết nối
       if (waitingView) waitingView.style.display = 'none';
 
       const remoteVideoEl = document.getElementById('remote-video');
@@ -881,7 +875,6 @@ function endCallCleanUp() {
     peer = null;
   }
 
-  // Tắt hẳn đèn webcam / micro ngầm
   if (localStream) {
     localStream.getTracks().forEach(track => track.stop());
     localStream = null;
@@ -938,11 +931,6 @@ if (typeof socket !== 'undefined') {
     endCallCleanUp();
   });
 }
-
-// Đưa các hàm gọi vào đối tượng window toàn cục để các nút onclick trong HTML gọi được
-window.answerCall = answerCall;
-window.rejectCall = rejectCall;
-window.endCall = endCall;
 
 // Xóa đoạn chat thành công
 socket.on('messages:cleared_me', ({ roomId }) => {
@@ -1113,7 +1101,6 @@ document.addEventListener('click', (e) => {
   const modalNickname = document.getElementById('modal-nickname');
   const modalConfirm = document.getElementById('modal-confirm');
 
-  // Bắt phần tử dạng nút bấm hoặc item menu gần nhất được click
   const clickedTarget = e.target.closest('button, .setting-item, .menu-item, [id^="set-"], [id^="btn-"]');
   const targetText = clickedTarget ? clickedTarget.innerText.trim() : '';
 
@@ -1546,8 +1533,7 @@ document.addEventListener('click', (e) => {
   }
 });
 
-// 2. CÁC HÀM XỬ LÝ CUỘC GỌI (Đặt phía dưới phần biến toàn cục)
-
+// 2. CÁC HÀM XỬ LÝ CUỘC GỌI
 function answerCall() {
   const popup = document.getElementById('incoming-call-popup');
   if (popup) popup.style.display = 'none';
@@ -1616,23 +1602,6 @@ function endCall() {
   endCallCleanUp();
 }
 
-function endCallCleanUp() {
-  if (peer) {
-    try { peer.destroy(); } catch (e) {}
-    peer = null;
-  }
-  if (localStream) {
-    localStream.getTracks().forEach(track => track.stop());
-    localStream = null;
-  }
-  const videoContainer = document.getElementById('video-call-container');
-  const popup = document.getElementById('incoming-call-popup');
-  if (videoContainer) videoContainer.style.display = 'none';
-  if (popup) popup.style.display = 'none';
-  currentCallTargetId = null;
-  incomingCallDataGlobal = null;
-}
-
 function toggleAudioTrack() {
   if (localStream) {
     const audioTrack = localStream.getAudioTracks()[0];
@@ -1659,7 +1628,7 @@ function toggleVideoTrack() {
   }
 }
 
-// Gán toàn cục ở cuối file
+// Gán toàn cục ở cuối file để các nút onclick trong HTML gọi được
 window.answerCall = answerCall;
 window.rejectCall = rejectCall;
 window.endCall = endCall;

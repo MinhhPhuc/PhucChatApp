@@ -63,15 +63,15 @@ function reviver(key, value) {
 }
 
 let DB = {
-  accounts: new Map(),       // username -> { id, username, password, avatar }
-  users: new Map(),          // userId -> user status object
-  friendRequests: new Map(), // reqId -> request object
-  friends: new Map(),        // userId -> Set(friendUserIds)
-  messages: new Map(),       // roomId -> array of messages
-  groups: new Map(),         // groupId -> { id, name, avatar, members: Set() }
-  clearedChats: new Map(),   // `${userId}_${roomId}` -> timestamp
-  reports: new Map(),        // reportId -> report object
-  appeals: new Map()         // appealId -> appeal object
+  accounts: new Map(),       
+  users: new Map(),          
+  friendRequests: new Map(), 
+  friends: new Map(),        
+  messages: new Map(),       
+  groups: new Map(),         
+  clearedChats: new Map(),   
+  reports: new Map(),        
+  appeals: new Map()         
 };
 
 function loadDB() {
@@ -84,7 +84,6 @@ function loadDB() {
       if (!DB.appeals) DB.appeals = new Map();
       console.log('✅ Đã nạp dữ liệu cũ từ database.json');
       
-      // Reset trạng thái online về offline khi khởi động lại server
       DB.users.forEach(user => user.status = 'offline');
     } else {
       console.log('⚠️ Không tìm thấy database.json, sẽ tạo mới khi có dữ liệu.');
@@ -139,7 +138,6 @@ app.get('/api/admin/appeals', (req, res) => {
   res.json(Array.from(DB.appeals.values()));
 });
 
-// Hạn chế người dùng 24h
 app.post('/api/admin/user/:id/restrict', (req, res) => {
   const userId = req.params.id;
   const userObj = DB.users.get(userId);
@@ -152,7 +150,6 @@ app.post('/api/admin/user/:id/restrict', (req, res) => {
   res.status(404).json({ success: false, message: 'Không tìm thấy người dùng!' });
 });
 
-// Gỡ hoàn toàn hạn chế
 app.post('/api/admin/user/:id/lift-restriction', (req, res) => {
   const userId = req.params.id;
   const userObj = DB.users.get(userId);
@@ -165,7 +162,6 @@ app.post('/api/admin/user/:id/lift-restriction', (req, res) => {
   res.status(404).json({ success: false, message: 'Không tìm thấy người dùng!' });
 });
 
-// Giảm thời gian hạn chế
 app.post('/api/admin/user/:id/reduce-restriction', (req, res) => {
   const userId = req.params.id;
   const { hours } = req.body;
@@ -182,7 +178,6 @@ app.post('/api/admin/user/:id/reduce-restriction', (req, res) => {
   res.status(404).json({ success: false, message: 'Không tìm thấy người dùng hoặc tài khoản không có hạn chế!' });
 });
 
-// Xóa báo cáo
 app.delete('/api/admin/report/:id', (req, res) => {
   const reportId = req.params.id;
   if (DB.reports.has(reportId)) {
@@ -193,7 +188,6 @@ app.delete('/api/admin/report/:id', (req, res) => {
   res.status(404).json({ success: false, message: 'Không tìm thấy báo cáo!' });
 });
 
-// Xóa tài khoản
 app.delete('/api/admin/user/:id', (req, res) => {
   const userId = req.params.id;
   let targetUsername = null;
@@ -221,9 +215,6 @@ app.delete('/api/admin/user/:id', (req, res) => {
 
 app.use(express.static(path.join(__dirname, 'public')));
 
-// ==========================================
-// HÀM ĐỒNG BỘ DỮ LIỆU NGƯỜI DÙNG CHUẨN HOÁ
-// ==========================================
 function syncUserData(target, userId) {
   if (!target || !userId) return;
 
@@ -289,14 +280,26 @@ io.on('connection', (socket) => {
 
   // --- LOGIC VIDEO CALL ---
   socket.on("call_user", (data) => {
-    // Kiểm tra trạng thái online của người nhận
-    const targetUser = DB.users.get(data.userToCall);
-    if (!targetUser || targetUser.status === 'offline') {
-      return socket.emit("call_error", { message: "Người dùng hiện đang Offline!" });
+    console.log(`📞 Nhận yêu cầu gọi từ ${currentUser ? currentUser.username : socket.id} tới user: ${data.userToCall}`);
+    
+    let targetUser = DB.users.get(data.userToCall);
+    if (!targetUser) {
+      for (let [uId, uObj] of DB.users.entries()) {
+        if (String(uId) === String(data.userToCall)) {
+          targetUser = uObj;
+          break;
+        }
+      }
     }
 
-    // Gửi tín hiệu gọi đến Room theo userId của người nhận
-    io.to(data.userToCall).emit("incoming_call", { 
+    if (!targetUser) {
+      return socket.emit("call_error", { message: "Không tìm thấy người dùng trong hệ thống!" });
+    }
+
+    const receiverRoomId = String(targetUser.id);
+    console.log(`🚀 Đang chuyển tiếp tín hiệu "incoming_call" tới Room: ${receiverRoomId}`);
+
+    io.to(receiverRoomId).emit("incoming_call", { 
       signal: data.signalData, 
       fromSocketId: socket.id, 
       fromUserId: currentUser ? currentUser.id : null,
@@ -307,12 +310,10 @@ io.on('connection', (socket) => {
   });
 
   socket.on("answer_call", (data) => {
-    // Trả tín hiệu chấp nhận cuộc gọi về cho socket người gọi
     io.to(data.toSocketId || data.to).emit("call_accepted", data.signal);
   });
 
   socket.on("end_call", (data) => {
-    // Báo kết thúc cuộc gọi cho cả hai bên
     if (data.targetId) {
       io.to(data.targetId).emit("call_ended");
     }
@@ -322,18 +323,15 @@ io.on('connection', (socket) => {
   });
 
   socket.on("reject_call", (data) => {
-    // Báo từ chối cuộc gọi
     io.to(data.toSocketId || data.to).emit("call_rejected");
   });
   
-  // Admin Room
   socket.on('join_admin_room', (userData) => {
     if (userData && userData.isAdmin) {
       socket.join('admin_room');
     }
   });
 
-  // --- XÓA TIN NHẮN ---
   socket.on('messages:clear_me', ({ roomId }) => {
     if (!currentUser || !roomId) return;
     const clearKey = `${currentUser.id}_${roomId}`;
@@ -359,7 +357,6 @@ io.on('connection', (socket) => {
     }
   });
 
-  // --- LẤY LỊCH SỬ TIN NHẮN ---
   socket.on('messages:get', ({ roomId }) => {
     if (!currentUser) return;
     const msgs = DB.messages.get(roomId) || [];
@@ -374,7 +371,6 @@ io.on('connection', (socket) => {
     socket.emit('messages:history', { roomId, messages: filteredMsgs });
   });
 
-  // --- QUẢN LÝ NHÓM ---
   socket.on('group:action', ({ action, groupId, targetId }) => {
     if (!currentUser) return;
     const group = DB.groups.get(groupId);
@@ -524,7 +520,6 @@ io.on('connection', (socket) => {
     io.emit('users:sync', Array.from(DB.users.values()));
   });
 
-  // --- TẠO NHÓM CHAT ---
   socket.on('group:create', ({ name, avatar, memberIds }) => {
     if (!currentUser || !name || !memberIds) return;
     const groupId = `grp_${Math.random().toString(36).substr(2, 9)}`;
@@ -547,7 +542,6 @@ io.on('connection', (socket) => {
     syncUserData(socket, currentUser.id);
   });
 
-  // --- BẠN BÈ ---
   socket.on('friend:request', ({ targetId, targetUserId }) => {
     const finalTargetId = targetId || targetUserId;
     if (!currentUser || currentUser.id === finalTargetId) return;
@@ -616,11 +610,9 @@ io.on('connection', (socket) => {
     io.to(friendId).emit('friend:updated');
   });
 
-  // --- GỬI TIN NHẮN ---
   socket.on('message:send', ({ roomId, content, type = 'text' }) => {
     if (!currentUser || !content) return;
 
-    // Kiểm tra trạng thái hạn chế 24h
     const userStatus = DB.users.get(currentUser.id);
     if (userStatus && userStatus.restrictedUntil && userStatus.restrictedUntil > Date.now()) {
       const hoursLeft = Math.ceil((userStatus.restrictedUntil - Date.now()) / (1000 * 60 * 60));
@@ -657,7 +649,6 @@ io.on('connection', (socket) => {
     }
   });
 
-  // --- BÁO CÁO & KHÁNG CÁO ---
   socket.on('report:submit', ({ targetId, reason, description, reporterId, reporterName }) => {
     const finalReporterId = reporterId || (currentUser ? currentUser.id : null);
     const finalReporterName = reporterName || (currentUser ? currentUser.username : 'Người dùng');
@@ -735,7 +726,6 @@ io.on('connection', (socket) => {
     socket.emit('appeal:restriction', data);
   });
 
-  // --- DISCONNECT ---
   socket.on('disconnect', () => {
     if (currentUser) {
       currentUser.status = 'offline';
