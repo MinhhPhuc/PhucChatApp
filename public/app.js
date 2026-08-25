@@ -245,6 +245,20 @@ socket.on('auth:success', ({ token, user }) => {
   if (myName) myName.innerText = user.username;
 });
 
+// Đồng bộ danh sách người dùng realtime
+socket.on('users:sync', (users) => {
+  if (!Array.isArray(users)) return;
+
+  state.allUsers = users.map(user => ({
+    id: user.id,
+    username: user.username,
+    avatar: user.avatar,
+    status: user.status || 'offline'
+  }));
+
+  renderChatList();
+});
+
 socket.on('auth:restricted', (message) => {
   Swal.fire({
     icon: 'warning',

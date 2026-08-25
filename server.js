@@ -1889,6 +1889,21 @@ io.on('connection', socket => {
           new Set()
         );
 
+        // ==========================================
+        // ĐỒNG BỘ USER MỚI CHO TẤT CẢ CLIENT
+        // ==========================================
+        io.emit(
+          'users:sync',
+          Array.from(
+            DB.users.values()
+          ).map(user => ({
+            id: user.id,
+            username: user.username,
+            avatar: user.avatar,
+            status: user.status || 'offline'
+          }))
+        );
+
         socket.emit(
           'auth:register_success',
           'Tạo tài khoản thành công!'
