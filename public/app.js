@@ -839,17 +839,17 @@ async function startVideoCall(targetUserId, isVideo) {
     });
 
     peer.on('signal', (signalData) => {
-      const callData = incomingCallDataGlobal;
-
-      if (!callData?.fromSocketId) {
-        console.error('[CALL] Thiếu fromSocketId');
-        endCallCleanUp();
+      if (!targetUserId) {
+        console.error('[CALL] Thiếu targetUserId');
         return;
       }
 
-      socket.emit('call_accepted', {
-        toSocketId: callData.fromSocketId,
-        signal: signalData
+      socket.emit('call_user', {
+        targetUserId,
+        signal: signalData,
+        isVideo,
+        callerName: currentUser?.username || 'Người dùng',
+        callerAvatar: currentUser?.avatar || ''
       });
     });
 
@@ -1596,17 +1596,17 @@ function answerCall() {
     });
 
     peer.on('signal', (signalData) => {
-      const callData = incomingCallDataGlobal;
-
-      if (!callData?.fromSocketId) {
-        console.error('[CALL] Thiếu fromSocketId');
-        endCallCleanUp();
+      if (!targetUserId) {
+        console.error('[CALL] Thiếu targetUserId');
         return;
       }
 
-      socket.emit('call_accepted', {
-        toSocketId: callData.fromSocketId,
-        signal: signalData
+      socket.emit('call_user', {
+        targetUserId,
+        signal: signalData,
+        isVideo,
+        callerName: currentUser?.username || 'Người dùng',
+        callerAvatar: currentUser?.avatar || ''
       });
     });
 
