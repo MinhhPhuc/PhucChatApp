@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <!-- Cấu hình CSP hỗ trợ WebRTC, Socket.io, FontAwesome và SimplePeer -->
   <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval' https: data: blob: wss: ws:; media-src 'self' blob: data:;">
   
   <title>Messenger Web Chat Pro</title>
@@ -12,6 +13,7 @@
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   
   <style>
+    /* Reset kích thước chuẩn chống tràn khung */
     *, *::before, *::after {
       box-sizing: border-box !important;
     }
@@ -22,6 +24,7 @@
       overflow-x: hidden;
     }
 
+    /* Toast Notification thành công */
     #toast-notification {
       position: fixed;
       top: 20px;
@@ -40,6 +43,7 @@
       transform: translateX(-50%) translateY(0);
     }
 
+    /* Định dạng Modal cân xứng */
     .modal {
       position: fixed;
       inset: 0;
@@ -62,7 +66,9 @@
       overflow-x: hidden;
     }
 
-    .modal input, .modal select, .modal textarea {
+    .modal input, 
+    .modal select, 
+    .modal textarea {
       width: 100%;
       max-width: 100%;
       padding: 10px 12px;
@@ -104,6 +110,7 @@
       cursor: pointer;
     }
 
+    /* GIAO DIỆN LỜI MỜI KẾT BẠN & NÚT ĐỒNG Ý */
     .btn-accept-friend, .btn-action.green {
       background: #0084ff !important;
       color: #ffffff !important;
@@ -115,6 +122,13 @@
       cursor: pointer;
       box-shadow: 0 2px 4px rgba(0,0,0,0.1);
       transition: transform 0.1s ease, opacity 0.2s ease;
+    }
+    .btn-accept-friend:hover, .btn-action.green:hover {
+      opacity: 0.9;
+      transform: scale(1.03);
+    }
+    .btn-accept-friend:active, .btn-action.green:active {
+      transform: scale(0.97);
     }
     .chat-item.request-item {
       background: var(--bg-card, #1e293b);
@@ -129,18 +143,10 @@
 </head>
 <body>
 
+  <!-- Toast Thông Báo -->
   <div id="toast-notification">Thành công!</div>
 
-  <!-- POPUP NHẬN CUỘC GỌI ĐẾN -->
-  <div id="incoming-call-popup" style="display: none; position: fixed; top: 30px; right: 30px; background: #1a202c; color: white; padding: 20px; border-radius: 14px; z-index: 11000; box-shadow: 0 10px 25px rgba(0,0,0,0.5); width: 300px; text-align: center; border: 1px solid #2d3748;">
-    <h3 style="margin-top: 0; margin-bottom: 8px; font-size: 18px; color: #fff;">Cuộc gọi đến...</h3>
-    <p id="caller-name-display" style="font-size: 15px; color: #a0aec0; margin-bottom: 16px; font-weight: 600;">Ai đó đang gọi</p>
-    <div style="display: flex; gap: 12px; justify-content: center;">
-      <button onclick="answerCall()" style="flex: 1; background: #38a169; color: white; border: none; padding: 10px; border-radius: 8px; font-weight: bold; cursor: pointer;"><i class="fas fa-phone"></i> Nghe</button>
-      <button onclick="rejectCall()" style="flex: 1; background: #e53e3e; color: white; border: none; padding: 10px; border-radius: 8px; font-weight: bold; cursor: pointer;"><i class="fas fa-phone-slash"></i> Từ chối</button>
-    </div>
-  </div>
-
+  <!-- MODAL XÁC NHẬN -->
   <div id="modal-confirm" class="modal hidden" style="display: none; z-index: 1200;">
     <div class="modal-content" style="text-align: center;">
       <h3 id="confirm-title" style="margin-top: 0; margin-bottom: 12px; font-size: 18px; color: #2d3748;">Xác nhận</h3>
@@ -164,14 +170,34 @@
       </div>
     </header>
 
+        <!-- THANH TÌM KIẾM -->
     <div class="search-bar-container" style="padding: 14px 16px;">
       <div class="search-input-wrapper" style="display: flex; align-items: center; background: var(--bg-secondary, #2a2f35); border: 2px solid #3182ce; border-radius: 10px; padding: 4px 12px;">
         <i class="fa-solid fa-magnifying-glass search-icon" style="font-size: 18px; margin-right: 10px; color: #3182ce;"></i>
-        <input type="text" id="search-input" placeholder="Tìm kiếm bạn bè hoặc người dùng mới..." aria-label="Tìm kiếm bạn bè" style="flex: 1; background: transparent; border: none; color: inherit; font-size: 16px; outline: none; padding: 8px 0;">
-        <button type="button" id="btn-clear-search" class="clear-btn hidden" aria-label="Xóa" style="background: none; border: none; cursor: pointer; font-size: 16px; color: #a0aec0;"><i class="fa-solid fa-xmark"></i></button>
+        
+        <!-- Đã thêm aria-label cho input -->
+        <input 
+          type="text" 
+          id="search-input" 
+          placeholder="Tìm kiếm bạn bè hoặc người dùng mới..." 
+          aria-label="Tìm kiếm bạn bè hoặc người dùng mới"
+          style="flex: 1; background: transparent; border: none; color: inherit; font-size: 16px; outline: none; padding: 8px 0;"
+        >
+        
+        <!-- Đã thêm type="button" và aria-label cho nút bấm xóa -->
+        <button 
+          type="button"
+          id="btn-clear-search" 
+          class="clear-btn hidden" 
+          aria-label="Xóa nội dung tìm kiếm"
+          style="background: none; border: none; cursor: pointer; font-size: 16px; color: #a0aec0;"
+        >
+          <i class="fa-solid fa-xmark"></i>
+        </button>
       </div>
     </div>
 
+    <!-- THANH PHÂN CHIA TAB CHAT -->
     <div id="chat-filter-tabs" style="display: flex; align-items: center; gap: 8px; padding: 10px 16px; overflow-x: auto; border-bottom: 1px solid var(--border-color, #edf2f7);">
       <button class="filter-tab-btn active" data-filter="all" style="background: var(--primary-light, #ebf8ff); color: var(--primary-color, #3182ce); border: none; padding: 6px 14px; border-radius: 16px; font-weight: 600; font-size: 13px; cursor: pointer;">Tất cả</button>
       <button class="filter-tab-btn" data-filter="unread" style="background: transparent; color: var(--text-secondary, #718096); border: none; padding: 6px 14px; border-radius: 16px; font-weight: 500; font-size: 13px; cursor: pointer;">Chưa đọc</button>
@@ -181,8 +207,10 @@
       </button>
     </div>
 
+    <!-- DANH SÁCH KHUNG CHAT & BẠN BÈ -->
     <main class="chat-list" id="chat-list"></main>
 
+    <!-- KHUNG NHẮN TIN OVERLAY -->
     <section id="chat-screen" class="chat-screen hidden">
       <header class="chat-header" style="display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; width: 100%;">
         <div style="display: flex; align-items: center; gap: 10px;">
@@ -193,16 +221,18 @@
           </div>
         </div>
         
+        <!-- NÚT GỌI THOẠI, GỌI VIDEO VÀ CÀI ĐẶT -->
         <div class="chat-header-actions" style="display: flex; align-items: center; gap: 10px;">
           <button id="btn-voice-call" class="icon-btn" title="Gọi thoại" style="cursor: pointer;"><i class="fa-solid fa-phone"></i></button>
           <button id="btn-video-call" class="icon-btn" title="Gọi Video" style="cursor: pointer;"><i class="fa-solid fa-video"></i></button>
-          <button id="btn-chat-options" class="icon-btn" title="Tùy chọn đoạn chat" style="cursor: pointer;"><i class="fa-solid fa-ellipsis"></i></button>
-          <button id="btn-group-settings" class="icon-btn hidden" title="Cài đặt nhóm" style="cursor: pointer;"><i class="fa-solid fa-gear"></i></button>
+          <button id="btn-chat-options" class="icon-btn" title="Tùy chọn đoạn chat" style="position: relative; z-index: 10; cursor: pointer;"><i class="fa-solid fa-ellipsis"></i></button>
+          <button id="btn-group-settings" class="icon-btn hidden" title="Cài đặt nhóm" style="position: relative; z-index: 10; cursor: pointer;"><i class="fa-solid fa-gear"></i></button>
         </div>
       </header>
 
       <div class="messages-viewport" id="messages-viewport"></div>
 
+      <!-- BẢNG EMOJI CONTAINER -->
       <div id="emoji-picker" class="emoji-picker hidden">
         <div class="emoji-list">
           <span>😀</span><span>😁</span><span>😂</span><span>😃</span><span>😄</span><span>😅</span>
@@ -215,15 +245,58 @@
       </div>
 
       <footer class="chat-input-bar">
-        <button type="button" id="btn-emoji-toggle" class="icon-btn" title="Chọn Emoji" aria-label="Emoji"><i class="fa-solid fa-face-smile"></i></button>
-        <label for="image-upload-input" class="icon-btn image-upload-btn" title="Gửi ảnh" aria-label="Gửi ảnh"><i class="fa-solid fa-image"></i></label>
-        <input type="file" id="image-upload-input" accept="image/*" class="hidden" aria-label="Tải ảnh">
-        <input type="text" id="msg-input" placeholder="Nhập tin nhắn..." aria-label="Nhập tin nhắn">
-        <button type="button" class="icon-btn send-btn" id="btn-send" title="Gửi" aria-label="Gửi"><i class="fa-solid fa-paper-plane"></i></button>
-        <div id="quick-reaction-trigger" class="quick-reaction-btn" title="Gửi cảm xúc nhanh" role="button" tabindex="0" aria-label="Cảm xúc nhanh" style="font-size: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center; min-width: 36px; height: 36px; user-select: none;">❤️</div>
+        <!-- Nút mở emoji -->
+        <button 
+          type="button" 
+          id="btn-emoji-toggle" 
+          class="icon-btn" 
+          title="Chọn Emoji" 
+          aria-label="Chọn Emoji"
+        >
+          <i class="fa-solid fa-face-smile"></i>
+        </button>
+
+        <!-- Nút tải ảnh -->
+        <label for="image-upload-input" class="icon-btn image-upload-btn" title="Gửi ảnh" aria-label="Gửi ảnh">
+          <i class="fa-solid fa-image"></i>
+        </label>
+        <input type="file" id="image-upload-input" accept="image/*" class="hidden" aria-label="Tải ảnh lên">
+        
+        <!-- Ô nhập tin nhắn -->
+        <input 
+          type="text" 
+          id="msg-input" 
+          placeholder="Nhập tin nhắn..." 
+          aria-label="Nhập tin nhắn"
+        >
+
+        <!-- Nút gửi tin nhắn -->
+        <button 
+          type="button" 
+          class="icon-btn send-btn" 
+          id="btn-send" 
+          title="Gửi tin nhắn" 
+          aria-label="Gửi tin nhắn"
+        >
+          <i class="fa-solid fa-paper-plane"></i>
+        </button>
+        
+        <!-- Nút thả thả tim / cảm xúc nhanh -->
+        <div 
+          id="quick-reaction-trigger" 
+          class="quick-reaction-btn" 
+          title="Gửi cảm xúc nhanh" 
+          role="button" 
+          tabindex="0" 
+          aria-label="Gửi cảm xúc nhanh" 
+          style="font-size: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center; min-width: 36px; height: 36px; user-select: none;"
+        >
+          ❤️
+        </div>
       </footer>
     </section>
 
+    <!-- MODAL TẠO NHÓM -->
     <div id="modal-group" class="modal hidden">
       <div class="modal-group-content">
        <h3 style="margin-top: 0; margin-bottom: 16px; text-align: center; color: #2d3748;">Tạo Nhóm Trò Chuyện</h3>
@@ -235,7 +308,7 @@
         <label style="font-weight: bold; font-size: 13px; color: #4a5568; display: block;">Tên Nhóm</label>
         <input type="text" id="group-name-input" placeholder="Nhập tên nhóm...">
           
-        <label style="font-weight: bold; font-size: 13px; color: #4a5568; display: block; margin-bottom: 4px;">Thêm Thành Viên</label>
+        <label style="font-weight: bold; font-size: 13px; color: #4a5568; display: block; margin-bottom: 4px;">Thêm Thành Viên (Từ bạn bè)</label>
         <div id="group-members-list" class="members-checkbox-list"></div>
 
         <div class="modal-actions">
@@ -245,23 +318,39 @@
       </div>
     </div>
 
+    <!-- MODAL QUẢN LÝ NHÓM -->
     <div id="modal-group-settings" class="modal hidden">
       <div class="modal-group-content" style="max-width: 450px;">
         <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
           <h3 style="margin: 0;">Quản Lý Nhóm</h3>
           <button id="btn-close-group-settings" style="background:none; border:none; cursor:pointer; font-size: 18px; color:#a0aec0;"><i class="fa-solid fa-xmark"></i></button>
         </div>
+        
         <div style="display: flex; gap: 10px; margin-bottom: 16px;" id="group-actions-container">
           <button id="btn-leave-group" style="flex:1; background: #ed8936; color: white; border: none; padding: 10px; border-radius: 8px; font-weight: bold; cursor: pointer;">Rời Nhóm</button>
           <button id="btn-delete-group" class="hidden" style="flex:1; background: #e53e3e; color: white; border: none; padding: 10px; border-radius: 8px; font-weight: bold; cursor: pointer;">Giải Tán Nhóm</button>
         </div>
+
         <div style="display:flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e2e8f0; padding-bottom: 5px; margin-bottom: 10px;">
           <h4 style="margin: 0;">Thành Viên (<span id="setting-member-count">0</span>)</h4>
+          <button id="btn-show-add-member" style="background: #3182ce; color: white; border: none; padding: 4px 10px; border-radius: 4px; font-size: 12px; cursor: pointer; font-weight: bold;">
+            <i class="fa-solid fa-plus"></i> Thêm
+          </button>
+        </div>
+
+        <div id="add-member-section" class="hidden" style="margin-bottom: 15px; padding: 12px; background: #f7fafc; border-radius: 8px; border: 1px solid #e2e8f0;">
+          <div style="font-size: 13px; font-weight: bold; margin-bottom: 10px; color: #2d3748;">Chọn bạn bè để thêm:</div>
+          <div id="add-member-list" style="max-height: 120px; overflow-y: auto; margin-bottom: 10px;"></div>
+          <div style="display: flex; gap: 8px;">
+             <button id="btn-confirm-add-member" style="flex:1; background: #38a169; color: white; border: none; padding: 8px; border-radius: 4px; font-weight: bold; cursor: pointer;">Xác Nhận</button>
+             <button id="btn-cancel-add-member" style="flex:1; background: #cbd5e0; color: #333; border: none; padding: 8px; border-radius: 4px; font-weight: bold; cursor: pointer;">Hủy</button>
+          </div>
         </div>
         <div id="setting-members-list" class="members-checkbox-list" style="max-height: 250px;"></div>
       </div>
     </div>
 
+    <!-- MODAL XÁC THỰC -->
     <div id="modal-auth" class="modal">
       <div class="modal-content" style="max-width: 400px;">
         <div class="auth-tabs" style="display: flex; margin-bottom: 20px; gap: 10px;">
@@ -270,9 +359,34 @@
         </div>
         
         <form id="form-login" class="auth-form" onsubmit="return false;">
-          <input type="text" id="login-username" placeholder="Tên tài khoản..." required autocomplete="username">
-          <input type="password" id="login-password" placeholder="Mật khẩu..." required autocomplete="current-password">
-          <button type="submit" class="btn-primary" style="width:100%; background:#3182ce; color:white; border:none; padding:14px; border-radius:8px; font-weight:bold; cursor:pointer;">Đăng Nhập</button>
+          <!-- Ô nhập tên tài khoản -->
+          <input 
+            type="text" 
+            id="login-username" 
+            placeholder="Tên tài khoản..." 
+            aria-label="Tên tài khoản" 
+            required 
+            autocomplete="username"
+          >
+          
+          <!-- Ô nhập mật khẩu -->
+          <input 
+            type="password" 
+            id="login-password" 
+            placeholder="Mật khẩu..." 
+            aria-label="Mật khẩu" 
+            required 
+            autocomplete="current-password"
+          >
+          
+          <!-- Nút đăng nhập -->
+          <button 
+            type="submit" 
+            class="btn-primary" 
+            style="width:100%; background:#3182ce; color:white; border:none; padding:14px; border-radius:8px; font-weight:bold; cursor:pointer;"
+          >
+            Đăng Nhập
+          </button>
         </form>
 
         <form id="form-register" class="auth-form hidden" onsubmit="return false;">
@@ -291,6 +405,7 @@
       </div>
     </div>
 
+    <!-- MODAL CÀI ĐẶT TRÒ CHUYỆN 1-1 -->
     <div id="modal-chat-settings" class="modal hidden">
       <div class="modal-group-content" style="max-width: 400px;">
         <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
@@ -310,6 +425,30 @@
       </div>
     </div>
 
+    <!-- MODAL BÁO CÁO VI PHẠM -->
+    <div id="modal-report" class="modal hidden" style="z-index:1100;">
+      <div class="modal-group-content" style="max-width: 400px;">
+        <h3 style="margin-top: 0; text-align: center; color: #2d3748; margin-bottom: 16px; font-size: 20px;">Báo cáo vi phạm</h3>
+        
+        <label style="font-weight: 600; font-size: 13px; color: #4a5568; display: block;">Chọn lý do báo cáo:</label>
+        <select id="report-reason-select">
+          <option value="Spam / Tin nhắn rác">Spam tin nhắn</option>
+          <option value="Ngôn từ gây thù ghét / Lăng mạ">Ngôn từ gây thù ghét / Lăng mạ</option>
+          <option value="Nội dung không phù hợp">Nội dung không phù hợp</option>
+          <option value="Giả mạo tài khoản">Giả mạo tài khoản</option>
+        </select>
+
+        <label style="font-weight: 600; font-size: 13px; color: #4a5568; display: block;">Mô tả chi tiết:</label>
+        <textarea id="report-description-input" placeholder="Nhập chi tiết vi phạm (tùy chọn)..."></textarea>
+
+        <div class="modal-actions">
+          <button id="btn-submit-report" style="flex:1; background: #e53e3e; color: white; border: none; padding: 12px; border-radius: 8px; font-weight: bold; cursor: pointer;">Gửi báo cáo</button>
+          <button id="btn-cancel-report" style="flex:1; background: #cbd5e0; color: #2d3748; border: none; padding: 12px; border-radius: 8px; font-weight: bold; cursor: pointer;">Hủy</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL ĐỔI BIỆT DANH -->
     <div id="modal-nickname" class="modal hidden">
       <div class="modal-content" style="max-width: 340px;">
         <h3 style="margin-top: 0; margin-bottom: 12px; font-size: 16px;">Đổi biệt danh</h3>
@@ -322,6 +461,7 @@
       </div>
     </div>
 
+    <!-- MODAL TÙY CHỈNH CHỦ ĐỀ -->
     <div id="modal-theme" class="modal hidden">
       <div class="modal-content" style="max-width: 340px;">
         <h3 style="margin-top: 0; margin-bottom: 15px; font-size: 18px; color: var(--text-main);">Chọn chủ đề đoạn chat</h3>
@@ -337,33 +477,47 @@
 
   </div>
 
+  <!-- Giao diện cuộc gọi (Voice/Video Call) -->
   <div id="video-call-container" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: #0f0f0f; z-index: 9999; flex-direction: column; justify-content: space-between; align-items: center; padding: 40px 0;">
+      
+      <!-- Video hiển thị từ người bên kia (Remote Video) hoặc màn hình chờ -->
       <div style="position: relative; width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center;">
+          
+          <!-- Video của người bên kia -->
           <video id="remote-video" autoplay playsinline style="width: 100%; height: 100%; object-fit: cover; position: absolute; top: 0; left: 0; z-index: 1;"></video>
           
+          <!-- Giao diện chờ khi đang gọi (Hiện Avatar + Tên + Đang gọi...) -->
           <div id="call-waiting-view" style="position: relative; z-index: 2; display: flex; flex-direction: column; align-items: center; justify-content: center;">
               <img id="call-target-avatar" src="https://via.placeholder.com/100" alt="Avatar" style="width: 110px; height: 110px; border-radius: 50%; object-fit: cover; margin-bottom: 16px; border: 3px solid rgba(255,255,255,0.1); box-shadow: 0 8px 24px rgba(0,0,0,0.5);">
               <h2 id="call-target-name" style="color: #ffffff; font-size: 24px; font-weight: 600; margin-bottom: 6px;">Tên người nhận</h2>
               <p id="call-status-text" style="color: #9e9e9e; font-size: 15px; font-weight: 400;">Đang gọi...</p>
           </div>
 
+          <!-- Video nhỏ của chính mình (Local Video - hiển thị góc trên bên phải khi kết nối thành công) -->
           <video id="local-video" autoplay muted playsinline style="position: absolute; top: 30px; right: 30px; width: 160px; height: 110px; object-fit: cover; border-radius: 12px; z-index: 3; display: none; border: 2px solid rgba(255,255,255,0.2); box-shadow: 0 4px 12px rgba(0,0,0,0.4);"></video>
       </div>
 
+      <!-- Thanh công cụ điều khiển ở đáy màn hình (Giống hình mẫu) -->
       <div style="position: absolute; bottom: 40px; display: flex; gap: 16px; z-index: 10; align-items: center;">
+          <button class="call-action-btn" title="Chia sẻ màn hình" style="width: 50px; height: 50px; border-radius: 50%; background: #2c2c2c; border: none; color: white; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 18px;"><i class="fas fa-desktop"></i></button>
+          <button class="call-action-btn" title="Thêm người" style="width: 50px; height: 50px; border-radius: 50%; background: #2c2c2c; border: none; color: white; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 18px;"><i class="fas fa-user-plus"></i></button>
           <button class="call-action-btn" title="Bật/Tắt Camera" id="btn-toggle-cam" onclick="toggleVideoTrack()" style="width: 50px; height: 50px; border-radius: 50%; background: #2c2c2c; border: none; color: white; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 18px;"><i class="fas fa-video"></i></button>
           <button class="call-action-btn" title="Bật/Tắt Mic" id="btn-toggle-mic" onclick="toggleAudioTrack()" style="width: 50px; height: 50px; border-radius: 50%; background: #2c2c2c; border: none; color: white; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 18px;"><i class="fas fa-microphone"></i></button>
+          <!-- Nút kết thúc cuộc gọi màu đỏ -->
           <button class="call-action-btn" title="Kết thúc cuộc gọi" onclick="endCall()" style="width: 60px; height: 60px; border-radius: 50%; background: #ff3b30; border: none; color: white; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 22px;"><i class="fas fa-phone-slash"></i></button>
       </div>
   </div>
 
+  <!-- THƯ VIỆN & SCRIPTS XỬ LÝ -->
   <script src="/socket.io/socket.io.js"></script>
+  <!-- Thư viện Buffer Polyfill -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/buffer/6.0.3/buffer.min.js"></script>
   <script>
     if (typeof buffer !== 'undefined' && buffer.Buffer) {
       window.Buffer = buffer.Buffer;
     }
   </script>
+  <!-- Thư viện Simple-Peer -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/simple-peer/9.11.1/simplepeer.min.js"></script>
   <script src="app.js"></script>
 </body>
