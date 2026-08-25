@@ -839,17 +839,17 @@ async function startVideoCall(targetUserId, isVideo) {
     });
 
     peer.on('signal', (signalData) => {
-      if (!targetUserId) {
-        console.error('[CALL] Missing target user ID');
+      const callData = incomingCallDataGlobal;
+
+      if (!callData?.fromSocketId) {
+        console.error('[CALL] Thiếu fromSocketId');
+        endCallCleanUp();
         return;
       }
 
-      socket.emit('call_user', {
-        targetUserId,
-        signal: signalData,
-        isVideo,
-        callerName: currentUser?.username || 'Người dùng',
-        callerAvatar: currentUser?.avatar || ''
+      socket.emit('call_accepted', {
+        toSocketId: callData.fromSocketId,
+        signal: signalData
       });
     });
 
@@ -1596,17 +1596,17 @@ function answerCall() {
     });
 
     peer.on('signal', (signalData) => {
-      if (!targetUserId) {
-        console.error('[CALL] Missing target user ID');
+      const callData = incomingCallDataGlobal;
+
+      if (!callData?.fromSocketId) {
+        console.error('[CALL] Thiếu fromSocketId');
+        endCallCleanUp();
         return;
       }
 
-      socket.emit('call_user', {
-        targetUserId,
-        signal: signalData,
-        isVideo,
-        callerName: currentUser?.username || 'Người dùng',
-        callerAvatar: currentUser?.avatar || ''
+      socket.emit('call_accepted', {
+        toSocketId: callData.fromSocketId,
+        signal: signalData
       });
     });
 
@@ -1687,3 +1687,15 @@ window.rejectCall = rejectCall;
 window.endCall = endCall;
 window.toggleAudioTrack = toggleAudioTrack;
 window.toggleVideoTrack = toggleVideoTrack;
+
+socket.on('connect', () => {
+  console.log('[SOCKET] Connected:', socket.id);
+});
+
+socket.on('disconnect', (reason) => {
+  console.warn('[SOCKET] Disconnected:', reason);
+});
+
+socket.on('call_error', (message) => {
+  showToast(message || 'Không thể thực hiện cuộc gọi', false);
+});
