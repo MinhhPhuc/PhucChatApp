@@ -386,8 +386,41 @@
     </div>
 
   </div>
-
+  
   <script src="/socket.io/socket.io.js"></script>
   <script src="app.js"></script>
+    <!-- Thêm thư viện Simple-Peer wrapper cho WebRTC -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/simple-peer/9.11.1/simplepeer.min.js"></script>
+
+  <!-- GIAO DIỆN MÀN HÌNH CUỘC GỌI (Ẩn mặc định) -->
+  <div id="video-call-container" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.9); z-index: 9999; display: flex; justify-content: center; align-items: center; flex-direction: column;">
+      <div style="position: relative; width: 90%; max-width: 800px; aspect-ratio: 16/9; background: #222; border-radius: 12px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
+          <!-- Video của người kia -->
+          <video id="remote-video" autoplay playsinline style="width: 100%; height: 100%; object-fit: cover;"></video>
+          <!-- Video của mình (nhỏ ở góc) -->
+          <video id="local-video" autoplay muted playsinline style="position: absolute; bottom: 20px; right: 20px; width: 120px; height: 160px; object-fit: cover; border: 3px solid white; border-radius: 10px; background: #000;"></video>
+      </div>
+      
+      <div style="margin-top: 25px; display: flex; gap: 20px;">
+          <button onclick="endCall()" style="background: #e53e3e; color: white; padding: 15px 30px; border: none; border-radius: 50px; font-size: 16px; font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 10px;">
+              <i class="fa-solid fa-phone-slash"></i> Kết thúc cuộc gọi
+          </button>
+      </div>
+  </div>
+
+  <!-- POPUP KHI CÓ CUỘC GỌI ĐẾN (Ẩn mặc định) -->
+  <div id="incoming-call-popup" style="display: none; position: fixed; top: 20px; right: 20px; background: white; padding: 20px 25px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); z-index: 10000; text-align: center; border-left: 5px solid #38a169;">
+      <h4 style="margin: 0 0 10px 0; color: #2d3748;"><i class="fa-solid fa-video" style="color: #38a169;"></i> Cuộc gọi Video đến</h4>
+      <p style="margin-bottom: 15px; font-size: 15px;"><b id="caller-name-display" style="color: #2b6cb0;">Ai đó</b> đang gọi cho bạn...</p>
+      <div style="display: flex; gap: 10px; justify-content: center;">
+          <button onclick="answerCall()" style="background: #38a169; color: white; padding: 8px 15px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold;">
+              Nghe
+          </button>
+          <button onclick="rejectCall()" style="background: #e53e3e; color: white; padding: 8px 15px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold;">
+              Từ chối
+          </button>
+      </div>
+  </div>
+
 </body>
 </html>

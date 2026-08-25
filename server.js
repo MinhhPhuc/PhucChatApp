@@ -200,6 +200,29 @@ app.use(express.static(path.join(__dirname, 'public')));
 io.on('connection', (socket) => {
   let currentUser = null;
 
+  // --- LOGIC VIDEO CALL ---
+
+  //  Người gọi phát tín hiệu yêu cầu kết nối
+  socket.on("call_user", (data) => {
+      // data gồm: userToCall (ID người nhận), signalData (mã SDP), callerName (tên người gọi)
+      io.to(data.userToCall).emit("incoming_call", { 
+          signal: data.signalData, 
+          from: socket.id, 
+          name: data.callerName 
+      });
+  });
+
+  //  Người nhận chấp nhận cuộc gọi và gửi lại tín hiệu
+  socket.on("answer_call", (data) => {
+      // data gồm: to (ID người gọi gốc), signal (mã SDP trả lời)
+      io.to(data.to).emit("call_accepted", data.signal);
+  });
+
+  //  Một trong hai người cúp máy
+  socket.on("end_call", (data) => {
+      io.to(data.to).emit("call_ended");
+  });
+  
   // Cho phép Admin join vào phòng quản trị riêng
   socket.on('join_admin_room', (userData) => {
     if (userData && userData.isAdmin) {

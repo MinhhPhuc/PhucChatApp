@@ -716,6 +716,148 @@ socket.on('messages:history', ({ roomId, messages }) => {
   renderChatList();
 });
 
+let localStream = null;
+let peer = null;
+let currentCaller = null; 
+let callTargetId = null;
+
+const videoContainer = document.getElementById("video-call-container");
+const incomingPopup = document.getElementById("incoming-call-popup");
+const localVideo = document.getElementById("local-video");
+const remoteVideo = document.getElementById("remote-video");
+
+// Cấu hình STUN Server (giúp kết nối xuyên tường lửa)
+const peerConfig = {
+    iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:global.stun.twilio.com:3478' }
+    ]
+};
+
+// --- HÀM 1: BẮT ĐẦU GỌI AI ĐÓ ---
+// Gọi hàm này khi bấm nút [Gọi Video] trong khung chat. Ví dụ: onclick="startVideoCall('ID_nguoi_nhan')"
+async function startVideoCall(targetUserId) {
+    callTargetId = targetUserId;
+    try {
+        // Yêu cầu quyền mở Camera & Micro
+        localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+        localVideo.srcObject = localStream;
+        
+        // Hiện màn hình gọi
+        videoContainer.style.display = 'flex';
+
+        // Khởi tạo người gọi (initiator = true)
+        peer = new SimplePeer({
+            initiator: true,
+            stream: localStream,
+            config: peerConfig
+        });
+
+        // Khi có tín hiệu mã hóa, gửi qua Socket cho người nhận
+        peer.on('signal', (data) => {
+            socket.emit('call_user', {
+                userToCall: targetUserId,
+                signalData: data,
+                callerName: myUsername // Biến lưu tên của bạn (cần điều chỉnh theo code hiện tại của bạn)
+            });
+        });
+
+        // Khi nhận được luồng Video của người kia
+        peer.on('stream', (stream) => {
+            remoteVideo.srcObject = stream;
+        });
+
+        peer.on('close', destroyCall);
+
+    } catch (err) {
+        alert("Không thể truy cập Camera/Microphone! Hãy kiểm tra lại quyền.");
+        console.error(err);
+    }
+}
+
+// --- HÀM 2: LẮNG NGHE CUỘC GỌI ĐẾN ---
+socket.on("incoming_call", (data) => {
+    currentCaller = data;
+    document.getElementById("caller-name-display").innerText = data.name;
+    incomingPopup.style.display = 'block'; // Hiện popup
+});
+
+// --- HÀM 3: NHẤN NÚT NGHE ---
+async function answerCall() {
+    incomingPopup.style.display = 'none';
+    callTargetId = currentCaller.from;
+
+    try {
+        localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+        localVideo.srcObject = localStream;
+        videoContainer.style.display = 'flex';
+
+        peer = new SimplePeer({
+            initiator: false, // Người nhận
+            stream: localStream,
+            config: peerConfig
+        });
+
+        peer.on('signal', (data) => {
+            socket.emit('answer_call', {
+                signal: data,
+                to: currentCaller.from
+            });
+        });
+
+        peer.on('stream', (stream) => {
+            remoteVideo.srcObject = stream;
+        });
+
+        // Xử lý mã SDP của người gọi tới
+        peer.signal(currentCaller.signal);
+        
+        peer.on('close', destroyCall);
+
+    } catch (err) {
+        alert("Không thể truy cập Camera/Microphone!");
+    }
+}
+
+// --- HÀM 4: XỬ LÝ KHI NGƯỜI KIA CHẤP NHẬN ---
+socket.on("call_accepted", (signal) => {
+    if (peer) {
+        peer.signal(signal); // Hoàn tất bắt tay WebRTC
+    }
+});
+
+// --- HÀM 5: KẾT THÚC / TỪ CHỐI CUỘC GỌI ---
+function rejectCall() {
+    incomingPopup.style.display = 'none';
+    socket.emit('end_call', { to: currentCaller.from });
+    currentCaller = null;
+}
+
+function endCall() {
+    socket.emit('end_call', { to: callTargetId });
+    destroyCall();
+}
+
+socket.on("call_ended", () => {
+    destroyCall();
+    alert("Cuộc gọi đã kết thúc.");
+});
+
+// Dọn dẹp Video & Camera
+function destroyCall() {
+    if (peer) {
+        peer.destroy();
+        peer = null;
+    }
+    if (localStream) {
+        localStream.getTracks().forEach(track => track.stop()); // Tắt đèn Camera
+        localStream = null;
+    }
+    videoContainer.style.display = 'none';
+    incomingPopup.style.display = 'none';
+    callTargetId = null;
+}
+
 // Xóa đoạn chat thành công
 socket.on('messages:cleared_me', ({ roomId }) => {
   if (state.activeRoomId === roomId) {
