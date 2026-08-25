@@ -510,9 +510,14 @@
 
   <!-- THƯ VIỆN & SCRIPTS XỬ LÝ -->
   <script src="/socket.io/socket.io.js"></script>
+  <!-- Thư viện Buffer Polyfill -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/buffer/6.0.3/buffer.min.js"></script>
-  <script>window.Buffer = buffer.Buffer;</script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/simple-peer/9.11.1/simplepeer.min.js"></script>
+  <script>
+    if (typeof buffer !== 'undefined' && buffer.Buffer) {
+      window.Buffer = buffer.Buffer;
+    }
+  </script>
+  <!-- Thư viện Simple-Peer -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/simple-peer/9.11.1/simplepeer.min.js"></script>
   <script src="app.js"></script>
 </body>

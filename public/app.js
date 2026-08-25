@@ -1545,3 +1545,56 @@ document.addEventListener('click', (e) => {
     return;
   }
 });
+
+// ==========================================
+// CÁC HÀM ĐIỀU KHIỂN THIẾT BỊ TRONG CUỘC GỌI
+// ==========================================
+
+let isAudioMuted = false;
+let isVideoMuted = false;
+
+// 1. Bật / Tắt Micro
+function toggleAudioTrack() {
+  if (localStream) {
+    const audioTrack = localStream.getAudioTracks()[0];
+    if (audioTrack) {
+      isAudioMuted = !isAudioMuted;
+      audioTrack.enabled = !isAudioMuted;
+      
+      // Đổi màu nút bấm để nhận biết trạng thái (Đỏ khi tắt, xám/bình thường khi bật)
+      const btn = document.getElementById('btn-toggle-mic');
+      if (btn) {
+        btn.style.background = isAudioMuted ? '#ff3b30' : '#2c2c2c';
+      }
+    }
+  }
+}
+
+// 2. Bật / Tắt Camera
+function toggleVideoTrack() {
+  if (localStream) {
+    const videoTrack = localStream.getVideoTracks()[0];
+    if (videoTrack) {
+      isVideoMuted = !isVideoMuted;
+      videoTrack.enabled = !isVideoMuted;
+      
+      const btn = document.getElementById('btn-toggle-cam');
+      if (btn) {
+        btn.style.background = isVideoMuted ? '#ff3b30' : '#2c2c2c';
+      }
+
+      // Ẩn/hiện video của chính mình trên giao diện
+      const localVideoEl = document.getElementById('local-video');
+      if (localVideoEl) {
+        localVideoEl.style.display = isVideoMuted ? 'none' : 'block';
+      }
+    }
+  }
+}
+
+// Đảm bảo các hàm đều được gán toàn cục để HTML onclick gọi được không bị lỗi ReferenceError
+window.toggleAudioTrack = toggleAudioTrack;
+window.toggleVideoTrack = toggleVideoTrack;
+window.answerCall = answerCall;
+window.rejectCall = rejectCall;
+window.endCall = endCall;
