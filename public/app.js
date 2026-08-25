@@ -839,16 +839,11 @@ async function startVideoCall(targetUserId, isVideo) {
     });
 
     peer.on('signal', (signalData) => {
-      if (!targetUserId) {
-        console.error('[CALL] Thiếu targetUserId');
-        return;
-      }
-
       socket.emit('call_user', {
         targetUserId,
         signal: signalData,
         isVideo,
-        callerName: currentUser?.username || 'Người dùng',
+        callerName: currentUser?.username || 'Ai đó',
         callerAvatar: currentUser?.avatar || ''
       });
     });
@@ -1596,16 +1591,11 @@ function answerCall() {
     });
 
     peer.on('signal', (signalData) => {
-      if (!targetUserId) {
-        console.error('[CALL] Thiếu targetUserId');
-        return;
-      }
-
       socket.emit('call_user', {
         targetUserId,
         signal: signalData,
         isVideo,
-        callerName: currentUser?.username || 'Người dùng',
+        callerName: currentUser?.username || 'Ai đó',
         callerAvatar: currentUser?.avatar || ''
       });
     });
@@ -1687,15 +1677,3 @@ window.rejectCall = rejectCall;
 window.endCall = endCall;
 window.toggleAudioTrack = toggleAudioTrack;
 window.toggleVideoTrack = toggleVideoTrack;
-
-socket.on('connect', () => {
-  console.log('[SOCKET] Connected:', socket.id);
-});
-
-socket.on('disconnect', (reason) => {
-  console.warn('[SOCKET] Disconnected:', reason);
-});
-
-socket.on('call_error', (message) => {
-  showToast(message || 'Không thể thực hiện cuộc gọi', false);
-});
