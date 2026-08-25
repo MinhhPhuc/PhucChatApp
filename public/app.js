@@ -840,12 +840,9 @@ async function startVideoCall(targetUserId, isVideo) {
 
     peer.on('signal', (signalData) => {
       if (typeof socket !== 'undefined') {
-        socket.emit('call_user', {
-          userToCall: targetUserId,
-          signalData: signalData,
-          callerName: currentUser?.username || 'Người dùng',
-          callerAvatar: currentUser?.avatar || '',
-          isVideo: isVideo
+        socket.emit('answer_call', {
+          signal: signalData,
+          toSocketId: incomingCallDataGlobal.fromSocketId
         });
       }
     });
@@ -1623,11 +1620,20 @@ function answerCall() {
 
 function rejectCall() {
   const popup = document.getElementById('incoming-call-popup');
-  if (popup) popup.style.display = 'none';
-  if (incomingCallDataGlobal && typeof socket !== 'undefined') {
-    socket.emit('reject_call', { to: incomingCallDataGlobal.from });
+
+  if (popup) {
+    popup.style.display = 'none';
+    popup.classList.add('hidden');
   }
+
+  if (incomingCallDataGlobal && typeof socket !== 'undefined') {
+    socket.emit('reject_call', {
+      toSocketId: incomingCallDataGlobal.fromSocketId
+    });
+  }
+
   incomingCallDataGlobal = null;
+  currentCallTargetId = null;
 }
 
 function endCall() {
