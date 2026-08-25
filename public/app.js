@@ -793,7 +793,7 @@ async function startVideoCall(targetUserId, isVideo) {
   // (Bạn có thể điều chỉnh cách lấy này cho khớp với cấu trúc DOM lưu thông tin user của bạn)
   const activeChatHeader = document.querySelector('.chat-header') || {};
   const targetName = activeChatHeader.dataset?.username || 'Người dùng';
-  const targetAvatar = activeChatHeader.dataset?.avatar || 'https://via.placeholder.com/100';
+  const targetAvatar = 'c:\Users\MinhPhuc\Pictures\Saved Pictures\hinh-nen-may-tinh-vo-tri-2.jpg'; // Thay bằng một link ảnh bất kỳ hoặc ảnh tĩnh của bạn
 
   // Cập nhật thông tin lên màn hình chờ gọi
   const nameEl = document.getElementById('call-target-name');
