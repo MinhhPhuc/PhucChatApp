@@ -3,6 +3,7 @@ const http = require('http');
 const { Server } = require('socket.io');
 const path = require('path');
 const fs = require('fs');
+const DB_PATH = path.join(__dirname, 'database.json');
 const ngrok = require('ngrok');
 
 const app = express();
@@ -76,28 +77,47 @@ let DB = {
 
 function loadDB() {
   try {
-    if (fs.existsSync('database.json')) {
-      const data = fs.readFileSync('database.json', 'utf8');
+    if (fs.existsSync(DB_PATH)) {
+      const data = fs.readFileSync(DB_PATH, 'utf8');
+
       DB = JSON.parse(data, reviver);
+
+      if (!DB.accounts) DB.accounts = new Map();
+      if (!DB.users) DB.users = new Map();
+      if (!DB.friendRequests) DB.friendRequests = new Map();
+      if (!DB.friends) DB.friends = new Map();
+      if (!DB.messages) DB.messages = new Map();
+      if (!DB.groups) DB.groups = new Map();
       if (!DB.clearedChats) DB.clearedChats = new Map();
       if (!DB.reports) DB.reports = new Map();
       if (!DB.appeals) DB.appeals = new Map();
-      console.log('✅ Đã nạp dữ liệu cũ từ database.json');
-      
-      DB.users.forEach(user => user.status = 'offline');
+
+      console.log(`✅ Đã nạp database từ: ${DB_PATH}`);
+
+      DB.users.forEach(user => {
+        user.status = 'offline';
+      });
     } else {
-      console.log('⚠️ Không tìm thấy database.json, sẽ tạo mới khi có dữ liệu.');
+      console.log(`⚠️ Chưa có database, sẽ tạo: ${DB_PATH}`);
     }
   } catch (err) {
-    console.error('❌ Lỗi khi đọc file Database:', err);
+    console.error('❌ Lỗi đọc database:', err);
   }
 }
 
 function saveDB() {
   try {
-    fs.writeFileSync('database.json', JSON.stringify(DB, replacer, 2));
+    const data = JSON.stringify(DB, replacer, 2);
+
+    fs.writeFileSync(DB_PATH, data, 'utf8');
+
+    console.log(
+      `💾 Database đã lưu: ${DB_PATH} | ${Buffer.byteLength(data, 'utf8')} bytes`
+    );
   } catch (err) {
-    console.error('❌ Lỗi khi lưu file Database:', err);
+    console.error('❌ KHÔNG THỂ LƯU DATABASE');
+    console.error('Path:', DB_PATH);
+    console.error('Error:', err);
   }
 }
 
