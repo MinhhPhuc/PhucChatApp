@@ -3,7 +3,6 @@ const http = require('http');
 const { Server } = require('socket.io');
 const path = require('path');
 const fs = require('fs');
-const ngrok = require('ngrok');
 
 const app = express();
 const helmet = require('helmet');
@@ -22,7 +21,6 @@ app.use(
 
 const server = http.createServer(app);
 
-// --- CẤU HÌNH CONTENT SECURITY POLICY (CSP) ---
 app.use((req, res, next) => {
   res.setHeader(
     "Content-Security-Policy",
@@ -36,18 +34,16 @@ app.use((req, res, next) => {
 
 const io = new Server(server, { 
   cors: { origin: "*" },
-  maxHttpBufferSize: 1e7 // 10MB
+  maxHttpBufferSize: 1e7
 });
 
 app.use(express.json({ limit: '10mb' }));
+app.use(express.static(path.join(__dirname, 'public')));
 
 app.get('/admin', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'admin.html'));
 });
 
-// ==========================================
-// HỆ THỐNG LƯU TRỮ DATABASE TỰ ĐỘNG
-// ==========================================
 function replacer(key, value) {
   if (value instanceof Map) return { dataType: 'Map', value: Array.from(value.entries()) };
   if (value instanceof Set) return { dataType: 'Set', value: Array.from(value) };
@@ -83,7 +79,6 @@ function loadDB() {
       if (!DB.reports) DB.reports = new Map();
       if (!DB.appeals) DB.appeals = new Map();
       console.log('✅ Đã nạp dữ liệu cũ từ database.json');
-      
       DB.users.forEach(user => user.status = 'offline');
     } else {
       console.log('⚠️ Không tìm thấy database.json, sẽ tạo mới khi có dữ liệu.');
@@ -103,7 +98,6 @@ function saveDB() {
 
 loadDB();
 
-// --- API QUẢN TRỊ VIÊN (ADMIN) ---
 app.get('/api/admin/data', (req, res) => {
   let totalMessages = 0;
   DB.messages.forEach(msgs => { totalMessages += msgs.length; });
@@ -162,32 +156,6 @@ app.post('/api/admin/user/:id/lift-restriction', (req, res) => {
   res.status(404).json({ success: false, message: 'Không tìm thấy người dùng!' });
 });
 
-app.post('/api/admin/user/:id/reduce-restriction', (req, res) => {
-  const userId = req.params.id;
-  const { hours } = req.body;
-  const userObj = DB.users.get(userId);
-  if (userObj && userObj.restrictedUntil) {
-    const reduceMs = (hours || 0) * 60 * 60 * 1000;
-    userObj.restrictedUntil = Math.max(Date.now(), userObj.restrictedUntil - reduceMs);
-    if (userObj.restrictedUntil <= Date.now()) {
-      delete userObj.restrictedUntil;
-    }
-    saveDB();
-    return res.json({ success: true, message: `Đã giảm ${hours} giờ hạn chế thành công!` });
-  }
-  res.status(404).json({ success: false, message: 'Không tìm thấy người dùng hoặc tài khoản không có hạn chế!' });
-});
-
-app.delete('/api/admin/report/:id', (req, res) => {
-  const reportId = req.params.id;
-  if (DB.reports.has(reportId)) {
-    DB.reports.delete(reportId);
-    saveDB();
-    return res.json({ success: true, message: 'Đã xóa báo cáo!' });
-  }
-  res.status(404).json({ success: false, message: 'Không tìm thấy báo cáo!' });
-});
-
 app.delete('/api/admin/user/:id', (req, res) => {
   const userId = req.params.id;
   let targetUsername = null;
@@ -202,550 +170,116 @@ app.delete('/api/admin/user/:id', (req, res) => {
   if (targetUsername) {
     DB.accounts.delete(targetUsername);
     DB.users.delete(userId);
-    DB.friends.delete(userId);
-    DB.groups.forEach(group => { group.members.delete(userId); });
-
-    io.to(userId).emit('auth:forced_logout');
     saveDB();
-    return res.json({ success: true, message: 'Đã xóa tài khoản thành công!' });
+    io.to(userId).emit('auth:forced_logout');
+    return res.json({ success: true, message: 'Đã xóa người dùng thành công!' });
   }
-
   res.status(404).json({ success: false, message: 'Không tìm thấy người dùng!' });
 });
 
-app.use(express.static(path.join(__dirname, 'public')));
-
-function syncUserData(target, userId) {
-  if (!target || !userId) return;
-
-  const friendSet = DB.friends.get(userId) || new Set();
-  const friendsList = Array.from(friendSet).map(id => {
-    let acc = null;
-    for (let a of DB.accounts.values()) { if (a.id === id) acc = a; }
-    const statusObj = DB.users.get(id);
-    return acc ? { ...acc, status: statusObj ? statusObj.status : 'offline' } : null;
-  }).filter(Boolean);
-
-  const incomingRequests = Array.from(DB.friendRequests.values())
-    .filter(r => r.toUserId === userId && r.status === 'pending');
-
-  const allRegisteredUsers = Array.from(DB.accounts.values()).map(a => ({
-    id: a.id,
-    username: a.username,
-    avatar: a.avatar,
-    status: DB.users.get(a.id)?.status || 'offline'
-  }));
-
-  const userGroups = [];
-  DB.groups.forEach(group => {
-    if (group.members.has(userId)) {
-      const memberDetails = Array.from(group.members).map(mId => {
-        let acc = null;
-        for (let a of DB.accounts.values()) { if (a.id === mId) acc = a; }
-        return acc ? { id: mId, username: acc.username, avatar: acc.avatar, isMuted: group.muted.has(mId) } : null;
-      }).filter(Boolean);
-
-      userGroups.push({
-        id: group.id,
-        name: group.name,
-        avatar: group.avatar,
-        membersCount: group.members.size,
-        adminId: group.adminId,
-        members: memberDetails
-      });
-    }
-  });   
-
-  const payload = {
-    friends: friendsList,
-    requests: incomingRequests,
-    allUsers: allRegisteredUsers,
-    groups: userGroups
-  };
-
-  if (typeof target.emit === 'function') {
-    target.emit('data:sync', payload);
-    target.emit('receive_friend_requests', incomingRequests);
-  } else {
-    io.to(userId).emit('data:sync', payload);
-    io.to(userId).emit('receive_friend_requests', incomingRequests);
-  }
-}
-
 // ==========================================
-// SOCKET.IO REAL-TIME HANDLING
+// SOCKET.IO XỬ LÝ SỰ KIỆN VÀ WEBRTC CALL
 // ==========================================
 io.on('connection', (socket) => {
-  let currentUser = null;
-
-  // --- LOGIC VIDEO CALL ---
-  socket.on("call_user", (data) => {
-    console.log(`📞 Nhận yêu cầu gọi từ ${currentUser ? currentUser.username : socket.id} tới user: ${data.userToCall}`);
-    
-    let targetUser = DB.users.get(data.userToCall);
-    if (!targetUser) {
-      for (let [uId, uObj] of DB.users.entries()) {
-        if (String(uId) === String(data.userToCall)) {
-          targetUser = uObj;
-          break;
-        }
-      }
-    }
-
-    if (!targetUser) {
-      return socket.emit("call_error", { message: "Không tìm thấy người dùng trong hệ thống!" });
-    }
-
-    const receiverRoomId = String(targetUser.id);
-    console.log(`🚀 Đang chuyển tiếp tín hiệu "incoming_call" tới Room: ${receiverRoomId}`);
-
-    io.to(receiverRoomId).emit("incoming_call", { 
-      signal: data.signalData, 
-      fromSocketId: socket.id, 
-      fromUserId: currentUser ? currentUser.id : null,
-      callerName: data.callerName || (currentUser ? currentUser.username : "Người dùng"),
-      callerAvatar: currentUser ? currentUser.avatar : "",
-      isVideo: data.isVideo || false
-    });
-  });
-
-  socket.on("answer_call", (data) => {
-    io.to(data.toSocketId || data.to).emit("call_accepted", data.signal);
-  });
-
-  socket.on("end_call", (data) => {
-    if (data.targetId) {
-      io.to(data.targetId).emit("call_ended");
-    }
-    if (data.toSocketId) {
-      io.to(data.toSocketId).emit("call_ended");
-    }
-  });
-
-  socket.on("reject_call", (data) => {
-    io.to(data.toSocketId || data.to).emit("call_rejected");
-  });
-  
-  socket.on('join_admin_room', (userData) => {
-    if (userData && userData.isAdmin) {
-      socket.join('admin_room');
-    }
-  });
-
-  socket.on('messages:clear_me', ({ roomId }) => {
-    if (!currentUser || !roomId) return;
-    const clearKey = `${currentUser.id}_${roomId}`;
-    DB.clearedChats.set(clearKey, Date.now());
-    saveDB();
-    socket.emit('messages:cleared_me', { roomId });
-  });
-
-  socket.on('messages:clear', ({ roomId }) => {
-    if (!roomId) return;
-    DB.messages.set(roomId, []);
-    saveDB();
-
-    if (roomId.startsWith('grp_')) {
-      io.to(roomId).emit('messages:cleared', { roomId });
-    } else {
-      const parts = roomId.split('_DM_');
-      if (parts.length === 2) {
-        io.to(parts[0]).to(parts[1]).emit('messages:cleared', { roomId });
-      } else {
-        socket.emit('messages:cleared', { roomId });
-      }
-    }
-  });
-
-  socket.on('messages:get', ({ roomId }) => {
-    if (!currentUser) return;
-    const msgs = DB.messages.get(roomId) || [];
-    const clearKey = `${currentUser.id}_${roomId}`;
-    const clearedAt = DB.clearedChats.get(clearKey) || 0;
-
-    const filteredMsgs = msgs.filter(m => {
-      const msgTime = typeof m.timestamp === 'number' ? m.timestamp : new Date(m.timestamp).getTime();
-      return msgTime > clearedAt;
-    });
-
-    socket.emit('messages:history', { roomId, messages: filteredMsgs });
-  });
-
-  socket.on('group:action', ({ action, groupId, targetId }) => {
-    if (!currentUser) return;
-    const group = DB.groups.get(groupId);
-    if (!group || !group.members.has(currentUser.id)) return;
-
-    const isAdmin = group.adminId === currentUser.id;
-
-    if (action === 'leave') {
-      if (isAdmin && group.members.size > 1) {
-        group.members.delete(currentUser.id);
-        const nextMemberId = Array.from(group.members)[0];
-        group.adminId = nextMemberId;
-      } else {
-        group.members.delete(currentUser.id);
-      }
-
-      socket.leave(groupId);
-      io.to(currentUser.id).emit('group:kicked_out'); 
-      Array.from(group.members).forEach(mId => io.to(mId).emit('group:updated'));
-      
-      if (group.members.size === 0) DB.groups.delete(groupId);
-      saveDB();
-      return;
-    }
-
-    if (!isAdmin) return socket.emit('message:error', 'Bạn không có quyền thực hiện thao tác này!');
-
-    if (action === 'delete_group') {
-      const allMembers = Array.from(group.members);
-      DB.groups.delete(groupId);
-      allMembers.forEach(mId => io.to(mId).emit('group:kicked_out'));
-      saveDB();
-      return;
-    }
-
-    if (!targetId || targetId === currentUser.id) return;
-
-    if (action === 'kick') {
-      group.members.delete(targetId);
-      group.muted.delete(targetId);
-      io.to(targetId).emit('group:kicked_out');
-    } else if (action === 'mute') {
-      group.muted.add(targetId);
-    } else if (action === 'unmute') {
-      group.muted.delete(targetId);
-    } else if (action === 'transfer_admin') {
-      group.adminId = targetId;
-    }
-
-    saveDB();
-    Array.from(group.members).forEach(mId => io.to(mId).emit('group:updated'));
-  });
-
-  socket.on('group:add_members', ({ groupId, newMemberIds }) => {
-    if (!currentUser || !groupId || !newMemberIds || newMemberIds.length === 0) return;
-    const group = DB.groups.get(groupId);
-    if (!group) return;
-
-    let isAdded = false;
-    newMemberIds.forEach(rawId => {
-      if (!group.members.has(rawId)) {
-        group.members.add(rawId);
-        isAdded = true;
-      }
-    });
-
-    if (isAdded) {
-      saveDB();
-      io.emit('group:updated');
-    }
-  });
-
-  // --- AUTHENTICATION ---
-  socket.on('auth:register', ({ username, password, avatar }) => {
-    if (!username || !password) {
-      return socket.emit('auth:error', 'Vui lòng nhập đầy đủ tên tài khoản và mật khẩu!');
-    }
-    
-    const cleanUsername = username.trim();
-    if (DB.accounts.has(cleanUsername)) {
-      return socket.emit('auth:error', 'Tài khoản này đã tồn tại!');
-    }
-
-    const userId = `usr_${Math.random().toString(36).substr(2, 9)}`;
-    const userAvatar = avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(cleanUsername)}`;
-    const account = { id: userId, username: cleanUsername, password, avatar: userAvatar };
-
-    DB.accounts.set(cleanUsername, account);
-    DB.friends.set(userId, new Set());
-    DB.users.set(userId, { id: userId, username: cleanUsername, avatar: userAvatar, status: 'online' });
-
-    saveDB();
-    socket.emit('auth:register_success', 'Tạo tài khoản thành công!');
-  });
-
   socket.on('auth:login', ({ username, password }) => {
-    const cleanUsername = username ? username.trim() : '';
-    const acc = DB.accounts.get(cleanUsername);
-    
-    if (!acc || acc.password !== password) {
-      return socket.emit('auth:error', 'Tài khoản hoặc mật khẩu không chính xác!');
+    let foundAcc = null;
+    for (let acc of DB.accounts.values()) {
+      if (acc.username === username && acc.password === password) {
+        foundAcc = acc;
+        break;
+      }
     }
-
-    let user = DB.users.get(acc.id);
-    if (!user) {
-      user = { id: acc.id, username: acc.username, avatar: acc.avatar, status: 'online' };
-      DB.users.set(acc.id, user);
+    if (foundAcc) {
+      socket.join(foundAcc.id);
+      socket.userId = foundAcc.id;
+      const userObj = DB.users.get(foundAcc.id) || { id: foundAcc.id, username, avatar: foundAcc.avatar, status: 'online' };
+      userObj.status = 'online';
+      DB.users.set(foundAcc.id, userObj);
+      saveDB();
+      socket.emit('auth:success', { token: foundAcc.id, user: userObj });
     } else {
-      user.status = 'online';
-      user.avatar = acc.avatar;
+      socket.emit('auth:error', 'Tài khoản hoặc mật khẩu không chính xác!');
     }
+  });
 
-    currentUser = user;
-    socket.join(user.id);
-
-    DB.groups.forEach((group, groupId) => {
-      if (group.members.has(user.id)) socket.join(groupId);
-    });
-
-    socket.emit('auth:success', { token: user.id, user });
-    syncUserData(socket, user.id);
-    io.emit('users:sync', Array.from(DB.users.values()));
+  socket.on('auth:register', ({ username, password, avatar }) => {
+    if (DB.accounts.has(username)) {
+      socket.emit('auth:error', 'Tên tài khoản đã tồn tại!');
+      return;
+    }
+    const id = 'usr_' + Math.random().toString(36).substring(2, 9);
+    const newAcc = { id, username, password, avatar };
+    DB.accounts.set(username, newAcc);
+    DB.users.set(id, { id, username, avatar, status: 'offline' });
+    saveDB();
+    socket.emit('auth:register_success', 'Đăng ký tài khoản thành công!');
   });
 
   socket.on('auth:session', ({ userId }) => {
     let foundAcc = null;
     for (let acc of DB.accounts.values()) {
-      if (acc.id === userId) { foundAcc = acc; break; }
-    }
-
-    if (!foundAcc) return socket.emit('auth:session_invalid');
-
-    let user = DB.users.get(userId) || { id: foundAcc.id, username: foundAcc.username, avatar: foundAcc.avatar, status: 'online' };
-    user.status = 'online';
-    user.avatar = foundAcc.avatar;
-    DB.users.set(userId, user);
-
-    currentUser = user;
-    socket.join(user.id);
-
-    DB.groups.forEach((group, groupId) => {
-      if (group.members.has(user.id)) socket.join(groupId);
-    });
-
-    socket.emit('auth:success', { token: user.id, user });
-    syncUserData(socket, user.id);
-    io.emit('users:sync', Array.from(DB.users.values()));
-  });
-
-  socket.on('group:create', ({ name, avatar, memberIds }) => {
-    if (!currentUser || !name || !memberIds) return;
-    const groupId = `grp_${Math.random().toString(36).substr(2, 9)}`;
-    const groupAvatar = avatar || `https://api.dicebear.com/7.x/identicon/svg?seed=${encodeURIComponent(name)}`;
-    
-    const membersSet = new Set([currentUser.id, ...memberIds]);
-    const groupObj = {
-      id: groupId,
-      name,
-      avatar: groupAvatar,
-      members: membersSet,
-      adminId: currentUser.id,
-      muted: new Set()
-    };
-
-    DB.groups.set(groupId, groupObj);
-    saveDB();
-
-    membersSet.forEach(mId => io.to(mId).emit('group:updated'));
-    syncUserData(socket, currentUser.id);
-  });
-
-  socket.on('friend:request', ({ targetId, targetUserId }) => {
-    const finalTargetId = targetId || targetUserId;
-    if (!currentUser || currentUser.id === finalTargetId) return;
-    const reqId = `freq_${currentUser.id}_${finalTargetId}`;
-
-    DB.friendRequests.set(reqId, {
-      id: reqId,
-      fromUserId: currentUser.id,
-      fromUsername: currentUser.username,
-      fromAvatar: currentUser.avatar,
-      toUserId: finalTargetId,
-      status: 'pending'
-    });
-
-    saveDB();
-    io.to(finalTargetId).emit('friend:incoming');
-    syncUserData(io, finalTargetId);
-    syncUserData(socket, currentUser.id);
-  });
-
-  socket.on('friend:cancel_request', ({ targetId, targetUserId }) => {
-    const finalTargetId = targetId || targetUserId;
-    if (!currentUser || !finalTargetId) return;
-    const reqId = `freq_${currentUser.id}_${finalTargetId}`;
-
-    if (DB.friendRequests.has(reqId)) {
-      DB.friendRequests.delete(reqId);
-      saveDB();
-
-      syncUserData(socket, currentUser.id);
-      syncUserData(io, finalTargetId);
-    }
-  });
-
-  socket.on('friend:accept', ({ reqId }) => {
-    const req = DB.friendRequests.get(reqId);
-    if (!req || req.status !== 'pending') return;
-
-    req.status = 'accepted';
-    if (!DB.friends.has(req.fromUserId)) DB.friends.set(req.fromUserId, new Set());
-    if (!DB.friends.has(req.toUserId)) DB.friends.set(req.toUserId, new Set());
-
-    DB.friends.get(req.fromUserId).add(req.toUserId);
-    DB.friends.get(req.toUserId).add(req.fromUserId);
-
-    saveDB();
-    
-    syncUserData(io, req.fromUserId);
-    syncUserData(socket, req.toUserId);
-
-    io.to(req.fromUserId).emit('friend:updated');
-    io.to(req.toUserId).emit('friend:updated');
-  });
-
-  socket.on('friend:unfriend', ({ friendId }) => {
-    if (!currentUser || !friendId) return;
-    const currentUserId = currentUser.id;
-
-    if (DB.friends.has(currentUserId)) DB.friends.get(currentUserId).delete(friendId);
-    if (DB.friends.has(friendId)) DB.friends.get(friendId).delete(currentUserId);
-
-    saveDB();
-    syncUserData(socket, currentUserId);
-    syncUserData(io, friendId);
-
-    io.to(friendId).emit('friend:updated');
-  });
-
-  socket.on('message:send', ({ roomId, content, type = 'text' }) => {
-    if (!currentUser || !content) return;
-
-    const userStatus = DB.users.get(currentUser.id);
-    if (userStatus && userStatus.restrictedUntil && userStatus.restrictedUntil > Date.now()) {
-      const hoursLeft = Math.ceil((userStatus.restrictedUntil - Date.now()) / (1000 * 60 * 60));
-      return socket.emit('message:error', `Tài khoản của bạn đang bị hạn chế nhắn tin trong ${hoursLeft} giờ tới!`);
-    }
-
-    if (roomId.startsWith('grp_')) {
-      const group = DB.groups.get(roomId);
-      if (group && group.muted.has(currentUser.id)) {
-        return socket.emit('message:error', 'Bạn đã bị cấm chat trong nhóm này!');
-      }
-    }
-    
-    const msg = {
-      id: `msg_${Math.random().toString(36).substr(2, 9)}`,
-      roomId,
-      sender: currentUser,
-      content,
-      type,
-      timestamp: Date.now()
-    };
-
-    if (!DB.messages.has(roomId)) DB.messages.set(roomId, []);
-    DB.messages.get(roomId).push(msg);
-    saveDB();
-
-    if (roomId.startsWith('grp_')) {
-      io.to(roomId).emit('message:received', msg);
-    } else {
-      const parts = roomId.split('_DM_');
-      if (parts.length === 2) {
-        io.to(parts[0]).to(parts[1]).emit('message:received', msg);
-      }
-    }
-  });
-
-  socket.on('report:submit', ({ targetId, reason, description, reporterId, reporterName }) => {
-    const finalReporterId = reporterId || (currentUser ? currentUser.id : null);
-    const finalReporterName = reporterName || (currentUser ? currentUser.username : 'Người dùng');
-
-    if (!finalReporterId || !targetId) return;
-    
-    let cleanTargetId = targetId;
-    if (cleanTargetId.includes('_DM_')) {
-      const parts = cleanTargetId.split('_DM_');
-      cleanTargetId = parts.find(id => id !== finalReporterId) || parts[0];
-    }
-
-    const reportId = `rep_${Math.random().toString(36).substr(2, 9)}`;
-    let targetUsername = cleanTargetId;
-    
-    for (let [uname, acc] of DB.accounts.entries()) {
-      if (acc.id === cleanTargetId) {
-        targetUsername = uname;
+      if (acc.id === userId) {
+        foundAcc = acc;
         break;
       }
     }
+    if (foundAcc) {
+      socket.join(foundAcc.id);
+      socket.userId = foundAcc.id;
+      const userObj = DB.users.get(foundAcc.id);
+      if (userObj) userObj.status = 'online';
+      saveDB();
+      socket.emit('auth:success', { token: foundAcc.id, user: userObj });
+      
+      const userFriends = DB.friends.get(foundAcc.id) || [];
+      const userRequests = DB.friendRequests.get(foundAcc.id) || [];
+      const allUsersList = Array.from(DB.users.values());
+      const userGroups = Array.from(DB.groups.values()).filter(g => g.members && g.members.some(m => m.id === foundAcc.id));
 
-    const reportObj = {
-      id: reportId,
-      reporterId: finalReporterId,
-      reporterName: finalReporterName,
-      targetId: cleanTargetId,
-      targetUsername: targetUsername,
-      reason: reason || 'Spam',
-      description: description || '',
-      timestamp: Date.now()
-    };
+      socket.emit('data:sync', {
+        friends: userFriends,
+        requests: userRequests,
+        allUsers: allUsersList,
+        groups: userGroups
+      });
+    }
+  });
 
-    if (!DB.reports) DB.reports = new Map();
-    DB.reports.set(reportId, reportObj);
-    saveDB();
-
-    io.emit('admin:new-report', Array.from(DB.reports.values()));
-    io.to('admin_room').emit('admin_notification', {
-      type: 'new_report',
-      title: 'Báo cáo vi phạm mới',
-      data: reportObj
+  // --- WEBRTC CALL SIGNALING ---
+  socket.on('call_user', ({ userToCall, signalData, callerName, callerAvatar, isVideo }) => {
+    io.to(userToCall).emit('incoming_call', {
+      signal: signalData,
+      from: socket.id,
+      callerName,
+      callerAvatar,
+      isVideo
     });
   });
 
-  socket.on('appeal:restriction', ({ reason, userId, username }) => {
-    const finalUserId = userId || (currentUser ? currentUser.id : null);
-    const finalUsername = username || (currentUser ? currentUser.username : 'Người dùng');
-
-    if (!finalUserId) return;
-
-    const appealId = `apl_${Math.random().toString(36).substr(2, 9)}`;
-    const appealObj = {
-      id: appealId,
-      userId: finalUserId,
-      username: finalUsername,
-      reason: reason || 'Xin gỡ hạn chế',
-      timestamp: Date.now(),
-      status: 'pending'
-    };
-
-    if (!DB.appeals) DB.appeals = new Map();
-    DB.appeals.set(appealId, appealObj);
-    saveDB();
-
-    io.emit('admin:new-appeal', Array.from(DB.appeals.values()));
-    io.to('admin_room').emit('admin_notification', {
-      type: 'restriction_appeal',
-      title: 'Yêu cầu gỡ/giảm hạn chế mới',
-      data: appealObj
-    });
+  socket.on('answer_call', ({ signal, to }) => {
+    io.to(to).emit('call_accepted', signal);
   });
 
-  socket.on('appeal:submit', (data) => {
-    socket.emit('appeal:restriction', data);
+  socket.on('reject_call', ({ to }) => {
+    io.to(to).emit('call_rejected');
+  });
+
+  socket.on('end_call', ({ targetId }) => {
+    io.to(targetId).emit('call_ended');
   });
 
   socket.on('disconnect', () => {
-    if (currentUser) {
-      currentUser.status = 'offline';
-      io.to('admin_room').emit('admin_notification', { type: 'user_offline', userId: currentUser.id });
-      io.emit('users:sync', Array.from(DB.users.values()));
+    if (socket.userId) {
+      const userObj = DB.users.get(socket.userId);
+      if (userObj) {
+        userObj.status = 'offline';
+        saveDB();
+      }
     }
   });
 });
 
 const PORT = process.env.PORT || 3000;
-
-server.listen(PORT, async () => {
-  console.log(`[*] Web Chat Engine Online on port ${PORT}`);
-
-  if (process.env.NODE_ENV !== 'production') {
-    try {
-      const url = await ngrok.connect({ addr: PORT, authtoken_from_env: true });
-      console.log(`> 🌐 Link Ngrok (Local): ${url}`);
-    } catch (error) {
-      console.log('Không bật ngrok (chạy trên cloud hoặc chưa cấu hình token).');
-    }
-  }
+server.listen(PORT, () => {
+  console.log(`🚀 Server đang chạy tại cổng ${PORT}`);
 });
