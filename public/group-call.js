@@ -474,7 +474,9 @@
         callerName: meta.callerName || data.callerName,
         callerAvatar: meta.callerAvatar || data.callerAvatar,
         fromSocketId: data.fromSocketId
-      }, initialOffer);
+      }, 
+      initialOffer
+    );
 
       groupCallState.incoming = null;
     } catch (error) {
@@ -595,7 +597,12 @@
   // Existing incoming_call event is reused as the transport for group invitations.
   socket.on('incoming_call', data => {
     const packet = data?.signal;
-    if (!isGroupSignal(packet)) return;
+
+    if (!isGroupSignal(packet)) {
+      return;
+    }
+
+    const me = currentUser();
 
     const meta = {
       callId: packet.callId,
@@ -608,11 +615,146 @@
       fromSocketId: data.fromSocketId
     };
 
-    if (groupCallState.active) return;
-    if (groupCallState.incoming?.meta?.callId === meta.callId) return;
+    // =================================================
+    // ĐANG Ở TRONG CUỘC GỌI
+    // => Đây là lời mời tạo PEER giữa 2 thành viên
+    // =================================================
+    if (groupCallState.active) {
 
-    showIncomingGroupCall(meta, data);
+      // Không xử lý signal của call khác
+      if (
+        groupCallState.callId !== meta.callId ||
+        groupCallState.groupId !== meta.groupId
+      ) {
+        return;
+      }
+
+      // Không tự tạo peer với chính mình
+      if (
+        !packet.senderId ||
+        packet.senderId === me?.id
+      ) {
+        return;
+      }
+
+      console.log(
+        '[GROUP CALL] Peer invitation from:',
+        packet.senderId
+      );
+
+      createPeer(
+        packet.senderId,
+        false,
+        {
+          callId: meta.callId,
+          groupId: meta.groupId,
+          groupName: meta.groupName,
+          callerId: meta.callerId,
+          callerName: meta.callerName,
+          callerAvatar: meta.callerAvatar,
+          fromSocketId: data.fromSocketId
+        },
+        packet.signal
+      );
+
+      return;
+    }
+
+    // =================================================
+    // CHƯA Ở TRONG CUỘC GỌI
+    // => Hiện popup
+    // =================================================
+
+    if (
+      groupCallState.incoming?.meta?.callId ===
+      meta.callId
+    ) {
+      return;
+    }
+
+    showIncomingGroupCall(
+      meta,
+      data
+    );
   });
+
+  socket.on(
+    'group_call_participant_joined',
+    data => {
+      const me = currentUser();
+
+      if (!groupCallState.active) {
+        return;
+      }
+
+      if (
+        data.callId !==
+        groupCallState.callId
+      ) {
+        return;
+      }
+
+      if (
+        data.groupId !==
+        groupCallState.groupId
+      ) {
+        return;
+      }
+
+      if (
+        !data.userId ||
+        data.userId === me?.id
+      ) {
+        return;
+      }
+
+      // Đã có peer rồi thì không tạo lần nữa
+      if (
+        groupCallState.peers.has(
+          data.userId
+        )
+      ) {
+        return;
+      }
+
+      const remoteUser =
+        getUser(data.userId);
+
+      console.log(
+        '[GROUP CALL] New participant:',
+        remoteUser.username,
+        data.userId
+      );
+
+      // Người đang ở trong cuộc gọi
+      // chủ động tạo offer tới người mới
+      createPeer(
+        data.userId,
+        true,
+        {
+          callId:
+            groupCallState.callId,
+
+          groupId:
+            groupCallState.groupId,
+
+          groupName:
+            groupCallState.groupName,
+
+          callerId:
+            groupCallState.isCaller
+              ? me?.id
+              : undefined,
+
+          callerName:
+            me?.username,
+
+          callerAvatar:
+            me?.avatar
+        }
+      );
+    }
+  );
 
   // Existing call_accepted is reused, but group packets carry senderId to route the signal.
   socket.on('call_accepted', packet => {

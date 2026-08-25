@@ -1286,12 +1286,35 @@ io.on('connection', socket => {
         return;
       }
 
+      // Gửi signal trả lời về đúng người đang tạo Peer
       io.to(
         data.toSocketId
       ).emit(
         'call_accepted',
         data.signal
       );
+
+      // ==========================================
+      // GROUP CALL: THÔNG BÁO THÀNH VIÊN MỚI
+      // ==========================================
+      const packet = data.signal;
+
+      if (
+        packet &&
+        packet.__phucGroupCall === true &&
+        packet.groupId &&
+        packet.callId &&
+        packet.senderId
+      ) {
+        socket.to(packet.groupId).emit(
+          'group_call_participant_joined',
+          {
+            callId: packet.callId,
+            groupId: packet.groupId,
+            userId: packet.senderId
+          }
+        );
+      }
     }
   );
 
