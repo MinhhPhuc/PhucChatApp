@@ -839,12 +839,13 @@ async function startVideoCall(targetUserId, isVideo) {
     });
 
     peer.on('signal', (signalData) => {
-      if (typeof socket !== 'undefined') {
-        socket.emit('answer_call', {
-          signal: signalData,
-          toSocketId: incomingCallDataGlobal.fromSocketId
-        });
-      }
+      socket.emit('call_user', {
+        targetUserId,
+        signal: signalData,
+        isVideo,
+        callerName: currentUser?.username || 'Ai đó',
+        callerAvatar: currentUser?.avatar || ''
+      });
     });
 
     peer.on('stream', (remoteStream) => {
@@ -1590,12 +1591,13 @@ function answerCall() {
     });
 
     peer.on('signal', (signalData) => {
-      if (typeof socket !== 'undefined') {
-        socket.emit('answer_call', {
-          signal: signalData,
-          toSocketId: incomingCallDataGlobal.fromSocketId
-        });
-      }
+      socket.emit('call_user', {
+        targetUserId,
+        signal: signalData,
+        isVideo,
+        callerName: currentUser?.username || 'Ai đó',
+        callerAvatar: currentUser?.avatar || ''
+      });
     });
 
     peer.on('stream', (remoteStream) => {
