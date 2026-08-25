@@ -289,19 +289,41 @@ io.on('connection', (socket) => {
 
   // --- LOGIC VIDEO CALL ---
   socket.on("call_user", (data) => {
+    // Kiểm tra trạng thái online của người nhận
+    const targetUser = DB.users.get(data.userToCall);
+    if (!targetUser || targetUser.status === 'offline') {
+      return socket.emit("call_error", { message: "Người dùng hiện đang Offline!" });
+    }
+
+    // Gửi tín hiệu gọi đến Room theo userId của người nhận
     io.to(data.userToCall).emit("incoming_call", { 
       signal: data.signalData, 
-      from: socket.id, 
-      name: data.callerName 
+      fromSocketId: socket.id, 
+      fromUserId: currentUser ? currentUser.id : null,
+      callerName: data.callerName || (currentUser ? currentUser.username : "Người dùng"),
+      callerAvatar: currentUser ? currentUser.avatar : "",
+      isVideo: data.isVideo || false
     });
   });
 
   socket.on("answer_call", (data) => {
-    io.to(data.to).emit("call_accepted", data.signal);
+    // Trả tín hiệu chấp nhận cuộc gọi về cho socket người gọi
+    io.to(data.toSocketId || data.to).emit("call_accepted", data.signal);
   });
 
   socket.on("end_call", (data) => {
-    io.to(data.to).emit("call_ended");
+    // Báo kết thúc cuộc gọi cho cả hai bên
+    if (data.targetId) {
+      io.to(data.targetId).emit("call_ended");
+    }
+    if (data.toSocketId) {
+      io.to(data.toSocketId).emit("call_ended");
+    }
+  });
+
+  socket.on("reject_call", (data) => {
+    // Báo từ chối cuộc gọi
+    io.to(data.toSocketId || data.to).emit("call_rejected");
   });
   
   // Admin Room
