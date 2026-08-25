@@ -7,6 +7,19 @@ const ngrok = require('ngrok');
 
 const app = express();
 const server = http.createServer(app);
+
+// --- CẤU HÌNH CONTENT SECURITY POLICY (CSP) ---
+app.use((req, res, next) => {
+  res.setHeader(
+    "Content-Security-Policy",
+    "default-src 'self' * 'unsafe-inline' 'unsafe-eval' data: blob:; " +
+    "script-src 'self' * 'unsafe-inline' 'unsafe-eval'; " +
+    "style-src 'self' * 'unsafe-inline'; " +
+    "connect-src * wss: ws:;"
+  );
+  next();
+});
+
 const io = new Server(server, { 
   cors: { origin: "*" },
   maxHttpBufferSize: 1e7 // 10MB
