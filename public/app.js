@@ -839,12 +839,9 @@ async function startVideoCall(targetUserId, isVideo) {
     });
 
     peer.on('signal', (signalData) => {
-      socket.emit('call_user', {
-        targetUserId,
-        signal: signalData,
-        isVideo,
-        callerName: currentUser?.username || 'Ai đó',
-        callerAvatar: currentUser?.avatar || ''
+      socket.emit('call_accepted', {
+        toSocketId: incomingCallDataGlobal.fromSocketId,
+        signal: signalData
       });
     });
 
