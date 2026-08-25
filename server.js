@@ -2,12 +2,39 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const path = require('path');
-const fs = require('fs');
-const DB_PATH = path.join(__dirname, 'database.json');
 const ngrok = require('ngrok');
+const { createClient } = require('@supabase/supabase-js');
 
 const app = express();
 const helmet = require('helmet');
+
+// =====================================================
+// SUPABASE CONFIG
+// =====================================================
+
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+  throw new Error(
+    '❌ Thiếu SUPABASE_URL hoặc SUPABASE_SERVICE_ROLE_KEY trong Environment Variables.'
+  );
+}
+
+const supabase = createClient(
+  SUPABASE_URL,
+  SUPABASE_SERVICE_ROLE_KEY,
+  {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false
+    }
+  }
+);
+
+// =====================================================
+// APP CONFIG
+// =====================================================
 
 app.use(
   helmet.contentSecurityPolicy({
@@ -23,7 +50,6 @@ app.use(
 
 const server = http.createServer(app);
 
-// --- CẤU HÌNH CONTENT SECURITY POLICY (CSP) ---
 app.use((req, res, next) => {
   res.setHeader(
     "Content-Security-Policy",
@@ -35,9 +61,11 @@ app.use((req, res, next) => {
   next();
 });
 
-const io = new Server(server, { 
-  cors: { origin: "*" },
-  maxHttpBufferSize: 1e7 // 10MB
+const io = new Server(server, {
+  cors: {
+    origin: "*"
+  },
+  maxHttpBufferSize: 1e7
 });
 
 app.use(express.json({ limit: '10mb' }));
@@ -46,726 +74,3352 @@ app.get('/admin', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'admin.html'));
 });
 
-// ==========================================
-// HỆ THỐNG LƯU TRỮ DATABASE TỰ ĐỘNG
-// ==========================================
-function replacer(key, value) {
-  if (value instanceof Map) return { dataType: 'Map', value: Array.from(value.entries()) };
-  if (value instanceof Set) return { dataType: 'Set', value: Array.from(value) };
-  return value;
-}
+app.use(express.static(path.join(__dirname, 'public')));
 
-function reviver(key, value) {
-  if (typeof value === 'object' && value !== null) {
-    if (value.dataType === 'Map') return new Map(value.value);
-    if (value.dataType === 'Set') return new Set(value.value);
-  }
-  return value;
-}
+// =====================================================
+// IN-MEMORY CACHE
+// =====================================================
+// Supabase = DATABASE THẬT
+// DB = cache runtime để giữ nguyên architecture hiện tại
+// =====================================================
 
 let DB = {
-  accounts: new Map(),       
-  users: new Map(),          
-  friendRequests: new Map(), 
-  friends: new Map(),        
-  messages: new Map(),       
-  groups: new Map(),         
-  clearedChats: new Map(),   
-  reports: new Map(),        
-  appeals: new Map()         
+  accounts: new Map(),
+  users: new Map(),
+  friendRequests: new Map(),
+  friends: new Map(),
+  messages: new Map(),
+  groups: new Map(),
+  clearedChats: new Map(),
+  reports: new Map(),
+  appeals: new Map()
 };
 
-function loadDB() {
-  try {
-    if (fs.existsSync(DB_PATH)) {
-      const data = fs.readFileSync(DB_PATH, 'utf8');
+let dbReady = false;
+let syncTimer = null;
+let syncPromise = Promise.resolve();
 
-      DB = JSON.parse(data, reviver);
+// =====================================================
+// HELPERS
+// =====================================================
 
-      if (!DB.accounts) DB.accounts = new Map();
-      if (!DB.users) DB.users = new Map();
-      if (!DB.friendRequests) DB.friendRequests = new Map();
-      if (!DB.friends) DB.friends = new Map();
-      if (!DB.messages) DB.messages = new Map();
-      if (!DB.groups) DB.groups = new Map();
-      if (!DB.clearedChats) DB.clearedChats = new Map();
-      if (!DB.reports) DB.reports = new Map();
-      if (!DB.appeals) DB.appeals = new Map();
-
-      console.log(`✅ Đã nạp database từ: ${DB_PATH}`);
-
-      DB.users.forEach(user => {
-        user.status = 'offline';
-      });
-    } else {
-      console.log(`⚠️ Chưa có database, sẽ tạo: ${DB_PATH}`);
-    }
-  } catch (err) {
-    console.error('❌ Lỗi đọc database:', err);
-  }
+function generateId(prefix) {
+  return `${prefix}_${Math.random().toString(36).substring(2, 11)}`;
 }
 
-function saveDB() {
-  try {
-    const data = JSON.stringify(DB, replacer, 2);
+function toTimestamp(value) {
+  if (!value) return 0;
 
-    fs.writeFileSync(DB_PATH, data, 'utf8');
+  if (typeof value === 'number') {
+    return value;
+  }
+
+  const parsed = new Date(value).getTime();
+  return Number.isNaN(parsed) ? 0 : parsed;
+}
+
+// =====================================================
+// BUILD SENDER OBJECT
+// =====================================================
+
+function getSenderObject(userId) {
+  if (!userId) {
+    return {
+      id: '',
+      username: 'Unknown',
+      avatar: ''
+    };
+  }
+
+  const user = DB.users.get(userId);
+  const account = Array.from(DB.accounts.values())
+    .find(a => a.id === userId);
+
+  return {
+    id: userId,
+    username:
+      user?.username ||
+      account?.username ||
+      'Unknown',
+    avatar:
+      user?.avatar ||
+      account?.avatar ||
+      ''
+  };
+}
+
+// =====================================================
+// LOAD DATA FROM SUPABASE
+// =====================================================
+
+async function loadDB() {
+  console.log('📥 Đang tải dữ liệu từ Supabase...');
+
+  try {
+    // -----------------------------
+    // ACCOUNTS
+    // -----------------------------
+
+    const { data: accounts, error: accountsError } =
+      await supabase
+        .from('accounts')
+        .select('*');
+
+    if (accountsError) {
+      throw accountsError;
+    }
+
+    DB.accounts.clear();
+
+    for (const account of accounts || []) {
+      DB.accounts.set(account.username, {
+        id: account.id,
+        username: account.username,
+        password: account.password,
+        avatar: account.avatar
+      });
+    }
+
+    // -----------------------------
+    // USERS
+    // -----------------------------
+
+    const { data: users, error: usersError } =
+      await supabase
+        .from('users')
+        .select('*');
+
+    if (usersError) {
+      throw usersError;
+    }
+
+    DB.users.clear();
+
+    for (const user of users || []) {
+      DB.users.set(user.id, {
+        id: user.id,
+        username: user.username,
+        avatar: user.avatar,
+        status: 'offline',
+        restrictedUntil: user.restricted_until
+          ? new Date(user.restricted_until).getTime()
+          : undefined
+      });
+    }
+
+    // -----------------------------
+    // FRIEND REQUESTS
+    // -----------------------------
+
+    const {
+      data: friendRequests,
+      error: friendRequestsError
+    } = await supabase
+      .from('friend_requests')
+      .select('*');
+
+    if (friendRequestsError) {
+      throw friendRequestsError;
+    }
+
+    DB.friendRequests.clear();
+
+    for (const request of friendRequests || []) {
+      const fromUser = DB.users.get(request.from_user_id);
+
+      DB.friendRequests.set(request.id, {
+        id: request.id,
+        fromUserId: request.from_user_id,
+        fromUsername: fromUser?.username || '',
+        fromAvatar: fromUser?.avatar || '',
+        toUserId: request.to_user_id,
+        status: request.status
+      });
+    }
+
+    // -----------------------------
+    // FRIENDS
+    // -----------------------------
+
+    const {
+      data: friends,
+      error: friendsError
+    } = await supabase
+      .from('friends')
+      .select('*');
+
+    if (friendsError) {
+      throw friendsError;
+    }
+
+    DB.friends.clear();
+
+    for (const row of friends || []) {
+      if (!DB.friends.has(row.user_id)) {
+        DB.friends.set(row.user_id, new Set());
+      }
+
+      DB.friends.get(row.user_id).add(row.friend_id);
+    }
+
+    // -----------------------------
+    // GROUPS
+    // -----------------------------
+
+    const {
+      data: groups,
+      error: groupsError
+    } = await supabase
+      .from('groups')
+      .select('*');
+
+    if (groupsError) {
+      throw groupsError;
+    }
+
+    const {
+      data: groupMembers,
+      error: groupMembersError
+    } = await supabase
+      .from('group_members')
+      .select('*');
+
+    if (groupMembersError) {
+      throw groupMembersError;
+    }
+
+    DB.groups.clear();
+
+    for (const group of groups || []) {
+      const members = new Set();
+      const muted = new Set();
+
+      for (const member of groupMembers || []) {
+        if (member.group_id !== group.id) continue;
+
+        members.add(member.user_id);
+
+        if (member.is_muted) {
+          muted.add(member.user_id);
+        }
+      }
+
+      DB.groups.set(group.id, {
+        id: group.id,
+        name: group.name,
+        avatar: group.avatar,
+        members,
+        adminId: group.admin_id,
+        muted
+      });
+    }
+
+    // -----------------------------
+    // MESSAGES
+    // -----------------------------
+
+    const {
+      data: messages,
+      error: messagesError
+    } = await supabase
+      .from('messages')
+      .select('*')
+      .order('timestamp', {
+        ascending: true
+      });
+
+    if (messagesError) {
+      throw messagesError;
+    }
+
+    DB.messages.clear();
+
+    for (const message of messages || []) {
+      if (!DB.messages.has(message.room_id)) {
+        DB.messages.set(message.room_id, []);
+      }
+
+      DB.messages.get(message.room_id).push({
+        id: message.id,
+        roomId: message.room_id,
+        sender: getSenderObject(message.sender_id),
+        content: message.content,
+        type: message.type,
+        timestamp: Number(message.timestamp)
+      });
+    }
+
+    // -----------------------------
+    // CLEARED CHATS
+    // -----------------------------
+
+    const {
+      data: clearedChats,
+      error: clearedChatsError
+    } = await supabase
+      .from('cleared_chats')
+      .select('*');
+
+    if (clearedChatsError) {
+      throw clearedChatsError;
+    }
+
+    DB.clearedChats.clear();
+
+    for (const row of clearedChats || []) {
+      const key = `${row.user_id}_${row.room_id}`;
+
+      DB.clearedChats.set(
+        key,
+        Number(row.cleared_at)
+      );
+    }
+
+    // -----------------------------
+    // REPORTS
+    // -----------------------------
+
+    const {
+      data: reports,
+      error: reportsError
+    } = await supabase
+      .from('reports')
+      .select('*');
+
+    if (reportsError) {
+      throw reportsError;
+    }
+
+    DB.reports.clear();
+
+    for (const report of reports || []) {
+      DB.reports.set(report.id, {
+        id: report.id,
+        reporterId: report.reporter_id,
+        reporterName: report.reporter_name,
+        targetId: report.target_id,
+        targetUsername: report.target_username,
+        reason: report.reason,
+        description: report.description,
+        timestamp: Number(report.timestamp)
+      });
+    }
+
+    // -----------------------------
+    // APPEALS
+    // -----------------------------
+
+    const {
+      data: appeals,
+      error: appealsError
+    } = await supabase
+      .from('appeals')
+      .select('*');
+
+    if (appealsError) {
+      throw appealsError;
+    }
+
+    DB.appeals.clear();
+
+    for (const appeal of appeals || []) {
+      DB.appeals.set(appeal.id, {
+        id: appeal.id,
+        userId: appeal.user_id,
+        username: appeal.username,
+        reason: appeal.reason,
+        timestamp: Number(appeal.timestamp),
+        status: appeal.status
+      });
+    }
+
+    dbReady = true;
+
+    console.log('✅ Đã tải dữ liệu từ Supabase');
 
     console.log(
-      `💾 Database đã lưu: ${DB_PATH} | ${Buffer.byteLength(data, 'utf8')} bytes`
+      `👤 Accounts: ${DB.accounts.size}`
     );
-  } catch (err) {
-    console.error('❌ KHÔNG THỂ LƯU DATABASE');
-    console.error('Path:', DB_PATH);
-    console.error('Error:', err);
+
+    console.log(
+      `💬 Messages: ${Array.from(DB.messages.values())
+        .reduce((total, list) => total + list.length, 0)}`
+    );
+
+    console.log(
+      `👥 Groups: ${DB.groups.size}`
+    );
+
+  } catch (error) {
+    console.error(
+      '❌ Không thể tải database từ Supabase:',
+      error
+    );
+
+    throw error;
   }
 }
 
-loadDB();
+// =====================================================
+// SYNC DB CACHE -> SUPABASE
+// =====================================================
 
-// --- API QUẢN TRỊ VIÊN (ADMIN) ---
+async function syncDBToSupabase() {
+  if (!dbReady) {
+    return;
+  }
+
+  try {
+    // =================================================
+    // ACCOUNTS
+    // =================================================
+
+    const accounts = Array.from(
+      DB.accounts.values()
+    ).map(account => ({
+      id: account.id,
+      username: account.username,
+      password: account.password,
+      avatar: account.avatar
+    }));
+
+    if (accounts.length > 0) {
+      const { error } = await supabase
+        .from('accounts')
+        .upsert(accounts, {
+          onConflict: 'id'
+        });
+
+      if (error) throw error;
+    }
+
+    // =================================================
+    // USERS
+    // =================================================
+
+    const users = Array.from(
+      DB.users.values()
+    ).map(user => ({
+      id: user.id,
+      username: user.username,
+      avatar: user.avatar,
+      status: user.status || 'offline',
+      restricted_until:
+        user.restrictedUntil
+          ? new Date(user.restrictedUntil).toISOString()
+          : null
+    }));
+
+    if (users.length > 0) {
+      const { error } = await supabase
+        .from('users')
+        .upsert(users, {
+          onConflict: 'id'
+        });
+
+      if (error) throw error;
+    }
+
+    // =================================================
+    // FRIEND REQUESTS
+    // =================================================
+
+    const friendRequests =
+      Array.from(
+        DB.friendRequests.values()
+      ).map(request => ({
+        id: request.id,
+        from_user_id: request.fromUserId,
+        to_user_id: request.toUserId,
+        status: request.status
+      }));
+
+    // Xóa request cũ trước khi đồng bộ
+    await supabase
+      .from('friend_requests')
+      .delete()
+      .neq('id', '__none__');
+
+    if (friendRequests.length > 0) {
+      const { error } = await supabase
+        .from('friend_requests')
+        .insert(friendRequests);
+
+      if (error) throw error;
+    }
+
+    // =================================================
+    // FRIENDS
+    // =================================================
+
+    const friendRows = [];
+
+    DB.friends.forEach(
+      (friendSet, userId) => {
+        friendSet.forEach(friendId => {
+          friendRows.push({
+            user_id: userId,
+            friend_id: friendId
+          });
+        });
+      }
+    );
+
+    await supabase
+      .from('friends')
+      .delete()
+      .neq('user_id', '__none__');
+
+    if (friendRows.length > 0) {
+      const { error } = await supabase
+        .from('friends')
+        .insert(friendRows);
+
+      if (error) throw error;
+    }
+
+    // =================================================
+    // GROUPS
+    // =================================================
+
+    const groups = Array.from(
+      DB.groups.values()
+    ).map(group => ({
+      id: group.id,
+      name: group.name,
+      avatar: group.avatar,
+      admin_id: group.adminId
+    }));
+
+    if (groups.length > 0) {
+      const { error } = await supabase
+        .from('groups')
+        .upsert(groups, {
+          onConflict: 'id'
+        });
+
+      if (error) throw error;
+    }
+
+    // =================================================
+    // GROUP MEMBERS
+    // =================================================
+
+    const groupMembers = [];
+
+    DB.groups.forEach(group => {
+      group.members.forEach(userId => {
+        groupMembers.push({
+          group_id: group.id,
+          user_id: userId,
+          is_muted: group.muted.has(userId)
+        });
+      });
+    });
+
+    await supabase
+      .from('group_members')
+      .delete()
+      .neq('group_id', '__none__');
+
+    if (groupMembers.length > 0) {
+      const { error } = await supabase
+        .from('group_members')
+        .insert(groupMembers);
+
+      if (error) throw error;
+    }
+
+    // =================================================
+    // MESSAGES
+    // =================================================
+
+    const messageRows = [];
+
+    DB.messages.forEach(list => {
+      list.forEach(message => {
+        messageRows.push({
+          id: message.id,
+          room_id: message.roomId,
+          sender_id: message.sender.id,
+          content: message.content,
+          type: message.type || 'text',
+          timestamp: Number(message.timestamp)
+        });
+      });
+    });
+
+    if (messageRows.length > 0) {
+      const { error } = await supabase
+        .from('messages')
+        .upsert(messageRows, {
+          onConflict: 'id'
+        });
+
+      if (error) throw error;
+    }
+
+    // =================================================
+    // CLEARED CHATS
+    // =================================================
+
+    const clearedRows = [];
+
+    DB.clearedChats.forEach(
+      (clearedAt, key) => {
+        const separatorIndex =
+          key.indexOf('_');
+
+        if (separatorIndex === -1) {
+          return;
+        }
+
+        const userId =
+          key.substring(0, separatorIndex);
+
+        const roomId =
+          key.substring(separatorIndex + 1);
+
+        clearedRows.push({
+          user_id: userId,
+          room_id: roomId,
+          cleared_at: Number(clearedAt)
+        });
+      }
+    );
+
+    await supabase
+      .from('cleared_chats')
+      .delete()
+      .neq('user_id', '__none__');
+
+    if (clearedRows.length > 0) {
+      const { error } = await supabase
+        .from('cleared_chats')
+        .insert(clearedRows);
+
+      if (error) throw error;
+    }
+
+    // =================================================
+    // REPORTS
+    // =================================================
+
+    const reports =
+      Array.from(DB.reports.values())
+        .map(report => ({
+          id: report.id,
+          reporter_id: report.reporterId,
+          reporter_name: report.reporterName,
+          target_id: report.targetId,
+          target_username: report.targetUsername,
+          reason: report.reason,
+          description: report.description,
+          timestamp: Number(report.timestamp)
+        }));
+
+    if (reports.length > 0) {
+      const { error } = await supabase
+        .from('reports')
+        .upsert(reports, {
+          onConflict: 'id'
+        });
+
+      if (error) throw error;
+    }
+
+    // =================================================
+    // APPEALS
+    // =================================================
+
+    const appeals =
+      Array.from(DB.appeals.values())
+        .map(appeal => ({
+          id: appeal.id,
+          user_id: appeal.userId,
+          username: appeal.username,
+          reason: appeal.reason,
+          timestamp: Number(appeal.timestamp),
+          status: appeal.status
+        }));
+
+    if (appeals.length > 0) {
+      const { error } = await supabase
+        .from('appeals')
+        .upsert(appeals, {
+          onConflict: 'id'
+        });
+
+      if (error) throw error;
+    }
+
+    console.log('💾 Đồng bộ Supabase thành công');
+
+  } catch (error) {
+    console.error(
+      '❌ Lỗi đồng bộ Supabase:',
+      error
+    );
+  }
+}
+
+// =====================================================
+// DEBOUNCED SAVE
+// =====================================================
+
+function saveDB() {
+  clearTimeout(syncTimer);
+
+  syncTimer = setTimeout(() => {
+    syncPromise =
+      syncPromise
+        .then(() => syncDBToSupabase())
+        .catch(error => {
+          console.error(
+            '❌ Sync queue error:',
+            error
+          );
+        });
+  }, 500);
+}
+
+// =====================================================
+// SYNC BEFORE PROCESS EXIT
+// =====================================================
+
+async function flushDatabase() {
+  clearTimeout(syncTimer);
+
+  try {
+    await syncPromise;
+    await syncDBToSupabase();
+  } catch (error) {
+    console.error(
+      '❌ Final database sync failed:',
+      error
+    );
+  }
+}
+
+process.on('SIGTERM', async () => {
+  console.log('🛑 SIGTERM received');
+  await flushDatabase();
+  process.exit(0);
+});
+
+process.on('SIGINT', async () => {
+  console.log('🛑 SIGINT received');
+  await flushDatabase();
+  process.exit(0);
+});
+
+// =====================================================
+// ADMIN API
+// =====================================================
+
 app.get('/api/admin/data', (req, res) => {
   let totalMessages = 0;
-  DB.messages.forEach(msgs => { totalMessages += msgs.length; });
 
-  const accountsList = Array.from(DB.accounts.values()).map(acc => {
-    const userObj = DB.users.get(acc.id);
-    return {
-      id: acc.id,
-      username: acc.username,
-      avatar: acc.avatar,
-      status: userObj ? userObj.status : 'offline'
-    };
+  DB.messages.forEach(messages => {
+    totalMessages += messages.length;
   });
+
+  const accountsList =
+    Array.from(DB.accounts.values())
+      .map(account => {
+        const user =
+          DB.users.get(account.id);
+
+        return {
+          id: account.id,
+          username: account.username,
+          avatar: account.avatar,
+          status: user
+            ? user.status
+            : 'offline'
+        };
+      });
 
   res.json({
     stats: {
       totalUsers: DB.accounts.size,
       totalGroups: DB.groups.size,
-      totalMessages: totalMessages
+      totalMessages
     },
     accounts: accountsList
   });
 });
 
 app.get('/api/admin/reports', (req, res) => {
-  if (!DB.reports) return res.json([]);
-  res.json(Array.from(DB.reports.values()));
+  res.json(
+    Array.from(DB.reports.values())
+  );
 });
 
 app.get('/api/admin/appeals', (req, res) => {
-  if (!DB.appeals) return res.json([]);
-  res.json(Array.from(DB.appeals.values()));
+  res.json(
+    Array.from(DB.appeals.values())
+  );
 });
 
-app.post('/api/admin/user/:id/restrict', (req, res) => {
-  const userId = req.params.id;
-  const userObj = DB.users.get(userId);
-  if (userObj) {
-    userObj.restrictedUntil = Date.now() + 24 * 60 * 60 * 1000;
-    saveDB();
-    io.to(userId).emit('auth:restricted', 'Tài khoản của bạn đã bị hạn chế nhắn tin trong 24 giờ do vi phạm nội quy.');
-    return res.json({ success: true, message: 'Đã hạn chế người dùng 24h thành công!' });
-  }
-  res.status(404).json({ success: false, message: 'Không tìm thấy người dùng!' });
-});
+// =====================================================
+// ADMIN RESTRICTION
+// =====================================================
 
-app.post('/api/admin/user/:id/lift-restriction', (req, res) => {
-  const userId = req.params.id;
-  const userObj = DB.users.get(userId);
-  if (userObj) {
-    delete userObj.restrictedUntil;
-    saveDB();
-    io.to(userId).emit('auth:unrestricted', 'Tài khoản của bạn đã được gỡ hạn chế nhắn tin.');
-    return res.json({ success: true, message: 'Đã gỡ hạn chế thành công!' });
-  }
-  res.status(404).json({ success: false, message: 'Không tìm thấy người dùng!' });
-});
+app.post(
+  '/api/admin/user/:id/restrict',
+  async (req, res) => {
+    const userId = req.params.id;
 
-app.post('/api/admin/user/:id/reduce-restriction', (req, res) => {
-  const userId = req.params.id;
-  const { hours } = req.body;
-  const userObj = DB.users.get(userId);
-  if (userObj && userObj.restrictedUntil) {
-    const reduceMs = (hours || 0) * 60 * 60 * 1000;
-    userObj.restrictedUntil = Math.max(Date.now(), userObj.restrictedUntil - reduceMs);
-    if (userObj.restrictedUntil <= Date.now()) {
-      delete userObj.restrictedUntil;
-    }
-    saveDB();
-    return res.json({ success: true, message: `Đã giảm ${hours} giờ hạn chế thành công!` });
-  }
-  res.status(404).json({ success: false, message: 'Không tìm thấy người dùng hoặc tài khoản không có hạn chế!' });
-});
+    const user = DB.users.get(userId);
 
-app.delete('/api/admin/report/:id', (req, res) => {
-  const reportId = req.params.id;
-  if (DB.reports.has(reportId)) {
-    DB.reports.delete(reportId);
-    saveDB();
-    return res.json({ success: true, message: 'Đã xóa báo cáo!' });
-  }
-  res.status(404).json({ success: false, message: 'Không tìm thấy báo cáo!' });
-});
-
-app.delete('/api/admin/user/:id', (req, res) => {
-  const userId = req.params.id;
-  let targetUsername = null;
-
-  for (let [username, acc] of DB.accounts.entries()) {
-    if (acc.id === userId) {
-      targetUsername = username;
-      break;
-    }
-  }
-
-  if (targetUsername) {
-    DB.accounts.delete(targetUsername);
-    DB.users.delete(userId);
-    DB.friends.delete(userId);
-    DB.groups.forEach(group => { group.members.delete(userId); });
-
-    io.to(userId).emit('auth:forced_logout');
-    saveDB();
-    return res.json({ success: true, message: 'Đã xóa tài khoản thành công!' });
-  }
-
-  res.status(404).json({ success: false, message: 'Không tìm thấy người dùng!' });
-});
-
-app.use(express.static(path.join(__dirname, 'public')));
-
-function syncUserData(target, userId) {
-  if (!target || !userId) return;
-
-  const friendSet = DB.friends.get(userId) || new Set();
-  const friendsList = Array.from(friendSet).map(id => {
-    let acc = null;
-    for (let a of DB.accounts.values()) { if (a.id === id) acc = a; }
-    const statusObj = DB.users.get(id);
-    return acc ? { ...acc, status: statusObj ? statusObj.status : 'offline' } : null;
-  }).filter(Boolean);
-
-  const incomingRequests = Array.from(DB.friendRequests.values())
-    .filter(r => r.toUserId === userId && r.status === 'pending');
-
-  const allRegisteredUsers = Array.from(DB.accounts.values()).map(a => ({
-    id: a.id,
-    username: a.username,
-    avatar: a.avatar,
-    status: DB.users.get(a.id)?.status || 'offline'
-  }));
-
-  const userGroups = [];
-  DB.groups.forEach(group => {
-    if (group.members.has(userId)) {
-      const memberDetails = Array.from(group.members).map(mId => {
-        let acc = null;
-        for (let a of DB.accounts.values()) { if (a.id === mId) acc = a; }
-        return acc ? { id: mId, username: acc.username, avatar: acc.avatar, isMuted: group.muted.has(mId) } : null;
-      }).filter(Boolean);
-
-      userGroups.push({
-        id: group.id,
-        name: group.name,
-        avatar: group.avatar,
-        membersCount: group.members.size,
-        adminId: group.adminId,
-        members: memberDetails
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy người dùng!'
       });
     }
-  });   
 
-  const payload = {
-    friends: friendsList,
-    requests: incomingRequests,
-    allUsers: allRegisteredUsers,
-    groups: userGroups
-  };
+    user.restrictedUntil =
+      Date.now() +
+      24 * 60 * 60 * 1000;
 
-  if (typeof target.emit === 'function') {
-    target.emit('data:sync', payload);
-    target.emit('receive_friend_requests', incomingRequests);
-  } else {
-    io.to(userId).emit('data:sync', payload);
-    io.to(userId).emit('receive_friend_requests', incomingRequests);
+    saveDB();
+
+    io.to(userId).emit(
+      'auth:restricted',
+      'Tài khoản của bạn đã bị hạn chế nhắn tin trong 24 giờ do vi phạm nội quy.'
+    );
+
+    res.json({
+      success: true,
+      message:
+        'Đã hạn chế người dùng 24h thành công!'
+    });
   }
-}
+);
 
-// ==========================================
-// SOCKET.IO REAL-TIME HANDLING
-// ==========================================
-io.on('connection', (socket) => {
-  let currentUser = null;
+app.post(
+  '/api/admin/user/:id/lift-restriction',
+  async (req, res) => {
+    const userId = req.params.id;
 
-  // --- LOGIC VIDEO CALL ---
-  socket.on("call_user", (data) => {
-    console.log(`📞 Nhận yêu cầu gọi từ ${currentUser ? currentUser.username : socket.id} tới user: ${data.userToCall}`);
-    
-    let targetUser = DB.users.get(data.userToCall);
-    if (!targetUser) {
-      for (let [uId, uObj] of DB.users.entries()) {
-        if (String(uId) === String(data.userToCall)) {
-          targetUser = uObj;
-          break;
-        }
-      }
-    }
+    const user = DB.users.get(userId);
 
-    if (!targetUser) {
-      return socket.emit("call_error", { message: "Không tìm thấy người dùng trong hệ thống!" });
-    }
-
-    const receiverRoomId = String(targetUser.id);
-    console.log(`🚀 Đang chuyển tiếp tín hiệu "incoming_call" tới Room: ${receiverRoomId}`);
-
-    io.to(receiverRoomId).emit("incoming_call", { 
-      signal: data.signalData, 
-      fromSocketId: socket.id, 
-      fromUserId: currentUser ? currentUser.id : null,
-      callerName: data.callerName || (currentUser ? currentUser.username : "Người dùng"),
-      callerAvatar: currentUser ? currentUser.avatar : "",
-      isVideo: data.isVideo || false
-    });
-  });
-
-  socket.on("answer_call", (data) => {
-    io.to(data.toSocketId || data.to).emit("call_accepted", data.signal);
-  });
-
-  socket.on("end_call", (data) => {
-    if (data.targetId) {
-      io.to(data.targetId).emit("call_ended");
-    }
-    if (data.toSocketId) {
-      io.to(data.toSocketId).emit("call_ended");
-    }
-  });
-
-  socket.on("reject_call", (data) => {
-    io.to(data.toSocketId || data.to).emit("call_rejected");
-  });
-  
-  socket.on('join_admin_room', (userData) => {
-    if (userData && userData.isAdmin) {
-      socket.join('admin_room');
-    }
-  });
-
-  socket.on('messages:clear_me', ({ roomId }) => {
-    if (!currentUser || !roomId) return;
-    const clearKey = `${currentUser.id}_${roomId}`;
-    DB.clearedChats.set(clearKey, Date.now());
-    saveDB();
-    socket.emit('messages:cleared_me', { roomId });
-  });
-
-  socket.on('messages:clear', ({ roomId }) => {
-    if (!roomId) return;
-    DB.messages.set(roomId, []);
-    saveDB();
-
-    if (roomId.startsWith('grp_')) {
-      io.to(roomId).emit('messages:cleared', { roomId });
-    } else {
-      const parts = roomId.split('_DM_');
-      if (parts.length === 2) {
-        io.to(parts[0]).to(parts[1]).emit('messages:cleared', { roomId });
-      } else {
-        socket.emit('messages:cleared', { roomId });
-      }
-    }
-  });
-
-  socket.on('messages:get', ({ roomId }) => {
-    if (!currentUser) return;
-    const msgs = DB.messages.get(roomId) || [];
-    const clearKey = `${currentUser.id}_${roomId}`;
-    const clearedAt = DB.clearedChats.get(clearKey) || 0;
-
-    const filteredMsgs = msgs.filter(m => {
-      const msgTime = typeof m.timestamp === 'number' ? m.timestamp : new Date(m.timestamp).getTime();
-      return msgTime > clearedAt;
-    });
-
-    socket.emit('messages:history', { roomId, messages: filteredMsgs });
-  });
-
-  socket.on('group:action', ({ action, groupId, targetId }) => {
-    if (!currentUser) return;
-    const group = DB.groups.get(groupId);
-    if (!group || !group.members.has(currentUser.id)) return;
-
-    const isAdmin = group.adminId === currentUser.id;
-
-    if (action === 'leave') {
-      if (isAdmin && group.members.size > 1) {
-        group.members.delete(currentUser.id);
-        const nextMemberId = Array.from(group.members)[0];
-        group.adminId = nextMemberId;
-      } else {
-        group.members.delete(currentUser.id);
-      }
-
-      socket.leave(groupId);
-      io.to(currentUser.id).emit('group:kicked_out'); 
-      Array.from(group.members).forEach(mId => io.to(mId).emit('group:updated'));
-      
-      if (group.members.size === 0) DB.groups.delete(groupId);
-      saveDB();
-      return;
-    }
-
-    if (!isAdmin) return socket.emit('message:error', 'Bạn không có quyền thực hiện thao tác này!');
-
-    if (action === 'delete_group') {
-      const allMembers = Array.from(group.members);
-      DB.groups.delete(groupId);
-      allMembers.forEach(mId => io.to(mId).emit('group:kicked_out'));
-      saveDB();
-      return;
-    }
-
-    if (!targetId || targetId === currentUser.id) return;
-
-    if (action === 'kick') {
-      group.members.delete(targetId);
-      group.muted.delete(targetId);
-      io.to(targetId).emit('group:kicked_out');
-    } else if (action === 'mute') {
-      group.muted.add(targetId);
-    } else if (action === 'unmute') {
-      group.muted.delete(targetId);
-    } else if (action === 'transfer_admin') {
-      group.adminId = targetId;
-    }
-
-    saveDB();
-    Array.from(group.members).forEach(mId => io.to(mId).emit('group:updated'));
-  });
-
-  socket.on('group:add_members', ({ groupId, newMemberIds }) => {
-    if (!currentUser || !groupId || !newMemberIds || newMemberIds.length === 0) return;
-    const group = DB.groups.get(groupId);
-    if (!group) return;
-
-    let isAdded = false;
-    newMemberIds.forEach(rawId => {
-      if (!group.members.has(rawId)) {
-        group.members.add(rawId);
-        isAdded = true;
-      }
-    });
-
-    if (isAdded) {
-      saveDB();
-      io.emit('group:updated');
-    }
-  });
-
-  // --- AUTHENTICATION ---
-  socket.on('auth:register', ({ username, password, avatar }) => {
-    if (!username || !password) {
-      return socket.emit('auth:error', 'Vui lòng nhập đầy đủ tên tài khoản và mật khẩu!');
-    }
-    
-    const cleanUsername = username.trim();
-    if (DB.accounts.has(cleanUsername)) {
-      return socket.emit('auth:error', 'Tài khoản này đã tồn tại!');
-    }
-
-    const userId = `usr_${Math.random().toString(36).substr(2, 9)}`;
-    const userAvatar = avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(cleanUsername)}`;
-    const account = { id: userId, username: cleanUsername, password, avatar: userAvatar };
-
-    DB.accounts.set(cleanUsername, account);
-    DB.friends.set(userId, new Set());
-    DB.users.set(userId, { id: userId, username: cleanUsername, avatar: userAvatar, status: 'online' });
-
-    saveDB();
-    socket.emit('auth:register_success', 'Tạo tài khoản thành công!');
-  });
-
-  socket.on('auth:login', ({ username, password }) => {
-    const cleanUsername = username ? username.trim() : '';
-    const acc = DB.accounts.get(cleanUsername);
-    
-    if (!acc || acc.password !== password) {
-      return socket.emit('auth:error', 'Tài khoản hoặc mật khẩu không chính xác!');
-    }
-
-    let user = DB.users.get(acc.id);
     if (!user) {
-      user = { id: acc.id, username: acc.username, avatar: acc.avatar, status: 'online' };
-      DB.users.set(acc.id, user);
-    } else {
-      user.status = 'online';
-      user.avatar = acc.avatar;
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy người dùng!'
+      });
     }
 
-    currentUser = user;
-    socket.join(user.id);
+    delete user.restrictedUntil;
 
-    DB.groups.forEach((group, groupId) => {
-      if (group.members.has(user.id)) socket.join(groupId);
+    saveDB();
+
+    io.to(userId).emit(
+      'auth:unrestricted',
+      'Tài khoản của bạn đã được gỡ hạn chế nhắn tin.'
+    );
+
+    res.json({
+      success: true,
+      message: 'Đã gỡ hạn chế thành công!'
     });
+  }
+);
 
-    socket.emit('auth:success', { token: user.id, user });
-    syncUserData(socket, user.id);
-    io.emit('users:sync', Array.from(DB.users.values()));
-  });
+app.post(
+  '/api/admin/user/:id/reduce-restriction',
+  async (req, res) => {
+    const userId = req.params.id;
+    const { hours } = req.body;
 
-  socket.on('auth:session', ({ userId }) => {
-    let foundAcc = null;
-    for (let acc of DB.accounts.values()) {
-      if (acc.id === userId) { foundAcc = acc; break; }
+    const user = DB.users.get(userId);
+
+    if (
+      !user ||
+      !user.restrictedUntil
+    ) {
+      return res.status(404).json({
+        success: false,
+        message:
+          'Không tìm thấy người dùng hoặc tài khoản không có hạn chế!'
+      });
     }
 
-    if (!foundAcc) return socket.emit('auth:session_invalid');
+    const reduceMs =
+      (hours || 0) *
+      60 *
+      60 *
+      1000;
 
-    let user = DB.users.get(userId) || { id: foundAcc.id, username: foundAcc.username, avatar: foundAcc.avatar, status: 'online' };
-    user.status = 'online';
-    user.avatar = foundAcc.avatar;
-    DB.users.set(userId, user);
+    user.restrictedUntil =
+      Math.max(
+        Date.now(),
+        user.restrictedUntil - reduceMs
+      );
 
-    currentUser = user;
-    socket.join(user.id);
+    if (
+      user.restrictedUntil <= Date.now()
+    ) {
+      delete user.restrictedUntil;
+    }
 
-    DB.groups.forEach((group, groupId) => {
-      if (group.members.has(user.id)) socket.join(groupId);
+    saveDB();
+
+    res.json({
+      success: true,
+      message:
+        `Đã giảm ${hours} giờ hạn chế thành công!`
     });
+  }
+);
 
-    socket.emit('auth:success', { token: user.id, user });
-    syncUserData(socket, user.id);
-    io.emit('users:sync', Array.from(DB.users.values()));
-  });
+// =====================================================
+// ADMIN REPORT DELETE
+// =====================================================
 
-  socket.on('group:create', ({ name, avatar, memberIds }) => {
-    if (!currentUser || !name || !memberIds) return;
-    const groupId = `grp_${Math.random().toString(36).substr(2, 9)}`;
-    const groupAvatar = avatar || `https://api.dicebear.com/7.x/identicon/svg?seed=${encodeURIComponent(name)}`;
-    
-    const membersSet = new Set([currentUser.id, ...memberIds]);
-    const groupObj = {
-      id: groupId,
-      name,
-      avatar: groupAvatar,
-      members: membersSet,
-      adminId: currentUser.id,
-      muted: new Set()
-    };
+app.delete(
+  '/api/admin/report/:id',
+  (req, res) => {
+    const reportId = req.params.id;
 
-    DB.groups.set(groupId, groupObj);
-    saveDB();
+    if (!DB.reports.has(reportId)) {
+      return res.status(404).json({
+        success: false,
+        message:
+          'Không tìm thấy báo cáo!'
+      });
+    }
 
-    membersSet.forEach(mId => io.to(mId).emit('group:updated'));
-    syncUserData(socket, currentUser.id);
-  });
+    DB.reports.delete(reportId);
 
-  socket.on('friend:request', ({ targetId, targetUserId }) => {
-    const finalTargetId = targetId || targetUserId;
-    if (!currentUser || currentUser.id === finalTargetId) return;
-    const reqId = `freq_${currentUser.id}_${finalTargetId}`;
+    // Xoá trực tiếp Supabase
+    syncPromise =
+      syncPromise.then(async () => {
+        await supabase
+          .from('reports')
+          .delete()
+          .eq('id', reportId);
+      });
 
-    DB.friendRequests.set(reqId, {
-      id: reqId,
-      fromUserId: currentUser.id,
-      fromUsername: currentUser.username,
-      fromAvatar: currentUser.avatar,
-      toUserId: finalTargetId,
-      status: 'pending'
+    res.json({
+      success: true,
+      message: 'Đã xóa báo cáo!'
     });
+  }
+);
 
-    saveDB();
-    io.to(finalTargetId).emit('friend:incoming');
-    syncUserData(io, finalTargetId);
-    syncUserData(socket, currentUser.id);
-  });
+// =====================================================
+// ADMIN DELETE USER
+// =====================================================
 
-  socket.on('friend:cancel_request', ({ targetId, targetUserId }) => {
-    const finalTargetId = targetId || targetUserId;
-    if (!currentUser || !finalTargetId) return;
-    const reqId = `freq_${currentUser.id}_${finalTargetId}`;
+app.delete(
+  '/api/admin/user/:id',
+  (req, res) => {
+    const userId = req.params.id;
 
-    if (DB.friendRequests.has(reqId)) {
-      DB.friendRequests.delete(reqId);
-      saveDB();
+    let targetUsername = null;
 
-      syncUserData(socket, currentUser.id);
-      syncUserData(io, finalTargetId);
-    }
-  });
-
-  socket.on('friend:accept', ({ reqId }) => {
-    const req = DB.friendRequests.get(reqId);
-    if (!req || req.status !== 'pending') return;
-
-    req.status = 'accepted';
-    if (!DB.friends.has(req.fromUserId)) DB.friends.set(req.fromUserId, new Set());
-    if (!DB.friends.has(req.toUserId)) DB.friends.set(req.toUserId, new Set());
-
-    DB.friends.get(req.fromUserId).add(req.toUserId);
-    DB.friends.get(req.toUserId).add(req.fromUserId);
-
-    saveDB();
-    
-    syncUserData(io, req.fromUserId);
-    syncUserData(socket, req.toUserId);
-
-    io.to(req.fromUserId).emit('friend:updated');
-    io.to(req.toUserId).emit('friend:updated');
-  });
-
-  socket.on('friend:unfriend', ({ friendId }) => {
-    if (!currentUser || !friendId) return;
-    const currentUserId = currentUser.id;
-
-    if (DB.friends.has(currentUserId)) DB.friends.get(currentUserId).delete(friendId);
-    if (DB.friends.has(friendId)) DB.friends.get(friendId).delete(currentUserId);
-
-    saveDB();
-    syncUserData(socket, currentUserId);
-    syncUserData(io, friendId);
-
-    io.to(friendId).emit('friend:updated');
-  });
-
-  socket.on('message:send', ({ roomId, content, type = 'text' }) => {
-    if (!currentUser || !content) return;
-
-    const userStatus = DB.users.get(currentUser.id);
-    if (userStatus && userStatus.restrictedUntil && userStatus.restrictedUntil > Date.now()) {
-      const hoursLeft = Math.ceil((userStatus.restrictedUntil - Date.now()) / (1000 * 60 * 60));
-      return socket.emit('message:error', `Tài khoản của bạn đang bị hạn chế nhắn tin trong ${hoursLeft} giờ tới!`);
-    }
-
-    if (roomId.startsWith('grp_')) {
-      const group = DB.groups.get(roomId);
-      if (group && group.muted.has(currentUser.id)) {
-        return socket.emit('message:error', 'Bạn đã bị cấm chat trong nhóm này!');
-      }
-    }
-    
-    const msg = {
-      id: `msg_${Math.random().toString(36).substr(2, 9)}`,
-      roomId,
-      sender: currentUser,
-      content,
-      type,
-      timestamp: Date.now()
-    };
-
-    if (!DB.messages.has(roomId)) DB.messages.set(roomId, []);
-    DB.messages.get(roomId).push(msg);
-    saveDB();
-
-    if (roomId.startsWith('grp_')) {
-      io.to(roomId).emit('message:received', msg);
-    } else {
-      const parts = roomId.split('_DM_');
-      if (parts.length === 2) {
-        io.to(parts[0]).to(parts[1]).emit('message:received', msg);
-      }
-    }
-  });
-
-  socket.on('report:submit', ({ targetId, reason, description, reporterId, reporterName }) => {
-    const finalReporterId = reporterId || (currentUser ? currentUser.id : null);
-    const finalReporterName = reporterName || (currentUser ? currentUser.username : 'Người dùng');
-
-    if (!finalReporterId || !targetId) return;
-    
-    let cleanTargetId = targetId;
-    if (cleanTargetId.includes('_DM_')) {
-      const parts = cleanTargetId.split('_DM_');
-      cleanTargetId = parts.find(id => id !== finalReporterId) || parts[0];
-    }
-
-    const reportId = `rep_${Math.random().toString(36).substr(2, 9)}`;
-    let targetUsername = cleanTargetId;
-    
-    for (let [uname, acc] of DB.accounts.entries()) {
-      if (acc.id === cleanTargetId) {
-        targetUsername = uname;
+    for (
+      const [username, account]
+      of DB.accounts.entries()
+    ) {
+      if (account.id === userId) {
+        targetUsername = username;
         break;
       }
     }
 
-    const reportObj = {
-      id: reportId,
-      reporterId: finalReporterId,
-      reporterName: finalReporterName,
-      targetId: cleanTargetId,
-      targetUsername: targetUsername,
-      reason: reason || 'Spam',
-      description: description || '',
-      timestamp: Date.now()
-    };
+    if (!targetUsername) {
+      return res.status(404).json({
+        success: false,
+        message:
+          'Không tìm thấy người dùng!'
+      });
+    }
 
-    if (!DB.reports) DB.reports = new Map();
-    DB.reports.set(reportId, reportObj);
+    DB.accounts.delete(targetUsername);
+    DB.users.delete(userId);
+    DB.friends.delete(userId);
+
+    DB.friendRequests.forEach(
+      (request, id) => {
+        if (
+          request.fromUserId === userId ||
+          request.toUserId === userId
+        ) {
+          DB.friendRequests.delete(id);
+        }
+      }
+    );
+
+    DB.groups.forEach(group => {
+      group.members.delete(userId);
+      group.muted.delete(userId);
+
+      if (group.adminId === userId) {
+        const nextAdmin =
+          Array.from(group.members)[0];
+
+        group.adminId = nextAdmin || null;
+      }
+    });
+
+    io.to(userId).emit(
+      'auth:forced_logout'
+    );
+
     saveDB();
 
-    io.emit('admin:new-report', Array.from(DB.reports.values()));
-    io.to('admin_room').emit('admin_notification', {
-      type: 'new_report',
-      title: 'Báo cáo vi phạm mới',
-      data: reportObj
+    res.json({
+      success: true,
+      message:
+        'Đã xóa tài khoản thành công!'
     });
-  });
-
-  socket.on('appeal:restriction', ({ reason, userId, username }) => {
-    const finalUserId = userId || (currentUser ? currentUser.id : null);
-    const finalUsername = username || (currentUser ? currentUser.username : 'Người dùng');
-
-    if (!finalUserId) return;
-
-    const appealId = `apl_${Math.random().toString(36).substr(2, 9)}`;
-    const appealObj = {
-      id: appealId,
-      userId: finalUserId,
-      username: finalUsername,
-      reason: reason || 'Xin gỡ hạn chế',
-      timestamp: Date.now(),
-      status: 'pending'
-    };
-
-    if (!DB.appeals) DB.appeals = new Map();
-    DB.appeals.set(appealId, appealObj);
-    saveDB();
-
-    io.emit('admin:new-appeal', Array.from(DB.appeals.values()));
-    io.to('admin_room').emit('admin_notification', {
-      type: 'restriction_appeal',
-      title: 'Yêu cầu gỡ/giảm hạn chế mới',
-      data: appealObj
-    });
-  });
-
-  socket.on('appeal:submit', (data) => {
-    socket.emit('appeal:restriction', data);
-  });
-
-  socket.on('disconnect', () => {
-    if (currentUser) {
-      currentUser.status = 'offline';
-      io.to('admin_room').emit('admin_notification', { type: 'user_offline', userId: currentUser.id });
-      io.emit('users:sync', Array.from(DB.users.values()));
-    }
-  });
-});
-
-const PORT = process.env.PORT || 3000;
-
-server.listen(PORT, async () => {
-  console.log(`[*] Web Chat Engine Online on port ${PORT}`);
-
-  if (process.env.NODE_ENV !== 'production') {
-    try {
-      const url = await ngrok.connect({ addr: PORT, authtoken_from_env: true });
-      console.log(`> 🌐 Link Ngrok (Local): ${url}`);
-    } catch (error) {
-      console.log('Không bật ngrok (chạy trên cloud hoặc chưa cấu hình token).');
-    }
   }
+);
+
+// =====================================================
+// SYNC USER DATA
+// =====================================================
+
+function syncUserData(target, userId) {
+  if (!target || !userId) {
+    return;
+  }
+
+  const friendSet =
+    DB.friends.get(userId) ||
+    new Set();
+
+  const friendsList =
+    Array.from(friendSet)
+      .map(friendId => {
+        const account =
+          Array.from(
+            DB.accounts.values()
+          )
+            .find(
+              account =>
+                account.id === friendId
+            );
+
+        const user =
+          DB.users.get(friendId);
+
+        return account
+          ? {
+              ...account,
+              status:
+                user?.status ||
+                'offline'
+            }
+          : null;
+      })
+      .filter(Boolean);
+
+  const incomingRequests =
+    Array.from(
+      DB.friendRequests.values()
+    )
+      .filter(
+        request =>
+          request.toUserId === userId &&
+          request.status === 'pending'
+      );
+
+  const allRegisteredUsers =
+    Array.from(
+      DB.accounts.values()
+    ).map(account => ({
+      id: account.id,
+      username: account.username,
+      avatar: account.avatar,
+      status:
+        DB.users.get(account.id)
+          ?.status ||
+        'offline'
+    }));
+
+  const userGroups = [];
+
+  DB.groups.forEach(group => {
+    if (!group.members.has(userId)) {
+      return;
+    }
+
+    const members =
+      Array.from(
+        group.members
+      ).map(memberId => {
+        const account =
+          Array.from(
+            DB.accounts.values()
+          ).find(
+            account =>
+              account.id === memberId
+          );
+
+        return account
+          ? {
+              id: memberId,
+              username: account.username,
+              avatar: account.avatar,
+              isMuted:
+                group.muted.has(
+                  memberId
+                )
+            }
+          : null;
+      })
+      .filter(Boolean);
+
+    userGroups.push({
+      id: group.id,
+      name: group.name,
+      avatar: group.avatar,
+      membersCount:
+        group.members.size,
+      adminId: group.adminId,
+      members
+    });
+  });
+
+  const payload = {
+    friends: friendsList,
+    requests:
+      incomingRequests,
+    allUsers:
+      allRegisteredUsers,
+    groups:
+      userGroups
+  };
+
+  target.emit(
+    'data:sync',
+    payload
+  );
+
+  target.emit(
+    'receive_friend_requests',
+    incomingRequests
+  );
+}
+
+// =====================================================
+// SOCKET.IO
+// =====================================================
+
+io.on('connection', socket => {
+  let currentUser = null;
+
+  // ===================================================
+  // VIDEO CALL
+  // ===================================================
+
+  socket.on(
+    'call_user',
+    data => {
+      console.log(
+        `📞 Call từ ${
+          currentUser
+            ? currentUser.username
+            : socket.id
+        } → ${data.userToCall}`
+      );
+
+      const targetUser =
+        DB.users.get(
+          data.userToCall
+        );
+
+      if (!targetUser) {
+        return socket.emit(
+          'call_error',
+          {
+            message:
+              'Không tìm thấy người dùng trong hệ thống!'
+          }
+        );
+      }
+
+      const receiverRoomId =
+        String(targetUser.id);
+
+      io.to(
+        receiverRoomId
+      ).emit(
+        'incoming_call',
+        {
+          signal:
+            data.signalData,
+
+          fromSocketId:
+            socket.id,
+
+          fromUserId:
+            currentUser
+              ? currentUser.id
+              : null,
+
+          callerName:
+            data.callerName ||
+            currentUser?.username ||
+            'Người dùng',
+
+          callerAvatar:
+            currentUser?.avatar || '',
+
+          isVideo:
+            !!data.isVideo
+        }
+      );
+    }
+  );
+
+  socket.on(
+    'answer_call',
+    data => {
+      if (!data?.toSocketId) {
+        return;
+      }
+
+      io.to(
+        data.toSocketId
+      ).emit(
+        'call_accepted',
+        data.signal
+      );
+    }
+  );
+
+  socket.on(
+    'reject_call',
+    data => {
+      if (!data?.toSocketId) {
+        return;
+      }
+
+      io.to(
+        data.toSocketId
+      ).emit(
+        'call_rejected'
+      );
+    }
+  );
+
+  socket.on(
+    'end_call',
+    data => {
+      if (
+        data?.targetId
+      ) {
+        io.to(
+          data.targetId
+        ).emit(
+          'call_ended'
+        );
+      }
+
+      if (
+        data?.toSocketId
+      ) {
+        io.to(
+          data.toSocketId
+        ).emit(
+          'call_ended'
+        );
+      }
+    }
+  );
+
+  // ===================================================
+  // ADMIN ROOM
+  // ===================================================
+
+  socket.on(
+    'join_admin_room',
+    userData => {
+      if (
+        userData &&
+        userData.isAdmin
+      ) {
+        socket.join(
+          'admin_room'
+        );
+      }
+    }
+  );
+
+  // ===================================================
+  // CLEAR CHAT
+  // ===================================================
+
+  socket.on(
+    'messages:clear_me',
+    ({ roomId }) => {
+      if (!currentUser || !roomId) {
+        return;
+      }
+
+      const key =
+        `${currentUser.id}_${roomId}`;
+
+      DB.clearedChats.set(
+        key,
+        Date.now()
+      );
+
+      saveDB();
+
+      socket.emit(
+        'messages:cleared_me',
+        {
+          roomId
+        }
+      );
+    }
+  );
+
+  socket.on(
+    'messages:clear',
+    ({ roomId }) => {
+      if (!roomId) {
+        return;
+      }
+
+      DB.messages.set(
+        roomId,
+        []
+      );
+
+      saveDB();
+
+      if (
+        roomId.startsWith('grp_')
+      ) {
+        io.to(roomId).emit(
+          'messages:cleared',
+          {
+            roomId
+          }
+        );
+
+        return;
+      }
+
+      const parts =
+        roomId.split('_DM_');
+
+      if (
+        parts.length === 2
+      ) {
+        io.to(parts[0])
+          .to(parts[1])
+          .emit(
+            'messages:cleared',
+            {
+              roomId
+            }
+          );
+      } else {
+        socket.emit(
+          'messages:cleared',
+          {
+            roomId
+          }
+        );
+      }
+    }
+  );
+
+  // ===================================================
+  // MESSAGE HISTORY
+  // ===================================================
+
+  socket.on(
+    'messages:get',
+    ({ roomId }) => {
+      if (!currentUser) {
+        return;
+      }
+
+      const messages =
+        DB.messages.get(
+          roomId
+        ) || [];
+
+      const clearKey =
+        `${currentUser.id}_${roomId}`;
+
+      const clearedAt =
+        DB.clearedChats.get(
+          clearKey
+        ) || 0;
+
+      const filtered =
+        messages.filter(
+          message =>
+            Number(message.timestamp) >
+            Number(clearedAt)
+        );
+
+      socket.emit(
+        'messages:history',
+        {
+          roomId,
+          messages: filtered
+        }
+      );
+    }
+  );
+
+  // ===================================================
+  // GROUP ACTION
+  // ===================================================
+
+  socket.on(
+    'group:action',
+    ({ action, groupId, targetId }) => {
+      if (!currentUser) {
+        return;
+      }
+
+      const group =
+        DB.groups.get(groupId);
+
+      if (
+        !group ||
+        !group.members.has(
+          currentUser.id
+        )
+      ) {
+        return;
+      }
+
+      const isAdmin =
+        group.adminId ===
+        currentUser.id;
+
+      // LEAVE
+      if (action === 'leave') {
+        if (
+          isAdmin &&
+          group.members.size > 1
+        ) {
+          group.members.delete(
+            currentUser.id
+          );
+
+          const nextMember =
+            Array.from(
+              group.members
+            )[0];
+
+          group.adminId =
+            nextMember;
+        } else {
+          group.members.delete(
+            currentUser.id
+          );
+        }
+
+        group.muted.delete(
+          currentUser.id
+        );
+
+        socket.leave(
+          groupId
+        );
+
+        io.to(
+          currentUser.id
+        ).emit(
+          'group:kicked_out'
+        );
+
+        Array.from(
+          group.members
+        ).forEach(memberId => {
+          io.to(memberId)
+            .emit(
+              'group:updated'
+            );
+        });
+
+        if (
+          group.members.size ===
+          0
+        ) {
+          DB.groups.delete(
+            groupId
+          );
+        }
+
+        saveDB();
+
+        return;
+      }
+
+      if (!isAdmin) {
+        return socket.emit(
+          'message:error',
+          'Bạn không có quyền thực hiện thao tác này!'
+        );
+      }
+
+      // DELETE GROUP
+      if (
+        action ===
+        'delete_group'
+      ) {
+        const members =
+          Array.from(
+            group.members
+          );
+
+        DB.groups.delete(
+          groupId
+        );
+
+        members.forEach(
+          memberId => {
+            io.to(memberId)
+              .emit(
+                'group:kicked_out'
+              );
+          }
+        );
+
+        saveDB();
+
+        return;
+      }
+
+      if (
+        !targetId ||
+        targetId ===
+        currentUser.id
+      ) {
+        return;
+      }
+
+      if (
+        action === 'kick'
+      ) {
+        group.members.delete(
+          targetId
+        );
+
+        group.muted.delete(
+          targetId
+        );
+
+        io.to(targetId).emit(
+          'group:kicked_out'
+        );
+      }
+
+      else if (
+        action === 'mute'
+      ) {
+        group.muted.add(
+          targetId
+        );
+      }
+
+      else if (
+        action === 'unmute'
+      ) {
+        group.muted.delete(
+          targetId
+        );
+      }
+
+      else if (
+        action ===
+        'transfer_admin'
+      ) {
+        if (
+          group.members.has(
+            targetId
+          )
+        ) {
+          group.adminId =
+            targetId;
+        }
+      }
+
+      saveDB();
+
+      Array.from(
+        group.members
+      ).forEach(memberId => {
+        io.to(memberId)
+          .emit(
+            'group:updated'
+          );
+      });
+    }
+  );
+
+  // ===================================================
+  // ADD MEMBERS
+  // ===================================================
+
+  socket.on(
+    'group:add_members',
+    ({
+      groupId,
+      newMemberIds
+    }) => {
+      if (
+        !currentUser ||
+        !groupId ||
+        !Array.isArray(
+          newMemberIds
+        ) ||
+        newMemberIds.length === 0
+      ) {
+        return;
+      }
+
+      const group =
+        DB.groups.get(
+          groupId
+        );
+
+      if (!group) {
+        return;
+      }
+
+      let changed = false;
+
+      newMemberIds.forEach(
+        userId => {
+          if (
+            !group.members.has(
+              userId
+            )
+          ) {
+            group.members.add(
+              userId
+            );
+
+            changed = true;
+          }
+        }
+      );
+
+      if (changed) {
+        saveDB();
+
+        Array.from(
+          group.members
+        ).forEach(memberId => {
+          io.to(memberId)
+            .emit(
+              'group:updated'
+            );
+        });
+      }
+    }
+  );
+
+  // ===================================================
+  // AUTH REGISTER
+  // ===================================================
+
+  socket.on(
+    'auth:register',
+    async ({
+      username,
+      password,
+      avatar
+    }) => {
+      try {
+        if (
+          !username ||
+          !password
+        ) {
+          return socket.emit(
+            'auth:error',
+            'Vui lòng nhập đầy đủ tên tài khoản và mật khẩu!'
+          );
+        }
+
+        const cleanUsername =
+          username.trim();
+
+        if (!cleanUsername) {
+          return socket.emit(
+            'auth:error',
+            'Tên tài khoản không được để trống!'
+          );
+        }
+
+        // Check cache
+        if (
+          DB.accounts.has(
+            cleanUsername
+          )
+        ) {
+          return socket.emit(
+            'auth:error',
+            'Tài khoản này đã tồn tại!'
+          );
+        }
+
+        // Check trực tiếp DB
+        const {
+          data: existingAccount,
+          error: accountCheckError
+        } = await supabase
+          .from('accounts')
+          .select('id')
+          .eq(
+            'username',
+            cleanUsername
+          )
+          .maybeSingle();
+
+        if (accountCheckError) {
+          throw accountCheckError;
+        }
+
+        if (existingAccount) {
+          return socket.emit(
+            'auth:error',
+            'Tài khoản này đã tồn tại!'
+          );
+        }
+
+        const userId =
+          generateId('usr');
+
+        const userAvatar =
+          avatar ||
+          `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(
+            cleanUsername
+          )}`;
+
+        const account = {
+          id: userId,
+          username:
+            cleanUsername,
+          password,
+          avatar:
+            userAvatar
+        };
+
+        const newUser = {
+          id: userId,
+          username:
+            cleanUsername,
+          avatar:
+            userAvatar,
+          status:
+            'offline'
+        };
+
+        // Insert account
+        const {
+          error: insertAccountError
+        } = await supabase
+          .from('accounts')
+          .insert({
+            id:
+              account.id,
+            username:
+              account.username,
+            password:
+              account.password,
+            avatar:
+              account.avatar
+          });
+
+        if (insertAccountError) {
+          throw insertAccountError;
+        }
+
+        // Insert user
+        const {
+          error: insertUserError
+        } = await supabase
+          .from('users')
+          .insert({
+            id:
+              newUser.id,
+            username:
+              newUser.username,
+            avatar:
+              newUser.avatar,
+            status:
+              newUser.status
+          });
+
+        if (insertUserError) {
+          // Rollback account
+          await supabase
+            .from('accounts')
+            .delete()
+            .eq(
+              'id',
+              userId
+            );
+
+          throw insertUserError;
+        }
+
+        // Update cache
+        DB.accounts.set(
+          cleanUsername,
+          account
+        );
+
+        DB.users.set(
+          userId,
+          newUser
+        );
+
+        DB.friends.set(
+          userId,
+          new Set()
+        );
+
+        socket.emit(
+          'auth:register_success',
+          'Tạo tài khoản thành công!'
+        );
+
+        console.log(
+          `✅ Đăng ký thành công: ${cleanUsername}`
+        );
+
+      } catch (error) {
+        console.error(
+          '❌ Register error:',
+          error
+        );
+
+        socket.emit(
+          'auth:error',
+          'Không thể tạo tài khoản. Vui lòng thử lại!'
+        );
+      }
+    }
+  );
+
+  // ===================================================
+  // AUTH LOGIN
+  // ===================================================
+
+  socket.on(
+    'auth:login',
+    async ({
+      username,
+      password
+    }) => {
+      try {
+        const cleanUsername =
+          username
+            ? username.trim()
+            : '';
+
+        const account =
+          DB.accounts.get(
+            cleanUsername
+          );
+
+        let acc = account;
+
+        // Fallback direct Supabase
+        if (!acc) {
+          const {
+            data,
+            error
+          } = await supabase
+            .from('accounts')
+            .select('*')
+            .eq(
+              'username',
+              cleanUsername
+            )
+            .maybeSingle();
+
+          if (error) {
+            throw error;
+          }
+
+          acc = data;
+        }
+
+        if (
+          !acc ||
+          acc.password !==
+            password
+        ) {
+          return socket.emit(
+            'auth:error',
+            'Tài khoản hoặc mật khẩu không chính xác!'
+          );
+        }
+
+        const userId =
+          acc.id;
+
+        let user =
+          DB.users.get(
+            userId
+          );
+
+        if (!user) {
+          const {
+            data,
+            error
+          } = await supabase
+            .from('users')
+            .select('*')
+            .eq(
+              'id',
+              userId
+            )
+            .maybeSingle();
+
+          if (error) {
+            throw error;
+          }
+
+          if (data) {
+            user = {
+              id:
+                data.id,
+              username:
+                data.username,
+              avatar:
+                data.avatar,
+              status:
+                'online',
+              restrictedUntil:
+                data.restricted_until
+                  ? new Date(
+                      data.restricted_until
+                    ).getTime()
+                  : undefined
+            };
+
+            DB.users.set(
+              userId,
+              user
+            );
+          }
+        }
+
+        if (!user) {
+          user = {
+            id:
+              acc.id,
+            username:
+              acc.username,
+            avatar:
+              acc.avatar,
+            status:
+              'online'
+          };
+
+          DB.users.set(
+            userId,
+            user
+          );
+        }
+
+        user.status =
+          'online';
+
+        user.avatar =
+          acc.avatar;
+
+        DB.users.set(
+          userId,
+          user
+        );
+
+        // Update status to Supabase
+        await supabase
+          .from('users')
+          .update({
+            status:
+              'online',
+            avatar:
+              acc.avatar
+          })
+          .eq(
+            'id',
+            userId
+          );
+
+        currentUser =
+          user;
+
+        socket.join(
+          user.id
+        );
+
+        // Join groups
+        DB.groups.forEach(
+          (
+            group,
+            groupId
+          ) => {
+            if (
+              group.members.has(
+                user.id
+              )
+            ) {
+              socket.join(
+                groupId
+              );
+            }
+          }
+        );
+
+        socket.emit(
+          'auth:success',
+          {
+            token:
+              user.id,
+            user
+          }
+        );
+
+        syncUserData(
+          socket,
+          user.id
+        );
+
+        io.emit(
+          'users:sync',
+          Array.from(
+            DB.users.values()
+          )
+        );
+
+      } catch (error) {
+        console.error(
+          '❌ Login error:',
+          error
+        );
+
+        socket.emit(
+          'auth:error',
+          'Không thể đăng nhập. Vui lòng thử lại!'
+        );
+      }
+    }
+  );
+
+  // ===================================================
+  // AUTH SESSION
+  // ===================================================
+
+  socket.on(
+    'auth:session',
+    async ({ userId }) => {
+      try {
+        if (!userId) {
+          return socket.emit(
+            'auth:session_invalid'
+          );
+        }
+
+        let foundAcc = null;
+
+        for (
+          const account
+          of DB.accounts.values()
+        ) {
+          if (
+            account.id ===
+            userId
+          ) {
+            foundAcc =
+              account;
+            break;
+          }
+        }
+
+        // Fallback Supabase
+        if (!foundAcc) {
+          const {
+            data,
+            error
+          } = await supabase
+            .from('accounts')
+            .select('*')
+            .eq(
+              'id',
+              userId
+            )
+            .maybeSingle();
+
+          if (error) {
+            throw error;
+          }
+
+          if (data) {
+            foundAcc =
+              data;
+
+            DB.accounts.set(
+              data.username,
+              data
+            );
+          }
+        }
+
+        if (!foundAcc) {
+          return socket.emit(
+            'auth:session_invalid'
+          );
+        }
+
+        let user =
+          DB.users.get(
+            userId
+          );
+
+        if (!user) {
+          const {
+            data,
+            error
+          } = await supabase
+            .from('users')
+            .select('*')
+            .eq(
+              'id',
+              userId
+            )
+            .maybeSingle();
+
+          if (error) {
+            throw error;
+          }
+
+          if (data) {
+            user = {
+              id:
+                data.id,
+              username:
+                data.username,
+              avatar:
+                data.avatar,
+              status:
+                'online',
+              restrictedUntil:
+                data.restricted_until
+                  ? new Date(
+                      data.restricted_until
+                    ).getTime()
+                  : undefined
+            };
+
+            DB.users.set(
+              userId,
+              user
+            );
+          }
+        }
+
+        if (!user) {
+          user = {
+            id:
+              foundAcc.id,
+            username:
+              foundAcc.username,
+            avatar:
+              foundAcc.avatar,
+            status:
+              'online'
+          };
+        }
+
+        user.status =
+          'online';
+
+        user.avatar =
+          foundAcc.avatar;
+
+        DB.users.set(
+          userId,
+          user
+        );
+
+        await supabase
+          .from('users')
+          .update({
+            status:
+              'online',
+            avatar:
+              foundAcc.avatar
+          })
+          .eq(
+            'id',
+            userId
+          );
+
+        currentUser =
+          user;
+
+        socket.join(
+          user.id
+        );
+
+        DB.groups.forEach(
+          (
+            group,
+            groupId
+          ) => {
+            if (
+              group.members.has(
+                user.id
+              )
+            ) {
+              socket.join(
+                groupId
+              );
+            }
+          }
+        );
+
+        socket.emit(
+          'auth:success',
+          {
+            token:
+              user.id,
+            user
+          }
+        );
+
+        syncUserData(
+          socket,
+          user.id
+        );
+
+        io.emit(
+          'users:sync',
+          Array.from(
+            DB.users.values()
+          )
+        );
+
+      } catch (error) {
+        console.error(
+          '❌ Session error:',
+          error
+        );
+
+        socket.emit(
+          'auth:session_invalid'
+        );
+      }
+    }
+  );
+
+  // ===================================================
+  // GROUP CREATE
+  // ===================================================
+
+  socket.on(
+    'group:create',
+    async ({
+      name,
+      avatar,
+      memberIds
+    }) => {
+      try {
+        if (
+          !currentUser ||
+          !name ||
+          !Array.isArray(
+            memberIds
+          )
+        ) {
+          return;
+        }
+
+        const groupId =
+          generateId(
+            'grp'
+          );
+
+        const groupAvatar =
+          avatar ||
+          `https://api.dicebear.com/7.x/identicon/svg?seed=${encodeURIComponent(
+            name
+          )}`;
+
+        const membersSet =
+          new Set([
+            currentUser.id,
+            ...memberIds
+          ]);
+
+        const group = {
+          id:
+            groupId,
+          name,
+          avatar:
+            groupAvatar,
+          members:
+            membersSet,
+          adminId:
+            currentUser.id,
+          muted:
+            new Set()
+        };
+
+        const {
+          error:
+            groupInsertError
+        } = await supabase
+          .from('groups')
+          .insert({
+            id:
+              group.id,
+            name:
+              group.name,
+            avatar:
+              group.avatar,
+            admin_id:
+              group.adminId
+          });
+
+        if (groupInsertError) {
+          throw groupInsertError;
+        }
+
+        const groupMemberRows =
+          Array.from(
+            membersSet
+          ).map(
+            userId => ({
+              group_id:
+                groupId,
+              user_id:
+                userId,
+              is_muted:
+                false
+            })
+          );
+
+        if (
+          groupMemberRows.length
+        ) {
+          const {
+            error
+          } = await supabase
+            .from(
+              'group_members'
+            )
+            .insert(
+              groupMemberRows
+            );
+
+          if (error) {
+            // rollback group
+            await supabase
+              .from('groups')
+              .delete()
+              .eq(
+                'id',
+                groupId
+              );
+
+            throw error;
+          }
+        }
+
+        DB.groups.set(
+          groupId,
+          group
+        );
+
+        membersSet.forEach(
+          memberId => {
+            socket.join(
+              groupId
+            );
+
+            io.to(
+              memberId
+            ).emit(
+              'group:updated'
+            );
+          }
+        );
+
+        syncUserData(
+          socket,
+          currentUser.id
+        );
+
+      } catch (error) {
+        console.error(
+          '❌ Group create error:',
+          error
+        );
+
+        socket.emit(
+          'message:error',
+          'Không thể tạo nhóm!'
+        );
+      }
+    }
+  );
+
+  // ===================================================
+  // FRIEND REQUEST
+  // ===================================================
+
+  socket.on(
+    'friend:request',
+    async ({
+      targetId,
+      targetUserId
+    }) => {
+      try {
+        const finalTargetId =
+          targetId ||
+          targetUserId;
+
+        if (
+          !currentUser ||
+          !finalTargetId ||
+          currentUser.id ===
+            finalTargetId
+        ) {
+          return;
+        }
+
+        const reqId =
+          `freq_${currentUser.id}_${finalTargetId}`;
+
+        const targetUser =
+          DB.users.get(
+            finalTargetId
+          );
+
+        if (!targetUser) {
+          return;
+        }
+
+        const request = {
+          id:
+            reqId,
+          fromUserId:
+            currentUser.id,
+          fromUsername:
+            currentUser.username,
+          fromAvatar:
+            currentUser.avatar,
+          toUserId:
+            finalTargetId,
+          status:
+            'pending'
+        };
+
+        const {
+          error
+        } = await supabase
+          .from(
+            'friend_requests'
+          )
+          .upsert({
+            id:
+              reqId,
+            from_user_id:
+              currentUser.id,
+            to_user_id:
+              finalTargetId,
+            status:
+              'pending'
+          }, {
+            onConflict:
+              'id'
+          });
+
+        if (error) {
+          throw error;
+        }
+
+        DB.friendRequests.set(
+          reqId,
+          request
+        );
+
+        io.to(
+          finalTargetId
+        ).emit(
+          'friend:incoming'
+        );
+
+        syncUserData(
+          io.to(finalTargetId),
+          finalTargetId
+        );
+
+        syncUserData(
+          socket,
+          currentUser.id
+        );
+
+      } catch (error) {
+        console.error(
+          '❌ Friend request error:',
+          error
+        );
+
+        socket.emit(
+          'message:error',
+          'Không thể gửi lời mời kết bạn!'
+        );
+      }
+    }
+  );
+
+  // ===================================================
+  // CANCEL FRIEND REQUEST
+  // ===================================================
+
+  socket.on(
+    'friend:cancel_request',
+    async ({
+      targetId,
+      targetUserId
+    }) => {
+      try {
+        const finalTargetId =
+          targetId ||
+          targetUserId;
+
+        if (
+          !currentUser ||
+          !finalTargetId
+        ) {
+          return;
+        }
+
+        const reqId =
+          `freq_${currentUser.id}_${finalTargetId}`;
+
+        DB.friendRequests.delete(
+          reqId
+        );
+
+        await supabase
+          .from(
+            'friend_requests'
+          )
+          .delete()
+          .eq(
+            'id',
+            reqId
+          );
+
+        syncUserData(
+          socket,
+          currentUser.id
+        );
+
+        const targetSockets =
+          io.sockets.adapter
+            .rooms.get(
+              String(
+                finalTargetId
+              )
+            );
+
+        if (
+          targetSockets &&
+          targetSockets.size
+        ) {
+          for (
+            const socketId
+            of targetSockets
+          ) {
+            const targetSocket =
+              io.sockets.sockets.get(
+                socketId
+              );
+
+            if (
+              targetSocket
+            ) {
+              syncUserData(
+                targetSocket,
+                finalTargetId
+              );
+            }
+          }
+        }
+
+      } catch (error) {
+        console.error(
+          '❌ Cancel request error:',
+          error
+        );
+      }
+    }
+  );
+
+  // ===================================================
+  // ACCEPT FRIEND
+  // ===================================================
+
+  socket.on(
+    'friend:accept',
+    async ({
+      reqId
+    }) => {
+      try {
+        const request =
+          DB.friendRequests.get(
+            reqId
+          );
+
+        if (
+          !request ||
+          request.status !==
+            'pending'
+        ) {
+          return;
+        }
+
+        request.status =
+          'accepted';
+
+        const fromId =
+          request.fromUserId;
+
+        const toId =
+          request.toUserId;
+
+        if (
+          !DB.friends.has(
+            fromId
+          )
+        ) {
+          DB.friends.set(
+            fromId,
+            new Set()
+          );
+        }
+
+        if (
+          !DB.friends.has(
+            toId
+          )
+        ) {
+          DB.friends.set(
+            toId,
+            new Set()
+          );
+        }
+
+        DB.friends
+          .get(fromId)
+          .add(toId);
+
+        DB.friends
+          .get(toId)
+          .add(fromId);
+
+        await supabase
+          .from(
+            'friend_requests'
+          )
+          .update({
+            status:
+              'accepted'
+          })
+          .eq(
+            'id',
+            reqId
+          );
+
+        await supabase
+          .from(
+            'friends'
+          )
+          .upsert(
+            [
+              {
+                user_id:
+                  fromId,
+                friend_id:
+                  toId
+              },
+              {
+                user_id:
+                  toId,
+                friend_id:
+                  fromId
+              }
+            ],
+            {
+              onConflict:
+                'user_id,friend_id'
+            }
+          );
+
+        saveDB();
+
+        syncUserData(
+          socket,
+          toId
+        );
+
+        const sockets =
+          io.sockets.sockets;
+
+        sockets.forEach(
+          targetSocket => {
+            if (
+              targetSocket.id !==
+              socket.id
+            ) {
+              syncUserData(
+                targetSocket,
+                fromId
+              );
+            }
+          }
+        );
+
+        io.to(
+          fromId
+        ).emit(
+          'friend:updated'
+        );
+
+        io.to(
+          toId
+        ).emit(
+          'friend:updated'
+        );
+
+      } catch (error) {
+        console.error(
+          '❌ Friend accept error:',
+          error
+        );
+      }
+    }
+  );
+
+  // ===================================================
+  // UNFRIEND
+  // ===================================================
+
+  socket.on(
+    'friend:unfriend',
+    async ({
+      friendId
+    }) => {
+      try {
+        if (
+          !currentUser ||
+          !friendId
+        ) {
+          return;
+        }
+
+        const currentUserId =
+          currentUser.id;
+
+        DB.friends
+          .get(currentUserId)
+          ?.delete(friendId);
+
+        DB.friends
+          .get(friendId)
+          ?.delete(currentUserId);
+
+        await supabase
+          .from('friends')
+          .delete()
+          .eq(
+            'user_id',
+            currentUserId
+          )
+          .eq(
+            'friend_id',
+            friendId
+          );
+
+        await supabase
+          .from('friends')
+          .delete()
+          .eq(
+            'user_id',
+            friendId
+          )
+          .eq(
+            'friend_id',
+            currentUserId
+          );
+
+        saveDB();
+
+        syncUserData(
+          socket,
+          currentUserId
+        );
+
+        io.to(
+          friendId
+        ).emit(
+          'friend:updated'
+        );
+
+      } catch (error) {
+        console.error(
+          '❌ Unfriend error:',
+          error
+        );
+      }
+    }
+  );
+
+  // ===================================================
+  // SEND MESSAGE
+  // ===================================================
+
+  socket.on(
+    'message:send',
+    async ({
+      roomId,
+      content,
+      type = 'text'
+    }) => {
+      try {
+        if (
+          !currentUser ||
+          !content ||
+          !roomId
+        ) {
+          return;
+        }
+
+        const userStatus =
+          DB.users.get(
+            currentUser.id
+          );
+
+        if (
+          userStatus &&
+          userStatus.restrictedUntil &&
+          userStatus.restrictedUntil >
+            Date.now()
+        ) {
+          const hoursLeft =
+            Math.ceil(
+              (
+                userStatus.restrictedUntil -
+                Date.now()
+              ) /
+              (
+                1000 *
+                60 *
+                60
+              )
+            );
+
+          return socket.emit(
+            'message:error',
+            `Tài khoản của bạn đang bị hạn chế nhắn tin trong ${hoursLeft} giờ tới!`
+          );
+        }
+
+        if (
+          roomId.startsWith('grp_')
+        ) {
+          const group =
+            DB.groups.get(
+              roomId
+            );
+
+          if (
+            group &&
+            group.muted.has(
+              currentUser.id
+            )
+          ) {
+            return socket.emit(
+              'message:error',
+              'Bạn đã bị cấm chat trong nhóm này!'
+            );
+          }
+        }
+
+        const message = {
+          id:
+            generateId('msg'),
+          roomId,
+          sender:
+            {
+              id:
+                currentUser.id,
+              username:
+                currentUser.username,
+              avatar:
+                currentUser.avatar
+            },
+          content,
+          type,
+          timestamp:
+            Date.now()
+        };
+
+        const {
+          error
+        } = await supabase
+          .from('messages')
+          .insert({
+            id:
+              message.id,
+            room_id:
+              roomId,
+            sender_id:
+              currentUser.id,
+            content,
+            type,
+            timestamp:
+              message.timestamp
+          });
+
+        if (error) {
+          throw error;
+        }
+
+        if (
+          !DB.messages.has(
+            roomId
+          )
+        ) {
+          DB.messages.set(
+            roomId,
+            []
+          );
+        }
+
+        DB.messages
+          .get(roomId)
+          .push(
+            message
+          );
+
+        if (
+          roomId.startsWith('grp_')
+        ) {
+          io.to(roomId).emit(
+            'message:received',
+            message
+          );
+        } else {
+          const parts =
+            roomId.split('_DM_');
+
+          if (
+            parts.length === 2
+          ) {
+            io.to(parts[0])
+              .to(parts[1])
+              .emit(
+                'message:received',
+                message
+              );
+          }
+        }
+
+      } catch (error) {
+        console.error(
+          '❌ Message send error:',
+          error
+        );
+
+        socket.emit(
+          'message:error',
+          'Không thể gửi tin nhắn!'
+        );
+      }
+    }
+  );
+
+  // ===================================================
+  // REPORT
+  // ===================================================
+
+  socket.on(
+    'report:submit',
+    async ({
+      targetId,
+      reason,
+      description,
+      reporterId,
+      reporterName
+    }) => {
+      try {
+        const finalReporterId =
+          reporterId ||
+          currentUser?.id ||
+          null;
+
+        const finalReporterName =
+          reporterName ||
+          currentUser?.username ||
+          'Người dùng';
+
+        if (
+          !finalReporterId ||
+          !targetId
+        ) {
+          return;
+        }
+
+        let cleanTargetId =
+          targetId;
+
+        if (
+          cleanTargetId.includes(
+            '_DM_'
+          )
+        ) {
+          const parts =
+            cleanTargetId.split(
+              '_DM_'
+            );
+
+          cleanTargetId =
+            parts.find(
+              id =>
+                id !==
+                finalReporterId
+            ) ||
+            parts[0];
+        }
+
+        const reportId =
+          generateId('rep');
+
+        const targetUser =
+          DB.users.get(
+            cleanTargetId
+          );
+
+        const targetUsername =
+          targetUser?.username ||
+          cleanTargetId;
+
+        const report = {
+          id:
+            reportId,
+          reporterId:
+            finalReporterId,
+          reporterName:
+            finalReporterName,
+          targetId:
+            cleanTargetId,
+          targetUsername,
+          reason:
+            reason ||
+            'Spam',
+          description:
+            description ||
+            '',
+          timestamp:
+            Date.now()
+        };
+
+        await supabase
+          .from('reports')
+          .insert({
+            id:
+              report.id,
+            reporter_id:
+              report.reporterId,
+            reporter_name:
+              report.reporterName,
+            target_id:
+              report.targetId,
+            target_username:
+              report.targetUsername,
+            reason:
+              report.reason,
+            description:
+              report.description,
+            timestamp:
+              report.timestamp
+          });
+
+        DB.reports.set(
+          reportId,
+          report
+        );
+
+        io.emit(
+          'admin:new-report',
+          Array.from(
+            DB.reports.values()
+          )
+        );
+
+        io.to(
+          'admin_room'
+        ).emit(
+          'admin_notification',
+          {
+            type:
+              'new_report',
+            title:
+              'Báo cáo vi phạm mới',
+            data:
+              report
+          }
+        );
+
+      } catch (error) {
+        console.error(
+          '❌ Report error:',
+          error
+        );
+      }
+    }
+  );
+
+  // ===================================================
+  // APPEAL
+  // ===================================================
+
+  socket.on(
+    'appeal:restriction',
+    async ({
+      reason,
+      userId,
+      username
+    }) => {
+      try {
+        const finalUserId =
+          userId ||
+          currentUser?.id ||
+          null;
+
+        const finalUsername =
+          username ||
+          currentUser?.username ||
+          'Người dùng';
+
+        if (!finalUserId) {
+          return;
+        }
+
+        const appealId =
+          generateId('apl');
+
+        const appeal = {
+          id:
+            appealId,
+          userId:
+            finalUserId,
+          username:
+            finalUsername,
+          reason:
+            reason ||
+            'Xin gỡ hạn chế',
+          timestamp:
+            Date.now(),
+          status:
+            'pending'
+        };
+
+        await supabase
+          .from('appeals')
+          .insert({
+            id:
+              appeal.id,
+            user_id:
+              appeal.userId,
+            username:
+              appeal.username,
+            reason:
+              appeal.reason,
+            timestamp:
+              appeal.timestamp,
+            status:
+              appeal.status
+          });
+
+        DB.appeals.set(
+          appealId,
+          appeal
+        );
+
+        io.emit(
+          'admin:new-appeal',
+          Array.from(
+            DB.appeals.values()
+          )
+        );
+
+        io.to(
+          'admin_room'
+        ).emit(
+          'admin_notification',
+          {
+            type:
+              'restriction_appeal',
+            title:
+              'Yêu cầu gỡ/giảm hạn chế mới',
+            data:
+              appeal
+          }
+        );
+
+      } catch (error) {
+        console.error(
+          '❌ Appeal error:',
+          error
+        );
+      }
+    }
+  );
+
+  socket.on(
+    'appeal:submit',
+    data => {
+      socket.emit(
+        'appeal:restriction',
+        data
+      );
+    }
+  );
+
+  // ===================================================
+  // DISCONNECT
+  // ===================================================
+
+  socket.on(
+    'disconnect',
+    async () => {
+      if (!currentUser) {
+        return;
+      }
+
+      currentUser.status =
+        'offline';
+
+      DB.users.set(
+        currentUser.id,
+        currentUser
+      );
+
+      try {
+        await supabase
+          .from('users')
+          .update({
+            status:
+              'offline'
+          })
+          .eq(
+            'id',
+            currentUser.id
+          );
+      } catch (error) {
+        console.error(
+          '❌ Offline status error:',
+          error
+        );
+      }
+
+      io.to(
+        'admin_room'
+      ).emit(
+        'admin_notification',
+        {
+          type:
+            'user_offline',
+          userId:
+            currentUser.id
+        }
+      );
+
+      io.emit(
+        'users:sync',
+        Array.from(
+          DB.users.values()
+        )
+      );
+    }
+  );
 });
+
+// =====================================================
+// START SERVER
+// =====================================================
+
+const PORT =
+  process.env.PORT || 3000;
+
+async function startServer() {
+  try {
+    await loadDB();
+
+    server.listen(
+      PORT,
+      async () => {
+        console.log(
+          `[*] Web Chat Engine Online on port ${PORT}`
+        );
+
+        console.log(
+          `[*] Supabase: ${SUPABASE_URL}`
+        );
+
+        if (
+          process.env.NODE_ENV !==
+          'production'
+        ) {
+          try {
+            const url =
+              await ngrok.connect({
+                addr: PORT,
+                authtoken_from_env:
+                  true
+              });
+
+            console.log(
+              `> 🌐 Link Ngrok (Local): ${url}`
+            );
+
+          } catch (error) {
+            console.log(
+              'Không bật ngrok (chạy trên cloud hoặc chưa cấu hình token).'
+            );
+          }
+        }
+      }
+    );
+
+  } catch (error) {
+    console.error(
+      '❌ Server không thể khởi động:',
+      error
+    );
+
+    process.exit(1);
+  }
+}
+
+startServer();
