@@ -279,20 +279,33 @@ io.on('connection', (socket) => {
   let currentUser = null;
 
   // --- LOGIC VIDEO CALL ---
-  socket.on("call_user", ({ targetUserId, signal, isVideo, callerName, callerAvatar }) => {
-    const targetSocketId = userSockets.get(targetUserId);
-
-    if (!targetSocketId) {
-      socket.emit('call_error', 'Người nhận hiện không trực tuyến');
-      return;
+  socket.on("call_user", (data) => {
+    console.log(`📞 Nhận yêu cầu gọi từ ${currentUser ? currentUser.username : socket.id} tới user: ${data.userToCall}`);
+    
+    let targetUser = DB.users.get(data.userToCall);
+    if (!targetUser) {
+      for (let [uId, uObj] of DB.users.entries()) {
+        if (String(uId) === String(data.userToCall)) {
+          targetUser = uObj;
+          break;
+        }
+      }
     }
 
-    io.to(targetSocketId).emit('incoming_call', {
-      fromSocketId: socket.id,
-      signal,
-      isVideo,
-      callerName,
-      callerAvatar
+    if (!targetUser) {
+      return socket.emit("call_error", { message: "Không tìm thấy người dùng trong hệ thống!" });
+    }
+
+    const receiverRoomId = String(targetUser.id);
+    console.log(`🚀 Đang chuyển tiếp tín hiệu "incoming_call" tới Room: ${receiverRoomId}`);
+
+    io.to(receiverRoomId).emit("incoming_call", { 
+      signal: data.signalData, 
+      fromSocketId: socket.id, 
+      fromUserId: currentUser ? currentUser.id : null,
+      callerName: data.callerName || (currentUser ? currentUser.username : "Người dùng"),
+      callerAvatar: currentUser ? currentUser.avatar : "",
+      isVideo: data.isVideo || false
     });
   });
 

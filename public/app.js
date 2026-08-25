@@ -839,13 +839,15 @@ async function startVideoCall(targetUserId, isVideo) {
     });
 
     peer.on('signal', (signalData) => {
-      socket.emit('call_user', {
-        targetUserId,
-        signal: signalData,
-        isVideo,
-        callerName: currentUser?.username || 'Ai đó',
-        callerAvatar: currentUser?.avatar || ''
-      });
+      if (typeof socket !== 'undefined') {
+        socket.emit('call_user', {
+          userToCall: targetUserId,
+          signalData: signalData,
+          callerName: currentUser?.username || 'Người dùng',
+          callerAvatar: currentUser?.avatar || '',
+          isVideo: isVideo
+        });
+      }
     });
 
     peer.on('stream', (remoteStream) => {
@@ -1591,13 +1593,12 @@ function answerCall() {
     });
 
     peer.on('signal', (signalData) => {
-      socket.emit('call_user', {
-        targetUserId,
-        signal: signalData,
-        isVideo,
-        callerName: currentUser?.username || 'Ai đó',
-        callerAvatar: currentUser?.avatar || ''
-      });
+      if (typeof socket !== 'undefined') {
+        socket.emit('answer_call', {
+          signal: signalData,
+          toSocketId: incomingCallDataGlobal.fromSocketId
+        });
+      }
     });
 
     peer.on('stream', (remoteStream) => {
@@ -1622,20 +1623,11 @@ function answerCall() {
 
 function rejectCall() {
   const popup = document.getElementById('incoming-call-popup');
-
-  if (popup) {
-    popup.style.display = 'none';
-    popup.classList.add('hidden');
-  }
-
+  if (popup) popup.style.display = 'none';
   if (incomingCallDataGlobal && typeof socket !== 'undefined') {
-    socket.emit('reject_call', {
-      toSocketId: incomingCallDataGlobal.fromSocketId
-    });
+    socket.emit('reject_call', { to: incomingCallDataGlobal.from });
   }
-
   incomingCallDataGlobal = null;
-  currentCallTargetId = null;
 }
 
 function endCall() {
