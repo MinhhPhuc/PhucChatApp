@@ -6,6 +6,20 @@ const fs = require('fs');
 const ngrok = require('ngrok');
 
 const app = express();
+const helmet = require('helmet');
+
+app.use(
+  helmet.contentSecurityPolicy({
+    directives: {
+      defaultSrc: ["'self'", "*", "data:", "blob:"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "*"],
+      styleSrc: ["'self'", "'unsafe-inline'", "*"],
+      connectSrc: ["'self'", "*", "wss:", "ws:"],
+      imgSrc: ["'self'", "*", "data:", "blob:"],
+    },
+  })
+);
+
 const server = http.createServer(app);
 
 // --- CẤU HÌNH CONTENT SECURITY POLICY (CSP) ---

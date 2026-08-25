@@ -169,12 +169,30 @@
       </div>
     </header>
 
-    <!-- THANH TÌM KIẾM -->
+        <!-- THANH TÌM KIẾM -->
     <div class="search-bar-container" style="padding: 14px 16px;">
       <div class="search-input-wrapper" style="display: flex; align-items: center; background: var(--bg-secondary, #2a2f35); border: 2px solid #3182ce; border-radius: 10px; padding: 4px 12px;">
         <i class="fa-solid fa-magnifying-glass search-icon" style="font-size: 18px; margin-right: 10px; color: #3182ce;"></i>
-        <input type="text" id="search-input" placeholder="Tìm kiếm bạn bè hoặc người dùng mới..." style="flex: 1; background: transparent; border: none; color: inherit; font-size: 16px; outline: none; padding: 8px 0;">
-        <button id="btn-clear-search" class="clear-btn hidden" style="background: none; border: none; cursor: pointer; font-size: 16px; color: #a0aec0;"><i class="fa-solid fa-xmark"></i></button>
+        
+        <!-- Đã thêm aria-label cho input -->
+        <input 
+          type="text" 
+          id="search-input" 
+          placeholder="Tìm kiếm bạn bè hoặc người dùng mới..." 
+          aria-label="Tìm kiếm bạn bè hoặc người dùng mới"
+          style="flex: 1; background: transparent; border: none; color: inherit; font-size: 16px; outline: none; padding: 8px 0;"
+        >
+        
+        <!-- Đã thêm type="button" và aria-label cho nút bấm xóa -->
+        <button 
+          type="button"
+          id="btn-clear-search" 
+          class="clear-btn hidden" 
+          aria-label="Xóa nội dung tìm kiếm"
+          style="background: none; border: none; cursor: pointer; font-size: 16px; color: #a0aec0;"
+        >
+          <i class="fa-solid fa-xmark"></i>
+        </button>
       </div>
     </div>
 
@@ -226,16 +244,52 @@
       </div>
 
       <footer class="chat-input-bar">
-        <button id="btn-emoji-toggle" class="icon-btn" title="Chọn Emoji"><i class="fa-solid fa-face-smile"></i></button>
-        <label for="image-upload-input" class="icon-btn image-upload-btn" title="Gửi ảnh">
+        <!-- Nút mở emoji -->
+        <button 
+          type="button" 
+          id="btn-emoji-toggle" 
+          class="icon-btn" 
+          title="Chọn Emoji" 
+          aria-label="Chọn Emoji"
+        >
+          <i class="fa-solid fa-face-smile"></i>
+        </button>
+
+        <!-- Nút tải ảnh -->
+        <label for="image-upload-input" class="icon-btn image-upload-btn" title="Gửi ảnh" aria-label="Gửi ảnh">
           <i class="fa-solid fa-image"></i>
         </label>
-        <input type="file" id="image-upload-input" accept="image/*" class="hidden">
+        <input type="file" id="image-upload-input" accept="image/*" class="hidden" aria-label="Tải ảnh lên">
         
-        <input type="text" id="msg-input" placeholder="Nhập tin nhắn...">
-        <button class="icon-btn send-btn" id="btn-send"><i class="fa-solid fa-paper-plane"></i></button>
+        <!-- Ô nhập tin nhắn -->
+        <input 
+          type="text" 
+          id="msg-input" 
+          placeholder="Nhập tin nhắn..." 
+          aria-label="Nhập tin nhắn"
+        >
+
+        <!-- Nút gửi tin nhắn -->
+        <button 
+          type="button" 
+          class="icon-btn send-btn" 
+          id="btn-send" 
+          title="Gửi tin nhắn" 
+          aria-label="Gửi tin nhắn"
+        >
+          <i class="fa-solid fa-paper-plane"></i>
+        </button>
         
-        <div id="quick-reaction-trigger" class="quick-reaction-btn" title="Gửi cảm xúc nhanh" style="font-size: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center; min-width: 36px; height: 36px; user-select: none;">
+        <!-- Nút thả thả tim / cảm xúc nhanh -->
+        <div 
+          id="quick-reaction-trigger" 
+          class="quick-reaction-btn" 
+          title="Gửi cảm xúc nhanh" 
+          role="button" 
+          tabindex="0" 
+          aria-label="Gửi cảm xúc nhanh" 
+          style="font-size: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center; min-width: 36px; height: 36px; user-select: none;"
+        >
           ❤️
         </div>
       </footer>
@@ -304,9 +358,34 @@
         </div>
         
         <form id="form-login" class="auth-form" onsubmit="return false;">
-          <input type="text" id="login-username" placeholder="Tên tài khoản..." required autocomplete="username">
-          <input type="password" id="login-password" placeholder="Mật khẩu..." required autocomplete="current-password">
-          <button type="submit" class="btn-primary" style="width:100%; background:#3182ce; color:white; border:none; padding:14px; border-radius:8px; font-weight:bold; cursor:pointer;">Đăng Nhập</button>
+          <!-- Ô nhập tên tài khoản -->
+          <input 
+            type="text" 
+            id="login-username" 
+            placeholder="Tên tài khoản..." 
+            aria-label="Tên tài khoản" 
+            required 
+            autocomplete="username"
+          >
+          
+          <!-- Ô nhập mật khẩu -->
+          <input 
+            type="password" 
+            id="login-password" 
+            placeholder="Mật khẩu..." 
+            aria-label="Mật khẩu" 
+            required 
+            autocomplete="current-password"
+          >
+          
+          <!-- Nút đăng nhập -->
+          <button 
+            type="submit" 
+            class="btn-primary" 
+            style="width:100%; background:#3182ce; color:white; border:none; padding:14px; border-radius:8px; font-weight:bold; cursor:pointer;"
+          >
+            Đăng Nhập
+          </button>
         </form>
 
         <form id="form-register" class="auth-form hidden" onsubmit="return false;">
