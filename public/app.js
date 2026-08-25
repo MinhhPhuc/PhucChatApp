@@ -784,10 +784,27 @@ function initiateCall(isVideo) {
   startVideoCall(targetUserId, isVideo);
 }
 
-// 1. KHỞI TẠO CUỘC GỌI (Người gọi đi)
+// 1. KHỞI TẠO CUỘC GỌI (Người gọi đi - Đã cập nhật giao diện chờ & tên/avatar)
 async function startVideoCall(targetUserId, isVideo) {
   currentCallTargetId = targetUserId;
   const currentUser = typeof getCurrentUser === 'function' ? getCurrentUser() : null;
+
+  // Lấy thông tin người nhận (tên và avatar) từ giao diện chat hiện tại
+  // (Bạn có thể điều chỉnh cách lấy này cho khớp với cấu trúc DOM lưu thông tin user của bạn)
+  const activeChatHeader = document.querySelector('.chat-header') || {};
+  const targetName = activeChatHeader.dataset?.username || 'Người dùng';
+  const targetAvatar = activeChatHeader.dataset?.avatar || 'https://via.placeholder.com/100';
+
+  // Cập nhật thông tin lên màn hình chờ gọi
+  const nameEl = document.getElementById('call-target-name');
+  const avatarEl = document.getElementById('call-target-avatar');
+  const statusEl = document.getElementById('call-status-text');
+  const waitingView = document.getElementById('call-waiting-view');
+
+  if (nameEl) nameEl.textContent = targetName;
+  if (avatarEl) avatarEl.src = targetAvatar;
+  if (statusEl) statusEl.textContent = 'Đang gọi...';
+  if (waitingView) waitingView.style.display = 'flex';
 
   try {
     // Xin quyền truy cập thiết bị (Micro / Camera)
@@ -796,7 +813,7 @@ async function startVideoCall(targetUserId, isVideo) {
       audio: true
     });
 
-    // Hiển thị giao diện màn hình cuộc gọi
+    // Hiển thị khung giao diện cuộc gọi
     const videoContainer = document.getElementById('video-call-container');
     if (videoContainer) videoContainer.style.display = 'flex';
 
@@ -820,12 +837,16 @@ async function startVideoCall(targetUserId, isVideo) {
           userToCall: targetUserId,
           signalData: signalData,
           callerName: currentUser?.username || 'Người dùng',
+          callerAvatar: currentUser?.avatar || '',
           isVideo: isVideo
         });
       }
     });
 
     peer.on('stream', (remoteStream) => {
+      // Khi người bên kia bắt máy, ẩn màn hình chờ (avatar/tên) để hiện video/kết nối
+      if (waitingView) waitingView.style.display = 'none';
+
       const remoteVideoEl = document.getElementById('remote-video');
       if (remoteVideoEl) {
         remoteVideoEl.srcObject = remoteStream;
@@ -847,95 +868,6 @@ async function startVideoCall(targetUserId, isVideo) {
     if (typeof showToast === 'function') showToast('Không thể truy cập Microphone hoặc Camera! Vui lòng kiểm tra quyền.', false);
     endCallCleanUp();
   }
-}
-
-// 2. CHẤP NHẬN CUỘC GỌI (Gắn vào window để chạy từ HTML onclick="answerCall()")
-async function answerCall() {
-  const popup = document.getElementById('incoming-call-popup');
-  if (popup) popup.style.display = 'none';
-
-  if (!incomingCallDataGlobal) return;
-
-  const isVideo = incomingCallDataGlobal.isVideo;
-
-  try {
-    localStream = await navigator.mediaDevices.getUserMedia({
-      video: isVideo ? { width: 1280, height: 720 } : false,
-      audio: true
-    });
-
-    const videoContainer = document.getElementById('video-call-container');
-    if (videoContainer) videoContainer.style.display = 'flex';
-
-    const localVideoEl = document.getElementById('local-video');
-    if (localVideoEl) {
-      localVideoEl.srcObject = isVideo ? localStream : null;
-      localVideoEl.style.display = isVideo ? 'block' : 'none';
-    }
-
-    // Khởi tạo SimplePeer ở phía nhận (initiator: false)
-    peer = new SimplePeer({
-      initiator: false,
-      trickle: false,
-      stream: localStream,
-      config: peerConfig
-    });
-
-    peer.on('signal', (signalData) => {
-      if (typeof socket !== 'undefined') {
-        socket.emit('answer_call', {
-          signal: signalData,
-          to: incomingCallDataGlobal.from
-        });
-      }
-    });
-
-    peer.on('stream', (remoteStream) => {
-      const remoteVideoEl = document.getElementById('remote-video');
-      if (remoteVideoEl) {
-        remoteVideoEl.srcObject = remoteStream;
-      }
-    });
-
-    peer.on('close', () => {
-      endCallCleanUp();
-    });
-
-    peer.on('error', (err) => {
-      console.error('Peer error:', err);
-      endCallCleanUp();
-    });
-
-    // Truyền tín hiệu offer của người gọi vào peer
-    peer.signal(incomingCallDataGlobal.signal);
-
-  } catch (err) {
-    console.error('Media devices error:', err);
-    if (typeof showToast === 'function') showToast('Không thể bật thiết bị âm thanh/hình ảnh!', false);
-    if (typeof socket !== 'undefined' && incomingCallDataGlobal) {
-      socket.emit('reject_call', { to: incomingCallDataGlobal.from });
-    }
-    endCallCleanUp();
-  }
-}
-
-// 3. TỪ CHỐI CUỘC GỌI (Gắn vào window cho HTML onclick="rejectCall()")
-function rejectCall() {
-  const popup = document.getElementById('incoming-call-popup');
-  if (popup) popup.style.display = 'none';
-
-  if (incomingCallDataGlobal && typeof socket !== 'undefined') {
-    socket.emit('reject_call', { to: incomingCallDataGlobal.from });
-  }
-  incomingCallDataGlobal = null;
-}
-
-// 4. KẾT THÚC CUỘC GỌI (Gắn vào window cho HTML onclick="endCall()")
-function endCall() {
-  if (currentCallTargetId && typeof socket !== 'undefined') {
-    socket.emit('end_call', { targetId: currentCallTargetId });
-  }
-  endCallCleanUp();
 }
 
 // Hàm dọn dẹp phần cứng, ngắt kết nối và ẩn giao diện cuộc gọi

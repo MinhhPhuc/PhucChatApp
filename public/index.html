@@ -477,33 +477,34 @@
 
   </div>
 
-  <!-- GIAO DIỆN MÀN HÌNH CUỘC GỌI -->
-  <div id="video-call-container" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.9); z-index: 9999; justify-content: center; align-items: center; flex-direction: column;">
-      <div style="position: relative; width: 90%; max-width: 800px; aspect-ratio: 16/9; background: #222; border-radius: 12px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
-          <!-- Video người nhận -->
-          <video id="remote-video" autoplay playsinline style="width: 100%; height: 100%; object-fit: cover;"></video>
-          <!-- Video người gọi (nhỏ ở góc) -->
-          <video id="local-video" autoplay muted playsinline style="position: absolute; bottom: 20px; right: 20px; width: 120px; height: 160px; object-fit: cover; border: 3px solid white; border-radius: 10px; background: #000;"></video>
-      </div>
+  <!-- Giao diện cuộc gọi (Voice/Video Call) -->
+  <div id="video-call-container" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: #0f0f0f; z-index: 9999; flex-direction: column; justify-content: space-between; align-items: center; padding: 40px 0;">
       
-      <div style="margin-top: 25px; display: flex; gap: 20px;">
-          <button id="btn-end-call-action" onclick="endCall()" style="background: #e53e3e; color: white; padding: 15px 30px; border: none; border-radius: 50px; font-size: 16px; font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 10px;">
-              <i class="fa-solid fa-phone-slash"></i> Kết thúc cuộc gọi
-          </button>
-      </div>
-  </div>
+      <!-- Video hiển thị từ người bên kia (Remote Video) hoặc màn hình chờ -->
+      <div style="position: relative; width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center;">
+          
+          <!-- Video của người bên kia -->
+          <video id="remote-video" autoplay playsinline style="width: 100%; height: 100%; object-fit: cover; position: absolute; top: 0; left: 0; z-index: 1;"></video>
+          
+          <!-- Giao diện chờ khi đang gọi (Hiện Avatar + Tên + Đang gọi...) -->
+          <div id="call-waiting-view" style="position: relative; z-index: 2; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+              <img id="call-target-avatar" src="https://via.placeholder.com/100" alt="Avatar" style="width: 110px; height: 110px; border-radius: 50%; object-fit: cover; margin-bottom: 16px; border: 3px solid rgba(255,255,255,0.1); box-shadow: 0 8px 24px rgba(0,0,0,0.5);">
+              <h2 id="call-target-name" style="color: #ffffff; font-size: 24px; font-weight: 600; margin-bottom: 6px;">Tên người nhận</h2>
+              <p id="call-status-text" style="color: #9e9e9e; font-size: 15px; font-weight: 400;">Đang gọi...</p>
+          </div>
 
-  <!-- POPUP CUỘC GỌI ĐẾN -->
-  <div id="incoming-call-popup" style="display: none; position: fixed; top: 20px; right: 20px; background: white; padding: 20px 25px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); z-index: 10000; text-align: center; border-left: 5px solid #38a169;">
-      <h4 style="margin: 0 0 10px 0; color: #2d3748;"><i class="fa-solid fa-video" style="color: #38a169;"></i> Cuộc gọi Video đến</h4>
-      <p style="margin-bottom: 15px; font-size: 15px;"><b id="caller-name-display" style="color: #2b6cb0;">Ai đó</b> đang gọi cho bạn...</p>
-      <div style="display: flex; gap: 10px; justify-content: center;">
-          <button onclick="answerCall()" style="background: #38a169; color: white; padding: 8px 15px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold;">
-              Nghe
-          </button>
-          <button onclick="rejectCall()" style="background: #e53e3e; color: white; padding: 8px 15px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold;">
-              Từ chối
-          </button>
+          <!-- Video nhỏ của chính mình (Local Video - hiển thị góc trên bên phải khi kết nối thành công) -->
+          <video id="local-video" autoplay muted playsinline style="position: absolute; top: 30px; right: 30px; width: 160px; height: 110px; object-fit: cover; border-radius: 12px; z-index: 3; display: none; border: 2px solid rgba(255,255,255,0.2); box-shadow: 0 4px 12px rgba(0,0,0,0.4);"></video>
+      </div>
+
+      <!-- Thanh công cụ điều khiển ở đáy màn hình (Giống hình mẫu) -->
+      <div style="position: absolute; bottom: 40px; display: flex; gap: 16px; z-index: 10; align-items: center;">
+          <button class="call-action-btn" title="Chia sẻ màn hình" style="width: 50px; height: 50px; border-radius: 50%; background: #2c2c2c; border: none; color: white; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 18px;"><i class="fas fa-desktop"></i></button>
+          <button class="call-action-btn" title="Thêm người" style="width: 50px; height: 50px; border-radius: 50%; background: #2c2c2c; border: none; color: white; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 18px;"><i class="fas fa-user-plus"></i></button>
+          <button class="call-action-btn" title="Bật/Tắt Camera" id="btn-toggle-cam" onclick="toggleVideoTrack()" style="width: 50px; height: 50px; border-radius: 50%; background: #2c2c2c; border: none; color: white; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 18px;"><i class="fas fa-video"></i></button>
+          <button class="call-action-btn" title="Bật/Tắt Mic" id="btn-toggle-mic" onclick="toggleAudioTrack()" style="width: 50px; height: 50px; border-radius: 50%; background: #2c2c2c; border: none; color: white; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 18px;"><i class="fas fa-microphone"></i></button>
+          <!-- Nút kết thúc cuộc gọi màu đỏ -->
+          <button class="call-action-btn" title="Kết thúc cuộc gọi" onclick="endCall()" style="width: 60px; height: 60px; border-radius: 50%; background: #ff3b30; border: none; color: white; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 22px;"><i class="fas fa-phone-slash"></i></button>
       </div>
   </div>
 
