@@ -17,10 +17,11 @@ let state = {
   activeFilter: 'all',
   nicknames: new Map(JSON.parse(localStorage.getItem('chat_nicknames') || '[]')),
   selectedRegAvatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=default',
-  selectedGroupAvatar: 'https://api.dicebear.com/7.x/identicon/svg?seed=group'
+  selectedGroupAvatar: 'https://api.dicebear.com/7.x/identicon/svg?seed=group',
+  incomingCallData: null
 };
 
-// --- HÀM HỖ TRỢ TRUY XUẤT USER HIỆN TẠI ---
+// --- 1. HÀM HỖ TRỢ & TIỆN ÍCH CHUNG ---
 function getCurrentUser() {
   return state.currentUser || JSON.parse(localStorage.getItem('user')) || {};
 }
@@ -36,20 +37,7 @@ function showToast(message, isSuccess = true) {
   }, 3000);
 }
 
-// Gửi yêu cầu kháng cáo từ phía người dùng bị hạn chế
-function submitRestrictionAppeal(reasonText) {
-  const currentUser = getCurrentUser();
-
-  socket.emit('appeal:submit', {
-    userId: currentUser.id,
-    username: currentUser.username,
-    reason: reasonText
-  });
-
-  showToast('Đã gửi yêu cầu hỗ trợ tới Quản trị viên!');
-}
-
-// --- MODAL XÁC NHẬN ---
+// Modal xác nhận toàn cục
 let confirmCallback = null;
 function showConfirmModal(title, message, onYes) {
   const modal = document.getElementById('modal-confirm');
@@ -66,7 +54,7 @@ function showConfirmModal(title, message, onYes) {
   modal.style.display = 'flex';
 }
 
-// --- QUẢN LÝ THEME CHUNG ---
+// --- 2. QUẢN LÝ THEME & GIAO DIỆN PHÒNG CHAT ---
 function applyTheme(theme) {
   state.theme = theme;
   document.documentElement.setAttribute('data-theme', theme);
@@ -85,7 +73,6 @@ if (btnToggleTheme) {
 }
 applyTheme(state.theme);
 
-// --- QUẢN LÝ CHỦ ĐỀ PHÒNG CHAT ---
 function applyRoomTheme(roomId) {
   const chatViewport = document.getElementById('messages-viewport') || document.querySelector('.chat-messages') || document.querySelector('.messages-container');
   const chatScreen = document.getElementById('chat-screen') || document.querySelector('.chat-area');
@@ -107,9 +94,7 @@ function applyRoomTheme(roomId) {
 function updateRequestBadge(requestsList) {
   const badge = document.getElementById('request-count-badge');
   if (!badge) return;
-
   const count = requestsList ? requestsList.length : 0;
-
   if (count >= 1) {
     badge.innerText = count;
     badge.style.display = 'inline-block';
@@ -118,7 +103,6 @@ function updateRequestBadge(requestsList) {
   }
 }
 
-// --- EMOJI NHANH ---
 function updateQuickReactionUI(roomId) {
   const trigger = document.getElementById('quick-reaction-trigger');
   if (!trigger) return;
@@ -126,7 +110,7 @@ function updateQuickReactionUI(roomId) {
   trigger.innerText = roomEmoji;
 }
 
-// --- TAB ĐĂNG NHẬP / ĐĂNG KÝ ---
+// --- 3. XỬ LÝ AUTHENTICATION & ĐĂNG NHẬP / ĐĂNG KÝ ---
 const tabLogin = document.getElementById('tab-btn-login');
 const tabRegister = document.getElementById('tab-btn-register');
 const formLogin = document.getElementById('form-login');
@@ -145,7 +129,7 @@ if (tabLogin && tabRegister && formLogin && formRegister) {
   };
 }
 
-// --- CHỌN AVATAR ---
+// Chọn Avatar đăng ký/nhóm
 const regAvatarFile = document.getElementById('reg-avatar-file');
 const regPreviewAvatar = document.getElementById('reg-preview-avatar');
 const regRandomAvatar = document.getElementById('reg-random-avatar');
@@ -155,8 +139,8 @@ if (regAvatarFile && regPreviewAvatar) {
     const file = e.target.files[0];
     if (file) {
       const reader = new FileReader();
-      reader.onload = (uploadEvent) => {
-        state.selectedRegAvatar = uploadEvent.target.result;
+      reader.onload = (ev) => {
+        state.selectedRegAvatar = ev.target.result;
         regPreviewAvatar.src = state.selectedRegAvatar;
       };
       reader.readAsDataURL(file);
@@ -171,23 +155,6 @@ if (regRandomAvatar && regPreviewAvatar) {
   };
 }
 
-const groupAvatarFile = document.getElementById('group-avatar-file');
-const groupPreviewAvatar = document.getElementById('group-preview-avatar');
-if (groupAvatarFile && groupPreviewAvatar) {
-  groupAvatarFile.onchange = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (ev) => {
-        state.selectedGroupAvatar = ev.target.result;
-        groupPreviewAvatar.src = state.selectedGroupAvatar;
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-}
-
-// --- XỬ LÝ AUTHENTICATION ---
 if (formLogin) {
   formLogin.onsubmit = (e) => {
     e.preventDefault();
@@ -228,62 +195,14 @@ socket.on('auth:success', ({ token, user }) => {
 });
 
 socket.on('auth:restricted', (message) => {
-  Swal.fire({
-    icon: 'warning',
-    title: 'Tài khoản bị hạn chế',
-    text: message,
-    confirmButtonColor: '#d33'
-  });
+  Swal.fire({ icon: 'warning', title: 'Tài khoản bị hạn chế', text: message, confirmButtonColor: '#d33' });
 });
 
-// Lắng nghe thông báo lỗi/hạn chế tin nhắn
-socket.on('message:error', (errorMsg) => {
-  if (errorMsg.includes('hạn chế')) {
-    Swal.fire({
-      icon: 'warning',
-      title: 'Tài khoản bị hạn chế',
-      text: errorMsg,
-      showCancelButton: true,
-      confirmButtonText: 'Đã hiểu',
-      cancelButtonText: '🛠️ Yêu cầu hỗ trợ gỡ hạn chế',
-      confirmButtonColor: '#d33',
-      cancelButtonColor: '#3182ce',
-      reverseButtons: true
-    }).then((result) => {
-      if (result.dismiss === Swal.DismissReason.cancel) {
-        Swal.fire({
-          title: 'Gửi yêu cầu hỗ trợ',
-          input: 'textarea',
-          inputPlaceholder: 'Nhập lý do hoặc lời nhắn tới Admin để xin giảm/gỡ án phạt...',
-          showCancelButton: true,
-          confirmButtonText: 'Gửi yêu cầu',
-          cancelButtonText: 'Hủy',
-          confirmButtonColor: '#3182ce',
-          cancelButtonColor: '#cbd5e0'
-        }).then((appealResult) => {
-          if (appealResult.isConfirmed) {
-            const reason = appealResult.value || 'Xin hỗ trợ gỡ hạn chế tài khoản';
-            const currentUsr = getCurrentUser();
-
-            socket.emit('appeal:restriction', { 
-              reason: reason,
-              userId: currentUsr?.id,
-              username: currentUsr?.username
-            });
-            showToast('Đã gửi yêu cầu hỗ trợ tới Admin thành công!');
-          }
-        });
-      }
-    });
-  } else {
-    Swal.fire({
-      icon: 'warning',
-      title: 'Thông báo',
-      text: errorMsg,
-      confirmButtonColor: '#d33',
-      confirmButtonText: 'Đã hiểu'
-    });
-  }
+socket.on('auth:forced_logout', () => {
+  localStorage.removeItem('chat_session_token');
+  localStorage.removeItem('user');
+  alert('Tài khoản của bạn đã bị quản trị viên xóa!');
+  location.reload();
 });
 
 const savedToken = localStorage.getItem('chat_session_token');
@@ -303,27 +222,7 @@ if (btnLogout) {
   };
 }
 
-// Sự kiện socket nhận danh sách lời mời kết bạn từ server
-socket.on('receive_friend_requests', (requests) => {
-  if (Array.isArray(requests)) {
-    state.requests = requests;
-    updateRequestBadge(state.requests);
-    renderChatList();
-  }
-});
-
-// Xử lý click ra ngoài modal cài đặt chat để đóng an toàn
-const modalChatSettings = document.getElementById('modal-chat-settings');
-if (modalChatSettings) {
-  modalChatSettings.addEventListener('click', function(e) {
-    if (e.target === modalChatSettings) {
-      modalChatSettings.style.display = 'none';
-      modalChatSettings.classList.add('hidden');
-    }
-  });
-}
-
-// --- TÌM KIẾM ---
+// --- 4. TÌM KIẾM & DANH SÁCH CHAT ---
 const searchInput = document.getElementById('search-input');
 const btnClearSearch = document.getElementById('btn-clear-search');
 
@@ -341,92 +240,6 @@ if (searchInput && btnClearSearch) {
   };
 }
 
-// --- GỬI TIN NHẮN VÀ EMOJI ---
-const btnEmoji = document.getElementById('btn-emoji-toggle');
-const emojiPicker = document.getElementById('emoji-picker');
-const msgInput = document.getElementById('msg-input');
-
-if (btnEmoji && emojiPicker) {
-  btnEmoji.onclick = (e) => { e.stopPropagation(); emojiPicker.classList.toggle('hidden'); };
-}
-document.querySelectorAll('.emoji-list span').forEach(el => {
-  el.onclick = () => { if (msgInput) { msgInput.value += el.innerText; msgInput.focus(); } };
-});
-document.onclick = (e) => {
-  if (emojiPicker && !emojiPicker.contains(e.target) && e.target !== btnEmoji) {
-    emojiPicker.classList.add('hidden');
-  }
-};
-
-document.getElementById('quick-reaction-trigger')?.addEventListener('click', () => {
-  if (state.activeRoomId) {
-    const quickEmoji = document.getElementById('quick-reaction-trigger')?.innerText || '❤️';
-    socket.emit('message:send', { roomId: state.activeRoomId, content: quickEmoji, type: 'text' });
-  }
-});
-
-const imageUploadInput = document.getElementById('image-upload-input');
-if (imageUploadInput) {
-  imageUploadInput.onchange = (e) => {
-    const file = e.target.files[0];
-    if (file && state.activeRoomId) {
-      const reader = new FileReader();
-      reader.onload = (uploadEvent) => {
-        socket.emit('message:send', { roomId: state.activeRoomId, content: uploadEvent.target.result, type: 'image' });
-        imageUploadInput.value = '';
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-}
-
-// --- SYNC DỮ LIỆU TỪ SERVER ---
-socket.on('data:sync', (data) => {
-  state.friends = data.friends || [];
-  state.requests = data.requests || [];
-  state.allUsers = data.allUsers || [];
-  state.groups = data.groups || [];
-
-  if (state.activeRoomId && state.activeRoomId.startsWith('grp_')) {
-    const currentGroup = state.groups.find(g => g.id === state.activeRoomId);
-    if (currentGroup) {
-      const count = currentGroup.members ? currentGroup.members.length : (currentGroup.membersCount || 0);
-      const statusEl = document.getElementById('active-chat-status');
-      if (statusEl) statusEl.innerText = `${count} thành viên`;
-    }
-  }
-
-  if (state.currentUser) {
-    state.friends.forEach(f => {
-      const dmRoomId = [state.currentUser.id, f.id].sort().join('_DM_');
-      socket.emit('messages:get', { roomId: dmRoomId });
-    });
-    state.groups.forEach(g => {
-      socket.emit('messages:get', { roomId: g.id });
-    });
-  }
-  renderChatList();
-  
-  const modalGroupSettings = document.getElementById('modal-group-settings');
-  if (modalGroupSettings && (modalGroupSettings.style.display === 'flex' || !modalGroupSettings.classList.contains('hidden'))) {
-    renderGroupSettingsModal();
-  }
-});
-
-socket.on('friend:incoming', () => { 
-  showToast('Bạn có lời mời kết bạn mới!');
-  if(state.currentUser) socket.emit('auth:session', { userId: state.currentUser.id }); 
-});
-socket.on('friend:updated', () => { if(state.currentUser) socket.emit('auth:session', { userId: state.currentUser.id }); });
-socket.on('group:updated', () => { if(state.currentUser) socket.emit('auth:session', { userId: state.currentUser.id }); });
-socket.on('auth:forced_logout', () => {
-  localStorage.removeItem('chat_session_token');
-  localStorage.removeItem('user');
-  alert('Tài khoản của bạn đã bị quản trị viên xóa!');
-  location.reload();
-});
-
-// --- RENDER DANH SÁCH CHAT (OPTIMIZED DOM RENDERING) ---
 function renderChatList() {
   const list = document.getElementById('chat-list');
   if (!list) return;
@@ -442,7 +255,6 @@ function renderChatList() {
       list.innerHTML = `<div class="empty-hint" style="text-align:center; padding:30px; color:var(--text-sub);">Không có lời mời kết bạn nào</div>`;
       return;
     }
-
     html += `<div style="padding: 8px 16px; font-weight: 600; color: var(--text-main);">Lời mời kết bạn (${state.requests.length})</div>`;
     state.requests.forEach(req => {
       html += `
@@ -463,12 +275,7 @@ function renderChatList() {
   let combinedChats = [];
 
   if ((filter === 'all' || filter === 'groups') && !query) {
-    const sortedGroups = [...state.groups];
-    const displayedGroups = filter === 'unread' 
-      ? sortedGroups.filter(g => (state.unreadCounts.get(g.id) || 0) > 0)
-      : sortedGroups;
-
-    displayedGroups.forEach(g => {
+    state.groups.forEach(g => {
       const lastMsg = state.lastMessages.get(g.id);
       const timeVal = lastMsg ? new Date(lastMsg.timestamp).getTime() : 0;
       combinedChats.push({ kind: 'group', item: g, timeVal });
@@ -514,18 +321,10 @@ function renderChatList() {
 
         html += `
           <div class="chat-item ${unreadCount > 0 ? 'unread' : ''}" onclick="openRoom('${g.id}', '${g.name}', '${g.avatar}', '${memberCount} thành viên')">
-            <div class="avatar-wrapper">
-              <img class="avatar" src="${g.avatar}">
-            </div>
+            <div class="avatar-wrapper"><img class="avatar" src="${g.avatar}"></div>
             <div class="chat-item-info">
-              <div class="chat-item-top">
-                <h4>${g.name}</h4>
-                <span class="chat-time">${timeText}</span>
-              </div>
-              <div class="chat-item-bottom">
-                <p class="chat-preview">${previewText}</p>
-                ${unreadCount > 0 ? `<span class="unread-badge">${unreadCount}</span>` : ''}
-              </div>
+              <div class="chat-item-top"><h4>${g.name}</h4><span class="chat-time">${timeText}</span></div>
+              <div class="chat-item-bottom"><p class="chat-preview">${previewText}</p>${unreadCount > 0 ? `<span class="unread-badge">${unreadCount}</span>` : ''}</div>
             </div>
           </div>
         `;
@@ -539,7 +338,6 @@ function renderChatList() {
 
         let previewText = 'Chưa có tin nhắn';
         let timeText = '';
-
         if (lastMsg) {
           const time = new Date(lastMsg.timestamp);
           timeText = `${time.getHours().toString().padStart(2, '0')}:${time.getMinutes().toString().padStart(2, '0')}`;
@@ -549,19 +347,10 @@ function renderChatList() {
 
         html += `
           <div class="chat-item ${unreadCount > 0 ? 'unread' : ''}" onclick="openRoom('${dmRoomId}', '${f.username}', '${f.avatar}', '${f.status === 'online' ? '🟢 Online' : '⚪ Offline'}')">
-            <div class="avatar-wrapper">
-              <img class="avatar" src="${f.avatar}">
-              <span class="status-dot ${f.status === 'online' ? 'online' : 'offline'}"></span>
-            </div>
+            <div class="avatar-wrapper"><img class="avatar" src="${f.avatar}"><span class="status-dot ${f.status === 'online' ? 'online' : 'offline'}"></span></div>
             <div class="chat-item-info">
-              <div class="chat-item-top">
-                <h4>${displayName}</h4>
-                <span class="chat-time">${timeText}</span>
-              </div>
-              <div class="chat-item-bottom">
-                <p class="chat-preview">${previewText}</p>
-                ${unreadCount > 0 ? `<span class="unread-badge">${unreadCount}</span>` : ''}
-              </div>
+              <div class="chat-item-top"><h4>${displayName}</h4><span class="chat-time">${timeText}</span></div>
+              <div class="chat-item-bottom"><p class="chat-preview">${previewText}</p>${unreadCount > 0 ? `<span class="unread-badge">${unreadCount}</span>` : ''}</div>
             </div>
           </div>
         `;
@@ -571,68 +360,45 @@ function renderChatList() {
 
   if (query && state.currentUser) {
     if (!state.sentRequests) state.sentRequests = new Set();
-
     const friendIds = new Set((state.friends || []).map(f => f.id));
-    const strangers = (state.allUsers || []).filter(u => 
-      u.id !== state.currentUser.id && 
-      !friendIds.has(u.id) && 
-      u.username.toLowerCase().includes(query.toLowerCase())
-    );
+    const strangers = (state.allUsers || []).filter(u => u.id !== state.currentUser.id && !friendIds.has(u.id) && u.username.toLowerCase().includes(query.toLowerCase()));
 
-    if (strangers.length > 0) {
-      strangers.forEach(u => {
-        const isSent = state.sentRequests.has(u.id);
+    strangers.forEach(u => {
+      const isSent = state.sentRequests.has(u.id);
+      const actionButton = isSent 
+        ? `<button class="btn-action gray" onclick="cancelFriendRequest('${u.id}')" style="background:#e4e6eb; color:#050505; border:none; padding:6px 12px; border-radius:16px; font-weight:600; cursor:pointer;">Hủy kết bạn</button>`
+        : `<button class="btn-action blue" onclick="sendFriendRequest('${u.id}')" style="background:#0084ff; color:#fff; border:none; padding:6px 12px; border-radius:16px; font-weight:600; cursor:pointer;">Kết Bạn</button>`;
 
-        let actionButton = '';
-        if (isSent) {
-          actionButton = `<button class="btn-action gray" onclick="cancelFriendRequest('${u.id}')" style="background:#e4e6eb; color:#050505; border:none; padding:6px 12px; border-radius:16px; font-weight:600; cursor:pointer;">Hủy kết bạn</button>`;
-        } else {
-          actionButton = `<button class="btn-action blue" onclick="sendFriendRequest('${u.id}')" style="background:#0084ff; color:#fff; border:none; padding:6px 12px; border-radius:16px; font-weight:600; cursor:pointer;">Kết Bạn</button>`;
-        }
-
-        html += `
-          <div class="chat-item" style="padding: 10px 14px;">
-            <img class="avatar" src="${u.avatar}">
-            <div style="flex:1; padding-left: 8px;">
-              <h4 style="margin:0; font-size: 14px;">${u.username}</h4>
-              <span style="font-size:12px; color:var(--text-sub);">${isSent ? 'Đã gửi lời mời' : 'Chưa kết bạn'}</span>
-            </div>
-            ${actionButton}
-          </div>
-        `;
-      });
-    }
+      html += `
+        <div class="chat-item" style="padding: 10px 14px;">
+          <img class="avatar" src="${u.avatar}">
+          <div style="flex:1; padding-left: 8px;"><h4 style="margin:0; font-size: 14px;">${u.username}</h4><span style="font-size:12px; color:var(--text-sub);">${isSent ? 'Đã gửi lời mời' : 'Chưa kết bạn'}</span></div>
+          ${actionButton}
+        </div>
+      `;
+    });
   }
-
   list.innerHTML = html;
 }
 
 function sendFriendRequest(userId) {
   socket.emit('friend:request', { targetId: userId });
-
   if (!state.sentRequests) state.sentRequests = new Set();
   state.sentRequests.add(userId);
-
   renderChatList();
   showToast('Đã gửi lời mời kết bạn!');
 }
 
 function cancelFriendRequest(userId) {
   socket.emit('friend:cancel_request', { targetId: userId });
-
-  if (state.sentRequests) {
-    state.sentRequests.delete(userId);
-  }
-
+  if (state.sentRequests) state.sentRequests.delete(userId);
   renderChatList();
   showToast('Đã hủy lời mời kết bạn');
 }
 
-function acceptFriend(reqId) { 
-  socket.emit('friend:accept', { reqId }); 
-}
+function acceptFriend(reqId) { socket.emit('friend:accept', { reqId }); }
 
-// --- MỞ PHÒNG CHAT ---
+// --- 5. QUẢN LÝ PHÒNG CHAT & TIN NHẮN ---
 function openRoom(roomId, name, avatar, status) {
   state.activeRoomId = roomId;
   state.unreadCounts.set(roomId, 0);
@@ -655,6 +421,7 @@ function openRoom(roomId, name, avatar, status) {
   const chatNameEl = document.getElementById('active-chat-name');
   const chatStatusEl = document.getElementById('active-chat-status');
   const chatScreen = document.getElementById('chat-screen');
+  const emojiPicker = document.getElementById('emoji-picker');
 
   if (chatNameEl) chatNameEl.innerText = displayName;
   if (chatStatusEl) chatStatusEl.innerText = displayStatus;
@@ -687,14 +454,47 @@ if (btnBackList) {
   };
 }
 
-// --- XỬ LÝ TIN NHẮN ---
+// Gửi tin nhắn
+const msgInput = document.getElementById('msg-input');
+const btnSend = document.getElementById('btn-send');
+
+function sendMessage() {
+  if (!msgInput) return;
+  const content = msgInput.value.trim();
+  if (content && state.activeRoomId) {
+    socket.emit('message:send', { roomId: state.activeRoomId, content, type: 'text' });
+    msgInput.value = '';
+    const emojiPicker = document.getElementById('emoji-picker');
+    if(emojiPicker) emojiPicker.classList.add('hidden');
+  }
+}
+
+if (btnSend) btnSend.onclick = sendMessage;
+if (msgInput) msgInput.onkeypress = (e) => { if (e.key === 'Enter') sendMessage(); };
+
+function appendMessage(msg) {
+  const viewport = document.getElementById('messages-viewport');
+  if (!viewport || !state.currentUser) return;
+  const isSelf = msg.sender.id === state.currentUser.id;
+  const div = document.createElement('div');
+  div.className = `msg ${isSelf ? 'self' : 'other'}`;
+
+  let bodyContent = msg.type === 'image' 
+    ? `<img src="${msg.content}" class="chat-image-sent" alt="Hình ảnh">`
+    : `<div class="msg-text-content">${msg.content}</div>`;
+
+  const isGroup = state.activeRoomId && state.activeRoomId.startsWith('grp_');
+  const showSenderName = !isSelf && isGroup;
+
+  div.innerHTML = `${showSenderName ? `<strong>${msg.sender.username}</strong><br>` : ''}${bodyContent}`;
+  viewport.appendChild(div);
+  viewport.scrollTop = viewport.scrollHeight;
+}
+
 socket.on('message:received', (msg) => {
   state.lastMessages.set(msg.roomId, { 
-    content: msg.content, 
-    timestamp: msg.timestamp, 
-    senderId: msg.sender.id, 
-    senderName: msg.sender.username, 
-    type: msg.type 
+    content: msg.content, timestamp: msg.timestamp, 
+    senderId: msg.sender.id, senderName: msg.sender.username, type: msg.type 
   });
   
   if (msg.roomId === state.activeRoomId) {
@@ -716,8 +516,7 @@ socket.on('messages:history', ({ roomId, messages }) => {
   if (messages && messages.length > 0) {
     const lastMsg = messages[messages.length - 1];
     state.lastMessages.set(roomId, {
-      content: lastMsg.content,
-      timestamp: lastMsg.timestamp,
+      content: lastMsg.content, timestamp: lastMsg.timestamp,
       senderId: lastMsg.sender?.id || lastMsg.senderId,
       senderName: lastMsg.sender?.username || lastMsg.senderName,
       type: lastMsg.type
@@ -728,59 +527,34 @@ socket.on('messages:history', ({ roomId, messages }) => {
   renderChatList();
 });
 
-// ==========================================
-// 1. KHỞI TẠO BIẾN TOÀN CỤC & CẤU HÌNH WEBRTC
-// ==========================================
+// --- 6. WEBRTC (GỌI THOẠI & VIDEO CALL) ---
 let peer = null;
 let localStream = null;
 let callTargetId = null;
 
-// Cấu hình STUN server miễn phí của Google để thông NAT
 const peerConfig = {
-  iceServers: [
-    { urls: 'stun:stun.l.google.com:19302' },
-    { urls: 'stun:stun1.l.google.com:19302' }
-  ]
+  iceServers: [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }]
 };
 
-// Lấy các phần tử DOM liên quan đến Video Call
 const localVideo = document.getElementById('localVideo');
 const remoteVideo = document.getElementById('remoteVideo');
 const videoContainer = document.getElementById('videoCallContainer');
 const incomingCallModal = document.getElementById('incomingCallModal');
 const callerNameText = document.getElementById('callerName');
 
-// ==========================================
-// 2. LẮNG NGHE SỰ KIỆN CLICK TRÊN GIAO DIỆN
-// ==========================================
 document.addEventListener('DOMContentLoaded', () => {
-  // Nút Gọi Thoại (Audio Call)
-  document.getElementById('btn-call-audio')?.addEventListener('click', () => {
-    initiateCall(false);
-  });
-
-  // Nút Gọi Video (Video Call)
-  document.getElementById('btn-call-video')?.addEventListener('click', () => {
-    initiateCall(true);
-  });
-
-  // Nút Kết thúc cuộc gọi
+  document.getElementById('btn-call-audio')?.addEventListener('click', () => initiateCall(false));
+  document.getElementById('btn-call-video')?.addEventListener('click', () => initiateCall(true));
   document.getElementById('btn-end-call')?.addEventListener('click', () => {
     socket.emit('end_call', { targetId: callTargetId });
     destroyCall();
   });
-
-  // Nút Chấp nhận cuộc gọi đến
   document.getElementById('btn-accept-call')?.addEventListener('click', acceptCall);
-
-  // Nút Từ chối cuộc gọi đến
   document.getElementById('btn-reject-call')?.addEventListener('click', rejectCall);
 });
 
-// Kiểm tra điều kiện trước khi khởi tạo cuộc gọi
 function initiateCall(isVideoCall) {
   if (!state.activeRoomId) return;
-
   if (state.activeRoomId.includes('_DM_')) {
     const parts = state.activeRoomId.split('_DM_');
     const targetUserId = parts.find(id => id !== state.currentUser?.id);
@@ -789,97 +563,57 @@ function initiateCall(isVideoCall) {
     if (!targetUser || targetUser.status === 'offline') {
       return showToast('Người dùng này hiện không Online!', false);
     }
-
     startVideoCall(targetUserId, isVideoCall);
   } else {
     showToast('Tính năng gọi nhóm hiện đang phát triển!', false);
   }
 }
 
-// ==========================================
-// 3. CÁC HÀM XỬ LÝ WEBRTC (CALL & RECEIVE)
-// ==========================================
-
-// Khởi tạo cuộc gọi (Người gọi)
 async function startVideoCall(targetUserId, isVideo = true) {
   callTargetId = targetUserId;
   const currentUsr = state.currentUser;
 
   try {
-    localStream = await navigator.mediaDevices.getUserMedia({
-      video: isVideo,
-      audio: true
-    });
-
+    localStream = await navigator.mediaDevices.getUserMedia({ video: isVideo, audio: true });
     if (localVideo) localVideo.srcObject = localStream;
     if (videoContainer) videoContainer.style.display = 'flex';
 
-    peer = new SimplePeer({
-      initiator: true,
-      trickle: false,
-      stream: localStream,
-      config: peerConfig
-    });
+    peer = new SimplePeer({ initiator: true, trickle: false, stream: localStream, config: peerConfig });
 
     peer.on('signal', (data) => {
-      socket.emit('call_user', {
-        userToCall: targetUserId,
-        signalData: data,
-        callerName: currentUsr?.username || 'Người dùng',
-        isVideo: isVideo
-      });
+      socket.emit('call_user', { userToCall: targetUserId, signalData: data, callerName: currentUsr?.username || 'Người dùng', isVideo });
     });
-
     peer.on('stream', (stream) => {
       if (remoteVideo) remoteVideo.srcObject = stream;
     });
-
     peer.on('close', destroyCall);
     peer.on('error', (err) => console.error('Peer error:', err));
-
   } catch (err) {
     showToast('Không thể truy cập Microphone hoặc Camera!', false);
-    console.error(err);
     destroyCall();
   }
 }
 
-// Chấp nhận cuộc gọi (Người nhận)
 async function acceptCall() {
   if (incomingCallModal) incomingCallModal.style.display = 'none';
 
   try {
-    localStream = await navigator.mediaDevices.getUserMedia({
-      video: state.incomingCallData.isVideo,
-      audio: true
-    });
-
+    localStream = await navigator.mediaDevices.getUserMedia({ video: state.incomingCallData.isVideo, audio: true });
     if (localVideo) localVideo.srcObject = localStream;
     if (videoContainer) videoContainer.style.display = 'flex';
 
-    peer = new SimplePeer({
-      initiator: false,
-      trickle: false,
-      stream: localStream,
-      config: peerConfig
-    });
+    peer = new SimplePeer({ initiator: false, trickle: false, stream: localStream, config: peerConfig });
 
     peer.on('signal', (data) => {
-      socket.emit('answer_call', {
-        signal: data,
-        to: state.incomingCallData.from
-      });
+      socket.emit('answer_call', { signal: data, to: state.incomingCallData.from });
     });
-
     peer.on('stream', (stream) => {
       if (remoteVideo) remoteVideo.srcObject = stream;
     });
-
     peer.on('close', destroyCall);
     peer.on('error', (err) => console.error('Peer error:', err));
 
     peer.signal(state.incomingCallData.signal);
-
   } catch (err) {
     showToast('Không thể kết nối Microphone/Camera!', false);
     socket.emit('reject_call', { to: state.incomingCallData.from });
@@ -887,7 +621,6 @@ async function acceptCall() {
   }
 }
 
-// Từ chối cuộc gọi
 function rejectCall() {
   if (state.incomingCallData) {
     socket.emit('reject_call', { to: state.incomingCallData.from });
@@ -896,140 +629,67 @@ function rejectCall() {
   state.incomingCallData = null;
 }
 
-// Dọn dẹp tài nguyên khi cuộc gọi kết thúc
 function destroyCall() {
-  if (peer) {
-    peer.destroy();
-    peer = null;
-  }
-
-  if (localStream) {
-    localStream.getTracks().forEach(track => track.stop());
-    localStream = null;
-  }
-
+  if (peer) { peer.destroy(); peer = null; }
+  if (localStream) { localStream.getTracks().forEach(track => track.stop()); localStream = null; }
   if (localVideo) localVideo.srcObject = null;
   if (remoteVideo) remoteVideo.srcObject = null;
   if (videoContainer) videoContainer.style.display = 'none';
   if (incomingCallModal) incomingCallModal.style.display = 'none';
-
   callTargetId = null;
   state.incomingCallData = null;
 }
 
-// ==========================================
-// 4. LẮNG NGHE TÍN HIỆU TỪ SOCKET.IO
-// ==========================================
-
-// Khi có người gọi tới
 socket.on('incoming_call', (data) => {
-  // data bao gồm: { from, signal, callerName, isVideo }
   state.incomingCallData = data;
   callTargetId = data.from;
+  if (callerNameText) callerNameText.textContent = `${data.callerName} đang gọi ${data.isVideo ? 'Video' : 'Thoại'}...`;
+  if (incomingCallModal) incomingCallModal.style.display = 'flex';
+});
 
-  if (callerNameText) {
-    callerNameText.textContent = `${data.callerName} đang gọi ${data.isVideo ? 'Video' : 'Thoại'}...`;
+socket.on('call_accepted', (signal) => { if (peer) peer.signal(signal); });
+socket.on('call_rejected', () => { destroyCall(); showToast('Người dùng đã từ chối cuộc gọi!', false); });
+socket.on('call_ended', () => { destroyCall(); showToast('Cuộc gọi đã kết thúc.', true); });
+socket.on('call_error', (data) => { destroyCall(); showToast(data.message || 'Lỗi cuộc gọi!', false); });
+
+// --- 7. QUẢN LÝ NHÓM & CÁC SỰ KIỆN GIAO DIỆN KHÁC ---
+socket.on('data:sync', (data) => {
+  state.friends = data.friends || [];
+  state.requests = data.requests || [];
+  state.allUsers = data.allUsers || [];
+  state.groups = data.groups || [];
+
+  if (state.activeRoomId && state.activeRoomId.startsWith('grp_')) {
+    const currentGroup = state.groups.find(g => g.id === state.activeRoomId);
+    if (currentGroup) {
+      const count = currentGroup.members ? currentGroup.members.length : (currentGroup.membersCount || 0);
+      const statusEl = document.getElementById('active-chat-status');
+      if (statusEl) statusEl.innerText = `${count} thành viên`;
+    }
   }
-  if (incomingCallModal) {
-    incomingCallModal.style.display = 'flex';
+
+  if (state.currentUser) {
+    state.friends.forEach(f => {
+      const dmRoomId = [state.currentUser.id, f.id].sort().join('_DM_');
+      socket.emit('messages:get', { roomId: dmRoomId });
+    });
+    state.groups.forEach(g => socket.emit('messages:get', { roomId: g.id }));
   }
-});
-
-// Khi người nghe chấp nhận cuộc gọi
-socket.on('call_accepted', (signal) => {
-  if (peer) {
-    peer.signal(signal);
-  }
-});
-
-// Khi cuộc gọi bị từ chối
-socket.on('call_rejected', () => {
-  destroyCall();
-  showToast('Người dùng đã từ chối cuộc gọi!', false);
-});
-
-// Khi đối phương ngắt kết nối/dập máy
-socket.on('call_ended', () => {
-  destroyCall();
-  showToast('Cuộc gọi đã kết thúc.', true);
-});
-
-// Khi gặp lỗi từ server (ví dụ: người dùng bận)
-socket.on('call_error', (data) => {
-  destroyCall();
-  showToast(data.message || 'Lỗi cuộc gọi!', false);
-});
-
-// Xóa đoạn chat thành công
-socket.on('messages:cleared_me', ({ roomId }) => {
-  if (state.activeRoomId === roomId) {
-    const viewport = document.getElementById('messages-viewport');
-    if (viewport) viewport.innerHTML = '';
-  }
-  state.lastMessages.delete(roomId);
   renderChatList();
 });
 
-socket.on('messages:cleared', ({ roomId }) => {
-  if (state.activeRoomId === roomId) {
-    const viewport = document.getElementById('messages-viewport');
-    if (viewport) viewport.innerHTML = '';
-  }
-  state.lastMessages.delete(roomId);
-  renderChatList();
-});
-
-function sendMessage() {
-  if (!msgInput) return;
-  const content = msgInput.value.trim();
-  if (content && state.activeRoomId) {
-    socket.emit('message:send', { roomId: state.activeRoomId, content, type: 'text' });
-    msgInput.value = '';
-    if(emojiPicker) emojiPicker.classList.add('hidden');
-  }
-}
-
-const btnSend = document.getElementById('btn-send');
-if (btnSend) btnSend.onclick = sendMessage;
-if (msgInput) msgInput.onkeypress = (e) => { if (e.key === 'Enter') sendMessage(); };
-
-function appendMessage(msg) {
-  const viewport = document.getElementById('messages-viewport');
-  if (!viewport || !state.currentUser) return;
-  const isSelf = msg.sender.id === state.currentUser.id;
-  const div = document.createElement('div');
-  div.className = `msg ${isSelf ? 'self' : 'other'}`;
-
-  let bodyContent = '';
-  if (msg.type === 'image') {
-    bodyContent = `<img src="${msg.content}" class="chat-image-sent" alt="Hình ảnh">`;
-  } else {
-    bodyContent = `<div class="msg-text-content">${msg.content}</div>`;
-  }
-
-  const isGroup = state.activeRoomId && state.activeRoomId.startsWith('grp_');
-  const showSenderName = !isSelf && isGroup;
-
-  div.innerHTML = `${showSenderName ? `<strong>${msg.sender.username}</strong><br>` : ''}${bodyContent}`;
-  viewport.appendChild(div);
-  viewport.scrollTop = viewport.scrollHeight;
-}
-
-// --- RENDERING THÀNH VIÊN TẠO NHÓM CHUẨN ---
 function renderGroupMembersCheckbox(preSelectedFriendId = null) {
   const container = document.getElementById('group-members-list');
   if (!container) return;
-
   if (state.friends.length === 0) {
     container.innerHTML = '<p style="font-size: 13px; color: #718096; text-align: center; padding: 10px;">Chưa có bạn bè để thêm</p>';
     return;
   }
-
   let html = '';
   state.friends.forEach(f => {
     const isChecked = f.id === preSelectedFriendId ? 'checked' : '';
     html += `
-      <label class="member-checkbox-item" style="display: flex; align-items: center; justify-content: flex-start; gap: 12px; padding: 8px 10px; cursor: pointer; width: 100%; box-sizing: border-box;">
+      <label class="member-checkbox-item" style="display: flex; align-items: center; gap: 12px; padding: 8px 10px; cursor: pointer; width: 100%; box-sizing: border-box;">
         <input type="checkbox" value="${f.id}" class="group-member-checkbox" ${isChecked} style="width: 18px; height: 18px; margin: 0; flex-shrink: 0;">
         <img src="${f.avatar}" style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover; flex-shrink: 0; margin: 0;">
         <span style="font-size: 14px; font-weight: 500; text-align: left; flex: 1; margin: 0;">${f.username}</span>
@@ -1108,7 +768,6 @@ window.execGroupAction = function(action, targetId) {
       modalGroupSettings.style.display = 'none';
       modalGroupSettings.classList.add('hidden');
     }
-
     state.groups = state.groups.filter(g => g.id !== currentGroupId);
     const chatScreen = document.getElementById('chat-screen');
     if (chatScreen) chatScreen.classList.add('hidden');
@@ -1120,7 +779,7 @@ window.execGroupAction = function(action, targetId) {
   }
 };
 
-// --- BỘ ĐIỀU KHIỂN EVENT CLICK HỢP NHẤT ---
+// Event delegation tổng hợp toàn bộ các nút bấm modal/cài đặt
 document.addEventListener('click', (e) => {
   const modalGroup = document.getElementById('modal-group');
   const modalChatSettings = document.getElementById('modal-chat-settings');
@@ -1129,170 +788,71 @@ document.addEventListener('click', (e) => {
   const modalNickname = document.getElementById('modal-nickname');
   const modalConfirm = document.getElementById('modal-confirm');
 
-  // Bắt phần tử dạng nút bấm hoặc item menu gần nhất được click
   const clickedTarget = e.target.closest('button, .setting-item, .menu-item, [id^="set-"], [id^="btn-"]');
   const targetText = clickedTarget ? clickedTarget.innerText.trim() : '';
 
-  // 1. XÓA ĐOẠN CHAT
-  const btnDeleteChat = e.target.closest('#delete-chat, #btn-delete-chat, #set-delete-chat, .btn-delete-chat');
-  const isDeleteTextClick = modalChatSettings && 
-    (modalChatSettings.style.display === 'flex' || !modalChatSettings.classList.contains('hidden')) && 
-    clickedTarget && targetText.includes('Xóa đoạn chat');
-
-  if (btnDeleteChat || isDeleteTextClick) {
-    if (modalChatSettings) {
-      modalChatSettings.classList.add('hidden');
-      modalChatSettings.style.display = 'none';
-    }
-
+  // 1. Xóa đoạn chat
+  if (e.target.closest('#delete-chat, #btn-delete-chat, #set-delete-chat, .btn-delete-chat') || (modalChatSettings && targetText.includes('Xóa đoạn chat'))) {
+    if (modalChatSettings) { modalChatSettings.classList.add('hidden'); modalChatSettings.style.display = 'none'; }
     if (state.activeRoomId && state.currentUser) {
-      showConfirmModal('Xóa đoạn chat', 'Bạn có chắc chắn muốn xóa đoạn chat ở phía bạn không? (Người còn lại vẫn giữ tin nhắn)', () => {
+      showConfirmModal('Xóa đoạn chat', 'Bạn có chắc chắn muốn xóa đoạn chat ở phía bạn không?', () => {
         socket.emit('messages:clear_me', { roomId: state.activeRoomId });
-        
         const viewport = document.getElementById('messages-viewport');
         if (viewport) viewport.innerHTML = '';
         state.lastMessages.delete(state.activeRoomId);
         renderChatList();
-
         showToast('Đã xóa đoạn chat phía bạn!');
       });
-    } else {
-      showToast('Không thể xác định đoạn chat!', false);
     }
     return;
   }
 
-  // 2. XÓA KẾT BẠN (HỦY KẾT BẠN)
-  const btnUnfriend = e.target.closest('#set-unfriend, #btn-unfriend');
-  const isUnfriendTextClick = modalChatSettings && 
-    (modalChatSettings.style.display === 'flex' || !modalChatSettings.classList.contains('hidden')) && 
-    clickedTarget && targetText.includes('Xóa kết bạn');
-
-  if (btnUnfriend || isUnfriendTextClick) {
-    if (modalChatSettings) {
-      modalChatSettings.classList.add('hidden');
-      modalChatSettings.style.display = 'none';
-    }
-
-    if (state.activeRoomId && state.activeRoomId.includes('_DM_') && state.currentUser) {
-      const parts = state.activeRoomId.split('_DM_');
-      const targetFriendId = parts.find(id => id !== state.currentUser.id);
-      const friend = state.friends.find(f => f.id === targetFriendId);
-      const friendName = friend ? friend.username : 'người dùng này';
-
-      showConfirmModal(
-        'Xóa kết bạn',
-        `Bạn có chắc chắn muốn xóa kết bạn với ${friendName}?`,
-        () => {
-          socket.emit('friend:unfriend', { friendId: targetFriendId });
-          state.friends = state.friends.filter(f => f.id !== targetFriendId);
-
-          const chatScreen = document.getElementById('chat-screen');
-          if (chatScreen) chatScreen.classList.add('hidden');
-          state.activeRoomId = null;
-
-          renderChatList();
-          showToast(`Đã xóa kết bạn với ${friendName}!`);
-        }
-      );
-    }
-    return;
-  }
-
-  // 3. TAB LỌC DANH SÁCH CHAT
+  // 2. Tab bộ lọc danh sách
   const tabBtn = e.target.closest('.filter-tab-btn');
   if (tabBtn) {
     const filterType = tabBtn.getAttribute('data-filter');
-    if (filterType === 'more') {
-      showToast('Tính năng mở rộng đang phát triển!');
-      return;
-    }
+    if (filterType === 'more') { showToast('Tính năng mở rộng đang phát triển!'); return; }
     state.activeFilter = filterType;
-
     document.querySelectorAll('.filter-tab-btn').forEach(btn => {
       if (btn.getAttribute('data-filter') !== 'more') {
-        btn.style.background = 'transparent';
-        btn.style.color = 'var(--text-secondary, #718096)';
-        btn.style.fontWeight = '500';
+        btn.style.background = 'transparent'; btn.style.color = 'var(--text-secondary, #718096)'; btn.style.fontWeight = '500';
       }
     });
-    if (filterType !== 'more') {
-      tabBtn.style.background = 'var(--primary-light, #ebf8ff)';
-      tabBtn.style.color = 'var(--primary-color, #3182ce)';
-      tabBtn.style.fontWeight = '600';
-    }
+    tabBtn.style.background = 'var(--primary-light, #ebf8ff)';
+    tabBtn.style.color = 'var(--primary-color, #3182ce)';
+    tabBtn.style.fontWeight = '600';
     renderChatList();
     return;
   }
 
-  // 4. MỞ/ĐÓNG MODAL CÀI ĐẶT
+  // 3. Mở cài đặt chat/nhóm
   if (e.target.closest('#btn-chat-options')) {
-    if (modalChatSettings) {
-      modalChatSettings.classList.remove('hidden');
-      modalChatSettings.style.display = 'flex';
-    }
+    if (modalChatSettings) { modalChatSettings.classList.remove('hidden'); modalChatSettings.style.display = 'flex'; }
     return;
   }
-
-  if (e.target.closest('#btn-close-chat-settings') || (modalChatSettings && e.target === modalChatSettings)) {
-    if (modalChatSettings) {
-      modalChatSettings.style.display = 'none';
-      modalChatSettings.classList.add('hidden');
-    }
+  if (e.target.closest('#btn-close-chat-settings') || e.target === modalChatSettings) {
+    if (modalChatSettings) { modalChatSettings.style.display = 'none'; modalChatSettings.classList.add('hidden'); }
     return;
   }
-
   if (e.target.closest('#btn-group-settings')) {
-    if (modalGroupSettings) {
-      modalGroupSettings.classList.remove('hidden');
-      modalGroupSettings.style.display = 'flex';
-      renderGroupSettingsModal();
-    }
+    if (modalGroupSettings) { modalGroupSettings.classList.remove('hidden'); modalGroupSettings.style.display = 'flex'; renderGroupSettingsModal(); }
+    return;
+  }
+  if (e.target.closest('#btn-close-group-settings') || e.target === modalGroupSettings) {
+    if (modalGroupSettings) { modalGroupSettings.style.display = 'none'; modalGroupSettings.classList.add('hidden'); }
     return;
   }
 
-  if (e.target.closest('#btn-close-group-settings') || (modalGroupSettings && e.target === modalGroupSettings)) {
-    if (modalGroupSettings) {
-      modalGroupSettings.style.display = 'none';
-      modalGroupSettings.classList.add('hidden');
-    }
+  // 4. Modal Theme
+  if (e.target.closest('#set-theme') || targetText.includes('chủ đề')) {
+    if (modalChatSettings) { modalChatSettings.classList.add('hidden'); modalChatSettings.style.display = 'none'; }
+    if (modalTheme) { modalTheme.classList.remove('hidden'); modalTheme.style.display = 'flex'; }
     return;
   }
-  
-  if (e.target.closest('#btn-close-group-modal') || (modalGroup && e.target === modalGroup)) {
-    if (modalGroup) {
-      modalGroup.style.display = 'none';
-      modalGroup.classList.add('hidden');
-    }
+  if (e.target.closest('#btn-close-theme-modal') || e.target === modalTheme) {
+    if (modalTheme) { modalTheme.style.display = 'none'; modalTheme.classList.add('hidden'); }
     return;
   }
-
-  // 5. THAY ĐỔI CHỦ ĐỀ (THEME)
-  const btnSetTheme = e.target.closest('#set-theme');
-  const isThemeTextClick = modalChatSettings && 
-    (modalChatSettings.style.display === 'flex' || !modalChatSettings.classList.contains('hidden')) && 
-    clickedTarget && targetText.includes('chủ đề');
-
-  if (btnSetTheme || isThemeTextClick) {
-    if (modalChatSettings) {
-      modalChatSettings.classList.add('hidden');
-      modalChatSettings.style.display = 'none';
-    }
-    if (modalTheme) {
-      modalTheme.classList.remove('hidden');
-      modalTheme.style.display = 'flex';
-    }
-    return;
-  }
-
-  if (e.target.closest('#btn-close-theme-modal') || e.target.closest('#btn-close-theme') || (modalTheme && e.target === modalTheme)) {
-    if (modalTheme) {
-      modalTheme.style.display = 'none';
-      modalTheme.classList.add('hidden');
-    }
-    return;
-  }
-
   const themeOption = e.target.closest('.theme-option, .theme-option-btn');
   if (themeOption && state.activeRoomId) {
     const selectedTheme = themeOption.getAttribute('data-theme') || themeOption.getAttribute('data-theme-type');
@@ -1302,261 +862,18 @@ document.addEventListener('click', (e) => {
       applyRoomTheme(state.activeRoomId);
       showToast('Đã thay đổi chủ đề đoạn chat!');
     }
-    if (modalTheme) {
-      modalTheme.style.display = 'none';
-      modalTheme.classList.add('hidden');
-    }
+    if (modalTheme) { modalTheme.style.display = 'none'; modalTheme.classList.add('hidden'); }
     return;
   }
 
-  // 6. ĐỔI BIỆT DANH
-  const btnSetNickname = e.target.closest('#set-nickname');
-  const isNicknameTextClick = modalChatSettings && 
-    (modalChatSettings.style.display === 'flex' || !modalChatSettings.classList.contains('hidden')) && 
-    clickedTarget && targetText.includes('biệt danh');
-
-  if (btnSetNickname || isNicknameTextClick) {
-    if (modalChatSettings) {
-      modalChatSettings.classList.add('hidden');
-      modalChatSettings.style.display = 'none';
-    }
-
-    if (state.activeRoomId && state.activeRoomId.includes('_DM_') && state.currentUser) {
-      const parts = state.activeRoomId.split('_DM_');
-      const targetFriendId = parts.find(id => id !== state.currentUser.id);
-      const friend = state.friends.find(f => f.id === targetFriendId);
-
-      if (friend) {
-        const inputNick = document.getElementById('nickname-input');
-        const titleNick = document.getElementById('nickname-target-name');
-
-        if (titleNick) titleNick.innerText = `Đổi biệt danh cho ${friend.username}`;
-        if (inputNick) inputNick.value = state.nicknames.get(state.activeRoomId) || friend.username;
-
-        if (modalNickname) {
-          modalNickname.classList.remove('hidden');
-          modalNickname.style.display = 'flex';
-          if (inputNick) inputNick.focus();
-        }
-      }
-    }
-    return;
-  }
-
-  if (e.target.closest('#btn-cancel-nickname') || (modalNickname && e.target === modalNickname)) {
-    if (modalNickname) {
-      modalNickname.style.display = 'none';
-      modalNickname.classList.add('hidden');
-    }
-    return;
-  }
-
-  if (e.target.closest('#btn-save-nickname')) {
-    const inputNick = document.getElementById('nickname-input');
-    const newNickname = inputNick ? inputNick.value.trim() : '';
-
-    if (state.activeRoomId && state.activeRoomId.includes('_DM_') && state.currentUser) {
-      if (newNickname) {
-        state.nicknames.set(state.activeRoomId, newNickname);
-      } else {
-        state.nicknames.delete(state.activeRoomId);
-      }
-      localStorage.setItem('chat_nicknames', JSON.stringify(Array.from(state.nicknames.entries())));
-
-      const parts = state.activeRoomId.split('_DM_');
-      const targetFriendId = parts.find(id => id !== state.currentUser.id);
-      const friend = state.friends.find(f => f.id === targetFriendId);
-      
-      const displayName = newNickname || (friend ? friend.username : 'Cuộc trò chuyện');
-      const headerNameEl = document.getElementById('active-chat-name');
-      if (headerNameEl) headerNameEl.innerText = displayName;
-
-      showToast('Đã cập nhật biệt danh thành công!');
-    }
-
-    if (modalNickname) {
-      modalNickname.style.display = 'none';
-      modalNickname.classList.add('hidden');
-    }
-    renderChatList();
-    return;
-  }
-
-  // 7. TẠO NHÓM
-  const btnOpenGroupModal = e.target.closest('#btn-open-group-modal, .btn-create-group, #set-create-group');
-  const isCreateGroupOptionClick = modalChatSettings && 
-    (modalChatSettings.style.display === 'flex' || !modalChatSettings.classList.contains('hidden')) && 
-    clickedTarget && targetText.includes('Tạo nhóm');
-
-  if (btnOpenGroupModal || isCreateGroupOptionClick) {
-    if (modalChatSettings) {
-      modalChatSettings.classList.add('hidden');
-      modalChatSettings.style.display = 'none';
-    }
-    if (modalGroup) {
-      modalGroup.classList.remove('hidden');
-      modalGroup.style.display = 'flex';
-      let preSelectedFriendId = null;
-      if (state.activeRoomId && state.activeRoomId.includes('_DM_')) {
-        const parts = state.activeRoomId.split('_DM_');
-        preSelectedFriendId = parts.find(id => id !== state.currentUser?.id);
-      }
-      renderGroupMembersCheckbox(preSelectedFriendId);
-    }
-    return;
-  }
-
-  const btnConfirmCreateGroup = e.target.closest('#btn-confirm-create-group, .btn-confirm-group');
-  const isCreateGroupButtonClick = modalGroup && 
-    (modalGroup.style.display === 'flex' || !modalGroup.classList.contains('hidden')) && 
-    clickedTarget && targetText.includes('Tạo Nhóm');
-
-  if (btnConfirmCreateGroup || isCreateGroupButtonClick) {
-    e.preventDefault();
-    const groupNameInput = document.getElementById('group-name-input') || modalGroup.querySelector('input[type="text"]');
-    const groupName = groupNameInput ? groupNameInput.value.trim() : '';
-    const checkedBoxes = document.querySelectorAll('.group-member-checkbox:checked, .member-checkbox:checked');
-    const memberIds = Array.from(checkedBoxes).map(cb => cb.value);
-
-    if (!groupName) return showToast('Vui lòng nhập tên nhóm!', false);
-    if (memberIds.length === 0) return showToast('Vui lòng chọn ít nhất 1 thành viên!', false);
-
-    socket.emit('group:create', {
-      name: groupName,
-      avatar: state.selectedGroupAvatar,
-      memberIds: memberIds
-    });
-
-    if (modalGroup) {
-      modalGroup.style.display = 'none';
-      modalGroup.classList.add('hidden');
-    }
-    if (groupNameInput) groupNameInput.value = '';
-    showToast('Đang tạo nhóm...');
-    return;
-  }
-
-  // 8. CẢM XÚC NHANH
-  const setEmojiBtn = e.target.closest('#set-emoji');
-  const isEmojiTextClick = modalChatSettings && 
-    (modalChatSettings.style.display === 'flex' || !modalChatSettings.classList.contains('hidden')) && 
-    clickedTarget && targetText.includes('Cảm xúc');
-
-  if (setEmojiBtn || isEmojiTextClick) {
-    if (modalChatSettings) {
-      modalChatSettings.classList.add('hidden');
-      modalChatSettings.style.display = 'none';
-    }
-    const currentEmoji = state.roomReactions?.get(state.activeRoomId) || '❤️';
-    
-    Swal.fire({
-      title: 'Cảm xúc nhanh',
-      text: 'Nhập emoji cảm xúc nhanh cho đoạn chat này:',
-      input: 'text',
-      inputValue: currentEmoji,
-      showCancelButton: true,
-      confirmButtonText: 'Xác nhận',
-      cancelButtonText: 'Hủy',
-      confirmButtonColor: '#0084ff',
-      cancelButtonColor: '#e4e6eb'
-    }).then((result) => {
-      if (result.isConfirmed && result.value) {
-        const newEmoji = result.value.trim();
-        if (newEmoji) {
-          if (!state.roomReactions) state.roomReactions = new Map();
-          state.roomReactions.set(state.activeRoomId, newEmoji);
-          localStorage.setItem('chat_room_reactions', JSON.stringify(Array.from(state.roomReactions.entries())));
-          updateQuickReactionUI(state.activeRoomId);
-          showToast('Đã đổi cảm xúc nhanh thành công!');
-        }
-      }
-    });
-    return;
-  }
-  
-  // 9. BÁO CÁO TỚI ADMIN 
-  const reportBtn = e.target.closest('#set-report'); 
-  const isReportTextClick = modalChatSettings && 
-    (modalChatSettings.style.display === 'flex' || !modalChatSettings.classList.contains('hidden')) && 
-    clickedTarget && targetText.includes('Báo cáo');
-
-  if (reportBtn || isReportTextClick) {
-    if (modalChatSettings) {
-      modalChatSettings.classList.add('hidden');
-      modalChatSettings.style.display = 'none';
-    }
-
-    let targetUserId = state.activeRoomId; 
-    const currentUsr = getCurrentUser();
-    if (targetUserId && targetUserId.includes('_DM_')) {
-      const parts = targetUserId.split('_DM_');
-      targetUserId = parts.find(id => id !== currentUsr?.id) || parts[0];
-    }
-
-    Swal.fire({
-      title: 'Báo cáo vi phạm',
-      html: `
-        <div style="text-align: left; margin-bottom: 10px;">
-          <label style="font-weight: 600; font-size: 14px;">Chọn lý do báo cáo:</label>
-          <select id="swal-report-reason" class="swal2-input" style="margin-top: 5px; width: 100%;">
-            <option value="Spam tin nhắn">Spam tin nhắn</option>
-            <option value="Tài khoản giả mạo">Tài khoản giả mạo</option>
-            <option value="Nội dung phản cảm">Nội dung phản cảm / Đả kích</option>
-            <option value="Lý do khác">Lý do khác</option>
-          </select>
-        </div>
-        <div style="text-align: left;">
-          <label style="font-weight: 600; font-size: 14px;">Mô tả chi tiết:</label>
-          <textarea id="swal-report-desc" class="swal2-textarea" placeholder="Nhập chi tiết vi phạm (tùy chọn)..." style="margin-top: 5px; width: 100%; height: 80px;"></textarea>
-        </div>
-      `,
-      showCancelButton: true,
-      confirmButtonText: 'Gửi báo cáo',
-      cancelButtonText: 'Hủy',
-      confirmButtonColor: '#d33',
-      cancelButtonColor: '#e4e6eb',
-      preConfirm: () => {
-        return {
-          reason: document.getElementById('swal-report-reason').value,
-          description: document.getElementById('swal-report-desc').value
-        };
-      }
-    }).then((result) => {
-      if (result.isConfirmed) {
-        const { reason, description } = result.value;
-
-        socket.emit('report:submit', { 
-          targetId: targetUserId, 
-          reason, 
-          description,
-          reporterId: currentUsr?.id,
-          reporterName: currentUsr?.username
-        });
-        
-        showToast('Đã gửi báo cáo tới Admin thành công!');
-      }
-    });
-    return;
-  }
-  
-  // 10. CÁC NÚT TRONG MODAL CONFIRM
+  // 5. Xác nhận Modal chung
   if (e.target.closest('#btn-confirm-yes')) {
-    if (modalConfirm) {
-      modalConfirm.classList.add('hidden');
-      modalConfirm.style.display = 'none';
-    }
-    if (typeof confirmCallback === 'function') {
-      confirmCallback();
-      confirmCallback = null;
-    }
+    if (modalConfirm) { modalConfirm.classList.add('hidden'); modalConfirm.style.display = 'none'; }
+    if (typeof confirmCallback === 'function') { confirmCallback(); confirmCallback = null; }
     return;
   }
-
   if (e.target.closest('#btn-confirm-no') || e.target.closest('#btn-close-confirm')) {
-    if (modalConfirm) {
-      modalConfirm.classList.add('hidden');
-      modalConfirm.style.display = 'none';
-    }
+    if (modalConfirm) { modalConfirm.classList.add('hidden'); modalConfirm.style.display = 'none'; }
     confirmCallback = null;
     return;
   }
