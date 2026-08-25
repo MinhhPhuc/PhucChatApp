@@ -899,16 +899,36 @@ function endCallCleanUp() {
 // ==========================================
 if (typeof socket !== 'undefined') {
   socket.on('incoming_call', (data) => {
+    console.log('[CALL] Incoming call received:', data);
+
     incomingCallDataGlobal = data;
-    currentCallTargetId = data.from;
+
+    // Server gửi fromSocketId, không phải from
+    currentCallTargetId = data.fromSocketId;
 
     const callerNameDisplay = document.getElementById('caller-name-display');
     if (callerNameDisplay) {
       callerNameDisplay.textContent = data.callerName || 'Ai đó';
     }
 
+    const callerAvatar = document.getElementById('caller-avatar');
+    if (callerAvatar && data.callerAvatar) {
+      callerAvatar.src = data.callerAvatar;
+    }
+
     const popup = document.getElementById('incoming-call-popup');
-    if (popup) popup.style.display = 'block';
+
+    if (popup) {
+      // Xóa hidden trước, vì CSS .hidden có thể có display:none
+      popup.classList.remove('hidden');
+
+      popup.style.display = 'flex';
+      popup.style.visibility = 'visible';
+      popup.style.opacity = '1';
+      popup.style.zIndex = '99999';
+    }
+
+    console.log('[CALL] Popup displayed');
   });
 
   socket.on('call_accepted', (signal) => {
@@ -1564,7 +1584,10 @@ function answerCall() {
 
     peer.on('signal', (signalData) => {
       if (typeof socket !== 'undefined') {
-        socket.emit('answer_call', { signal: signalData, to: incomingCallDataGlobal.from });
+        socket.emit('answer_call', {
+          signal: signalData,
+          toSocketId: incomingCallDataGlobal.fromSocketId
+        });
       }
     });
 
@@ -1580,7 +1603,9 @@ function answerCall() {
   }).catch(err => {
     console.error('Media error:', err);
     if (typeof socket !== 'undefined' && incomingCallDataGlobal) {
-      socket.emit('reject_call', { to: incomingCallDataGlobal.from });
+      socket.emit('reject_call', {
+        toSocketId: incomingCallDataGlobal.fromSocketId
+      });
     }
     endCallCleanUp();
   });
