@@ -20,6 +20,24 @@ let state = {
   selectedGroupAvatar: 'https://api.dicebear.com/7.x/identicon/svg?seed=group'
 };
 
+// ==========================================
+// 1. KHAI BÁO BIẾN TOÀN CỤC (ĐẶT Ở ĐẦU FILE JS)
+// ==========================================
+let peer = null;
+let localStream = null;
+let currentCallTargetId = null;
+let incomingCallDataGlobal = null;
+let isAudioMuted = false;
+let isVideoMuted = false;
+
+// Cấu hình STUN servers
+const peerConfig = {
+  iceServers: [
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:stun1.l.google.com:19302' }
+  ]
+};
+
 // --- HÀM HỖ TRỢ TRUY XUẤT USER HIỆN TẠI ---
 function getCurrentUser() {
   return state.currentUser || JSON.parse(localStorage.getItem('user')) || {};
@@ -728,23 +746,6 @@ socket.on('messages:history', ({ roomId, messages }) => {
   renderChatList();
 });
 
-// ==========================================
-// HỆ THỐNG GỌI THOẠI & GỌI VIDEO (WEBRTC)
-// ==========================================
-
-let peer = null;
-let localStream = null;
-let currentCallTargetId = null;
-let incomingCallDataGlobal = null;
-
-// Cấu hình STUN servers miễn phí của Google để thông mạng (NAT/STUN)
-const peerConfig = {
-  iceServers: [
-    { urls: 'stun:stun.l.google.com:19302' },
-    { urls: 'stun:stun1.l.google.com:19302' }
-  ]
-};
-
 // Lắng nghe sự kiện click nút gọi trên giao diện chat header
 document.addEventListener('DOMContentLoaded', () => {
   const btnVoiceCall = document.getElementById('btn-voice-call');
@@ -793,8 +794,8 @@ async function startVideoCall(targetUserId, isVideo) {
   // (Bạn có thể điều chỉnh cách lấy này cho khớp với cấu trúc DOM lưu thông tin user của bạn)
   const activeChatHeader = document.querySelector('.chat-header') || {};
   const targetName = activeChatHeader.dataset?.username || 'Người dùng';
-  const targetAvatar = 'https://cdn-icons-png.flaticon.com/512/149/149071.png';
-
+  const safeAvatar = 'https://cdn-icons-png.flaticon.com/512/149/149071.png';
+  
   // Cập nhật thông tin lên màn hình chờ gọi
   const nameEl = document.getElementById('call-target-name');
   const avatarEl = document.getElementById('call-target-avatar');
@@ -1546,13 +1547,92 @@ document.addEventListener('click', (e) => {
   }
 });
 
-// ==========================================
-// ĐIỀU KHIỂN THIẾT BỊ VÀ GÁN GLOBAL WINDOW
-// ==========================================
+// 2. CÁC HÀM XỬ LÝ CUỘC GỌI (Đặt phía dưới phần biến toàn cục)
 
-// Khai báo biến trạng thái ở đầu (tránh lỗi Temporal Dead Zone)
-let isAudioMuted = false;
-let isVideoMuted = false;
+function answerCall() {
+  const popup = document.getElementById('incoming-call-popup');
+  if (popup) popup.style.display = 'none';
+
+  if (!incomingCallDataGlobal) return;
+  const isVideo = incomingCallDataGlobal.isVideo;
+
+  navigator.mediaDevices.getUserMedia({
+    video: isVideo ? { width: 1280, height: 720 } : false,
+    audio: true
+  }).then(stream => {
+    localStream = stream;
+    const videoContainer = document.getElementById('video-call-container');
+    if (videoContainer) videoContainer.style.display = 'flex';
+
+    const localVideoEl = document.getElementById('local-video');
+    if (localVideoEl) {
+      localVideoEl.srcObject = isVideo ? localStream : null;
+      localVideoEl.style.display = isVideo ? 'block' : 'none';
+    }
+
+    peer = new SimplePeer({
+      initiator: false,
+      trickle: false,
+      stream: localStream,
+      config: peerConfig
+    });
+
+    peer.on('signal', (signalData) => {
+      if (typeof socket !== 'undefined') {
+        socket.emit('answer_call', { signal: signalData, to: incomingCallDataGlobal.from });
+      }
+    });
+
+    peer.on('stream', (remoteStream) => {
+      const remoteVideoEl = document.getElementById('remote-video');
+      if (remoteVideoEl) remoteVideoEl.srcObject = remoteStream;
+    });
+
+    peer.on('close', () => endCallCleanUp());
+    peer.on('error', () => endCallCleanUp());
+
+    peer.signal(incomingCallDataGlobal.signal);
+  }).catch(err => {
+    console.error('Media error:', err);
+    if (typeof socket !== 'undefined' && incomingCallDataGlobal) {
+      socket.emit('reject_call', { to: incomingCallDataGlobal.from });
+    }
+    endCallCleanUp();
+  });
+}
+
+function rejectCall() {
+  const popup = document.getElementById('incoming-call-popup');
+  if (popup) popup.style.display = 'none';
+  if (incomingCallDataGlobal && typeof socket !== 'undefined') {
+    socket.emit('reject_call', { to: incomingCallDataGlobal.from });
+  }
+  incomingCallDataGlobal = null;
+}
+
+function endCall() {
+  if (currentCallTargetId && typeof socket !== 'undefined') {
+    socket.emit('end_call', { targetId: currentCallTargetId });
+  }
+  endCallCleanUp();
+}
+
+function endCallCleanUp() {
+  if (peer) {
+    try { peer.destroy(); } catch (e) {}
+    peer = null;
+  }
+  if (localStream) {
+    localStream.getTracks().forEach(track => track.stop());
+    localStream = null;
+  }
+  const videoContainer = document.getElementById('video-call-container');
+  const popup = document.getElementById('incoming-call-popup');
+  if (videoContainer) videoContainer.style.display = 'none';
+  if (popup) popup.style.display = 'none';
+  currentCallTargetId = null;
+  incomingCallDataGlobal = null;
+}
 
 function toggleAudioTrack() {
   if (localStream) {
@@ -1560,11 +1640,8 @@ function toggleAudioTrack() {
     if (audioTrack) {
       isAudioMuted = !isAudioMuted;
       audioTrack.enabled = !isAudioMuted;
-      
       const btn = document.getElementById('btn-toggle-mic');
-      if (btn) {
-        btn.style.background = isAudioMuted ? '#ff3b30' : '#2c2c2c';
-      }
+      if (btn) btn.style.background = isAudioMuted ? '#ff3b30' : '#2c2c2c';
     }
   }
 }
@@ -1575,23 +1652,17 @@ function toggleVideoTrack() {
     if (videoTrack) {
       isVideoMuted = !isVideoMuted;
       videoTrack.enabled = !isVideoMuted;
-      
       const btn = document.getElementById('btn-toggle-cam');
-      if (btn) {
-        btn.style.background = isVideoMuted ? '#ff3b30' : '#2c2c2c';
-      }
-
+      if (btn) btn.style.background = isVideoMuted ? '#ff3b30' : '#2c2c2c';
       const localVideoEl = document.getElementById('local-video');
-      if (localVideoEl) {
-        localVideoEl.style.display = isVideoMuted ? 'none' : 'block';
-      }
+      if (localVideoEl) localVideoEl.style.display = isVideoMuted ? 'none' : 'block';
     }
   }
 }
 
-// Bắt buộc gán tất cả các hàm ra window ở dòng cuối cùng của file app.js
-window.toggleAudioTrack = toggleAudioTrack;
-window.toggleVideoTrack = toggleVideoTrack;
+// Gán toàn cục ở cuối file
 window.answerCall = answerCall;
 window.rejectCall = rejectCall;
 window.endCall = endCall;
+window.toggleAudioTrack = toggleAudioTrack;
+window.toggleVideoTrack = toggleVideoTrack;
