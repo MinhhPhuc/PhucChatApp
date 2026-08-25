@@ -785,17 +785,16 @@ function initiateCall(isVideo) {
   startVideoCall(targetUserId, isVideo);
 }
 
-// 1. KHỞI TẠO CUỘC GỌI (Người gọi đi - Đã cập nhật giao diện chờ & tên/avatar)
+// 1. KHỞI TẠO CUỘC GỌI (Đã sửa lỗi khai báo targetAvatar và loại bỏ placeholder)
 async function startVideoCall(targetUserId, isVideo) {
   currentCallTargetId = targetUserId;
   const currentUser = typeof getCurrentUser === 'function' ? getCurrentUser() : null;
 
-  // Lấy thông tin người nhận (tên và avatar) từ giao diện chat hiện tại
-  // (Bạn có thể điều chỉnh cách lấy này cho khớp với cấu trúc DOM lưu thông tin user của bạn)
+  // Khai báo an toàn tên và avatar (tránh lỗi is not defined)
   const activeChatHeader = document.querySelector('.chat-header') || {};
   const targetName = activeChatHeader.dataset?.username || 'Người dùng';
-  const safeAvatar = 'https://cdn-icons-png.flaticon.com/512/149/149071.png';
-  
+  const targetAvatar = activeChatHeader.dataset?.avatar || 'https://cdn-icons-png.flaticon.com/512/149/149071.png';
+
   // Cập nhật thông tin lên màn hình chờ gọi
   const nameEl = document.getElementById('call-target-name');
   const avatarEl = document.getElementById('call-target-avatar');
@@ -803,7 +802,7 @@ async function startVideoCall(targetUserId, isVideo) {
   const waitingView = document.getElementById('call-waiting-view');
 
   if (nameEl) nameEl.textContent = targetName;
-  if (avatarEl) avatarEl.src = targetAvatar;
+  if (avatarEl) avatarEl.src = targetAvatar; // Đã có biến targetAvatar nên không còn báo lỗi
   if (statusEl) statusEl.textContent = 'Đang gọi...';
   if (waitingView) waitingView.style.display = 'flex';
 
