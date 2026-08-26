@@ -160,7 +160,9 @@ body, html {
 .emoji-picker span, .emoji-picker button, .emoji-container span, .emoji-container button, .emoji-grid span, .emoji-grid button, .emoji-item { font-size: 26px !important; width: 38px !important; height: 38px !important; display: inline-flex !important; align-items: center !important; justify-content: center !important; cursor: pointer; border-radius: 8px; transition: transform 0.15s ease, background-color 0.15s ease; }
 .emoji-picker span:active, .emoji-picker button:active, .emoji-container span:active, .emoji-container button:active, .emoji-item:active { transform: scale(1.3); background-color: rgba(0, 0, 0, 0.08); }
 
-.msg img, .message-content img, .chat-screen img, .chat-image { max-width: 100% !important; max-height: 280px !important; width: auto !important; height: auto !important; border-radius: 12px !important; object-fit: cover !important; display: block !important; margin-top: 4px; cursor: pointer; }
+.msg img,
+.message-content img,
+.chat-image { max-width: 100% !important; max-height: 280px !important; width: auto !important; height: auto !important; border-radius: 12px !important; object-fit: cover !important; display: block !important; margin-top: 4px; cursor: pointer; }
 
 /* Request Items */
 .filter-btn-request { display: inline-flex; align-items: center; gap: 6px; background: var(--bg-card); border: 1px solid var(--border); color: var(--text-main); padding: 6px 12px; border-radius: 16px; font-size: 13px; font-weight: 500; cursor: pointer; transition: background 0.2s; }
@@ -448,4 +450,19 @@ body, html {
   min-width: 0 !important;
   width: auto !important;
   text-align: left !important;
+}
+
+#setting-members-list img {
+    width: 32px !important;
+    height: 32px !important;
+    min-width: 32px !important;
+    max-width: 32px !important;
+    min-height: 32px !important;
+    max-height: 32px !important;
+    flex: 0 0 32px !important;
+    object-fit: cover !important;
+    border-radius: 50% !important;
+    margin: 0 !important;
+    position: static !important;
+    float: none !important;
 }
