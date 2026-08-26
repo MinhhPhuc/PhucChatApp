@@ -1094,19 +1094,57 @@ function renderGroupSettingsModal() {
       }
 
       html += `
-        <div style="padding: 10px; border-bottom: 1px solid #edf2f7;">
-          <div style="display: flex; align-items: center; justify-content: space-between;">
-            <div style="display: flex; align-items: center; gap: 10px;">
-              <img src="${m.avatar}" style="width: 32px; height: 32px; border-radius: 50%;">
-              <div>
-                <span style="font-weight: bold; font-size: 14px;">${m.username} ${isSelf ? '(Bạn)' : ''}</span>
-                <div style="font-size: 11px; color: ${m.isMuted ? '#e53e3e' : '#718096'};">
-                  ${isMemberAdmin ? '👑 Quản Trị Viên' : 'Thành Viên'} ${m.isMuted ? ' • 🔇 Đang bị cấm chat' : ''}
-                </div>
+        <div style="
+          padding: 10px;
+          border-bottom: 1px solid #edf2f7;
+        ">
+          <div style="
+            display: flex;
+            align-items: flex-start;
+            justify-content: flex-start;
+            width: 100%;
+            gap: 10px;
+          ">
+
+            <img
+              src="${m.avatar}"
+              alt="${m.username}"
+              style="
+                width: 32px;
+                height: 32px;
+                min-width: 32px;
+                border-radius: 50%;
+                object-fit: cover;
+                flex-shrink: 0;
+                margin: 0;
+              "
+            >
+
+            <div style="
+              flex: 1;
+              min-width: 0;
+            ">
+              <span style="
+                font-weight: bold;
+                font-size: 14px;
+                display: block;
+              ">
+                ${m.username} ${isSelf ? '(Bạn)' : ''}
+              </span>
+
+              <div style="
+                font-size: 11px;
+                color: ${m.isMuted ? '#e53e3e' : '#718096'};
+                margin-top: 2px;
+              ">
+                ${isMemberAdmin ? '👑 Quản Trị Viên' : 'Thành Viên'}
+                ${m.isMuted ? ' • 🔇 Đang bị cấm chat' : ''}
               </div>
+
+              ${actionButtons}
             </div>
+
           </div>
-          ${actionButtons}
         </div>
       `;
     });
