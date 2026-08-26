@@ -14,11 +14,10 @@ function inject(anchor, replacement, label) {
 
 inject(
   "const helmet = require('helmet');",
-  "const helmet = require('helmet');\nconst notifications = require('./notifications-server');",
+  "const helmet = require('helmet');\nconst fs = require('fs');\nconst notifications = require('./notifications-server');",
   'notifications require'
 );
 
-// Inject push API + a small HTML wrapper before Express static files.
 inject(
   "app.use(express.static(path.join(__dirname, 'public')));",
   `app.get('/api/push/public-key', (req, res) => {
