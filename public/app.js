@@ -1062,93 +1062,169 @@ function renderGroupSettingsModal() {
   const isAdmin = group.adminId === state.currentUser.id;
   const countEl = document.getElementById('setting-member-count');
   const memberCount = group.members ? group.members.length : (group.membersCount || 0);
+
   if (countEl) countEl.innerText = memberCount;
-  
+
   const btnDeleteGroup = document.getElementById('btn-delete-group');
   if (btnDeleteGroup) {
-    if (isAdmin) btnDeleteGroup.classList.remove('hidden');
-    else btnDeleteGroup.classList.add('hidden');
+    btnDeleteGroup.classList.toggle('hidden', !isAdmin);
   }
 
   const listContainer = document.getElementById('setting-members-list');
   if (!listContainer) return;
 
   let html = '';
+
   if (group.members) {
     group.members.forEach(m => {
       const isMemberAdmin = m.id === group.adminId;
       const isSelf = m.id === state.currentUser.id;
+
       let actionButtons = '';
-      
+
       if (isAdmin && !isSelf) {
         actionButtons = `
-          <div style="display:flex; gap:5px; margin-top:5px;">
-            <button onclick="execGroupAction('transfer_admin', '${m.id}')" style="background:#3182ce; color:white; border:none; padding:4px 8px; border-radius:4px; font-size:11px; cursor:pointer;">Phong Admin</button>
-            ${m.isMuted 
-              ? `<button onclick="execGroupAction('unmute', '${m.id}')" style="background:#38a169; color:white; border:none; padding:4px 8px; border-radius:4px; font-size:11px; cursor:pointer;">Bỏ Mute</button>`
-              : `<button onclick="execGroupAction('mute', '${m.id}')" style="background:#d69e2e; color:white; border:none; padding:4px 8px; border-radius:4px; font-size:11px; cursor:pointer;">Mute</button>`
+          <div style="
+            display:flex;
+            gap:5px;
+            margin-top:5px;
+            flex-wrap:wrap;
+          ">
+            <button
+              onclick="execGroupAction('transfer_admin', '${m.id}')"
+              style="
+                background:#3182ce;
+                color:white;
+                border:none;
+                padding:4px 8px;
+                border-radius:4px;
+                font-size:11px;
+                cursor:pointer;
+              "
+            >
+              Phong Admin
+            </button>
+
+            ${
+              m.isMuted
+                ? `
+                  <button
+                    onclick="execGroupAction('unmute', '${m.id}')"
+                    style="
+                      background:#38a169;
+                      color:white;
+                      border:none;
+                      padding:4px 8px;
+                      border-radius:4px;
+                      font-size:11px;
+                      cursor:pointer;
+                    "
+                  >
+                    Bỏ Mute
+                  </button>
+                `
+                : `
+                  <button
+                    onclick="execGroupAction('mute', '${m.id}')"
+                    style="
+                      background:#d69e2e;
+                      color:white;
+                      border:none;
+                      padding:4px 8px;
+                      border-radius:4px;
+                      font-size:11px;
+                      cursor:pointer;
+                    "
+                  >
+                    Mute
+                  </button>
+                `
             }
-            <button onclick="execGroupAction('kick', '${m.id}')" style="background:#e53e3e; color:white; border:none; padding:4px 8px; border-radius:4px; font-size:11px; cursor:pointer;">Kick</button>
+
+            <button
+              onclick="execGroupAction('kick', '${m.id}')"
+              style="
+                background:#e53e3e;
+                color:white;
+                border:none;
+                padding:4px 8px;
+                border-radius:4px;
+                font-size:11px;
+                cursor:pointer;
+              "
+            >
+              Kick
+            </button>
           </div>
         `;
       }
 
       html += `
         <div style="
-          padding: 10px;
-          border-bottom: 1px solid #edf2f7;
+          display:flex !important;
+          flex-direction:row !important;
+          align-items:flex-start !important;
+          justify-content:flex-start !important;
+          width:100% !important;
+          gap:10px !important;
+          padding:10px !important;
+          border-bottom:1px solid #edf2f7;
+          box-sizing:border-box;
         ">
-          <div style="
-            display: flex;
-            align-items: flex-start;
-            justify-content: flex-start;
-            width: 100%;
-            gap: 10px;
-          ">
 
-            <img
-              src="${m.avatar}"
-              alt="${m.username}"
-              style="
-                width: 32px;
-                height: 32px;
-                min-width: 32px;
-                border-radius: 50%;
-                object-fit: cover;
-                flex-shrink: 0;
-                margin: 0;
-              "
-            >
+          <img
+            src="${m.avatar || ''}"
+            alt="${m.username || ''}"
+            style="
+              display:block !important;
+              position:static !important;
+              order:0 !important;
+              float:none !important;
+              width:32px !important;
+              height:32px !important;
+              min-width:32px !important;
+              max-width:32px !important;
+              border-radius:50% !important;
+              object-fit:cover !important;
+              flex:0 0 32px !important;
+              margin:0 !important;
+              padding:0 !important;
+            "
+          >
+
+          <div style="
+            display:block !important;
+            order:1 !important;
+            flex:1 1 auto !important;
+            min-width:0 !important;
+            width:auto !important;
+          ">
+            <span style="
+              display:block;
+              font-weight:bold;
+              font-size:14px;
+              margin:0;
+            ">
+              ${m.username} ${isSelf ? '(Bạn)' : ''}
+            </span>
 
             <div style="
-              flex: 1;
-              min-width: 0;
+              font-size:11px;
+              color:${m.isMuted ? '#e53e3e' : '#718096'};
+              margin-top:2px;
             ">
-              <span style="
-                font-weight: bold;
-                font-size: 14px;
-                display: block;
-              ">
-                ${m.username} ${isSelf ? '(Bạn)' : ''}
-              </span>
-
-              <div style="
-                font-size: 11px;
-                color: ${m.isMuted ? '#e53e3e' : '#718096'};
-                margin-top: 2px;
-              ">
-                ${isMemberAdmin ? '👑 Quản Trị Viên' : 'Thành Viên'}
-                ${m.isMuted ? ' • 🔇 Đang bị cấm chat' : ''}
-              </div>
-
-              ${actionButtons}
+              ${isMemberAdmin ? '👑 Quản Trị Viên' : 'Thành Viên'}
+              ${m.isMuted ? ' • 🔇 Đang bị cấm chat' : ''}
             </div>
 
+            ${actionButtons}
           </div>
+
         </div>
       `;
     });
   }
+
   listContainer.innerHTML = html;
 }
 
