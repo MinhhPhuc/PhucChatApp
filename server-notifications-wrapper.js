@@ -7,26 +7,17 @@ let source = fs.readFileSync(serverPath, 'utf8');
 
 function inject(anchor, replacement, label) {
   if (!source.includes(anchor)) {
-<<<<<<< HEAD
     console.warn(`⚠️ Bỏ qua notifications hook: ${label} (anchor không tồn tại)`);
     return false;
   }
+
   source = source.replace(anchor, replacement);
   return true;
-=======
-    throw new Error(`❌ Không tìm thấy anchor để cài notifications: ${label}`);
-  }
-  source = source.replace(anchor, replacement);
->>>>>>> 6b8907c (Add web push notifications and fix group call)
 }
 
 inject(
   "const helmet = require('helmet');",
-<<<<<<< HEAD
   "const helmet = require('helmet');\nconst notifications = require('./notifications-server');",
-=======
-  "const helmet = require('helmet');\nconst fs = require('fs');\nconst notifications = require('./notifications-server');",
->>>>>>> 6b8907c (Add web push notifications and fix group call)
   'notifications require'
 );
 
@@ -43,19 +34,17 @@ app.get('/', (req, res, next) => {
   const indexPath = path.join(__dirname, 'public', 'index.html');
   fs.readFile(indexPath, 'utf8', (error, html) => {
     if (error) return next(error);
-<<<<<<< HEAD
+
     const injectedHtml = html
-      .replace('</head>', '<link rel="stylesheet" href="/notifications.css"></head>')
-      .replace('</body>', '<script src="/notifications-client.js?v=2"></script></body>');
-=======
-    const injectedHtml = html.replace(
-      '</head>',
-      '<link rel="stylesheet" href="/notifications.css"></head>'
-    ).replace(
-      '</body>',
-      '<script src="/notifications-client.js"></script></body>'
-    );
->>>>>>> 6b8907c (Add web push notifications and fix group call)
+      .replace(
+        '</head>',
+        '<link rel="stylesheet" href="/notifications.css"></head>'
+      )
+      .replace(
+        '</body>',
+        '<script src="/notifications-client.js?v=2"></script></body>'
+      );
+
     res.type('html').send(injectedHtml);
   });
 });
@@ -64,19 +53,17 @@ app.get('/index.html', (req, res, next) => {
   const indexPath = path.join(__dirname, 'public', 'index.html');
   fs.readFile(indexPath, 'utf8', (error, html) => {
     if (error) return next(error);
-<<<<<<< HEAD
+
     const injectedHtml = html
-      .replace('</head>', '<link rel="stylesheet" href="/notifications.css"></head>')
-      .replace('</body>', '<script src="/notifications-client.js?v=2"></script></body>');
-=======
-    const injectedHtml = html.replace(
-      '</head>',
-      '<link rel="stylesheet" href="/notifications.css"></head>'
-    ).replace(
-      '</body>',
-      '<script src="/notifications-client.js"></script></body>'
-    );
->>>>>>> 6b8907c (Add web push notifications and fix group call)
+      .replace(
+        '</head>',
+        '<link rel="stylesheet" href="/notifications.css"></head>'
+      )
+      .replace(
+        '</body>',
+        '<script src="/notifications-client.js?v=2"></script></body>'
+      );
+
     res.type('html').send(injectedHtml);
   });
 });
@@ -86,24 +73,38 @@ app.use(express.static(path.join(__dirname, 'public')));`,
 );
 
 inject(
-  "  let currentUser = null;\n",
+  `  let currentUser = null;
+`,
   `  let currentUser = null;
 
   socket.on('push:subscribe', async ({ subscription }) => {
     try {
       if (!currentUser || !subscription) return;
-      await notifications.saveSubscription(supabase, currentUser.id, subscription);
+
+      await notifications.saveSubscription(
+        supabase,
+        currentUser.id,
+        subscription
+      );
+
       socket.emit('push:subscribed');
     } catch (error) {
       console.error('❌ Push subscribe error:', error);
-      socket.emit('push:error', 'Không thể bật thông báo trên thiết bị này.');
+      socket.emit(
+        'push:error',
+        'Không thể bật thông báo trên thiết bị này.'
+      );
     }
   });
 
   socket.on('push:unsubscribe', async ({ endpoint }) => {
     try {
       if (!currentUser || !endpoint) return;
-      await notifications.removeSubscription(supabase, endpoint);
+
+      await notifications.removeSubscription(
+        supabase,
+        endpoint
+      );
     } catch (error) {
       console.error('❌ Push unsubscribe error:', error);
     }
@@ -112,7 +113,12 @@ inject(
   socket.on('notifications:get', async () => {
     try {
       if (!currentUser) return;
-      const list = await notifications.getUnread(supabase, currentUser.id);
+
+      const list = await notifications.getUnread(
+        supabase,
+        currentUser.id
+      );
+
       socket.emit('notifications:sync', list);
     } catch (error) {
       console.error('❌ Notifications load error:', error);
@@ -123,8 +129,18 @@ inject(
   socket.on('notifications:read', async ({ notificationId }) => {
     try {
       if (!currentUser) return;
-      await notifications.markRead(supabase, currentUser.id, notificationId || null);
-      const list = await notifications.getUnread(supabase, currentUser.id);
+
+      await notifications.markRead(
+        supabase,
+        currentUser.id,
+        notificationId || null
+      );
+
+      const list = await notifications.getUnread(
+        supabase,
+        currentUser.id
+      );
+
       socket.emit('notifications:sync', list);
     } catch (error) {
       console.error('❌ Notifications read error:', error);
@@ -145,12 +161,30 @@ inject(
       String(targetUser.id);
 
     if (targetUser.status !== 'online') {
-      notifications.notifyUser(supabase, targetUser.id, {
-        type: data.isVideo ? 'video_call' : 'voice_call',
-        title: data.callerName || (currentUser ? currentUser.username : 'Cuộc gọi đến'),
-        body: data.isVideo ? 'Cuộc gọi video đến' : 'Cuộc gọi thoại đến',
-        data: { fromUserId: currentUser?.id || null, isVideo: !!data.isVideo }
-      }).catch(error => console.error('❌ Call notification error:', error));
+      notifications.notifyUser(
+        supabase,
+        targetUser.id,
+        {
+          type: data.isVideo ? 'video_call' : 'voice_call',
+          title:
+            data.callerName ||
+            (currentUser
+              ? currentUser.username
+              : 'Cuộc gọi đến'),
+          body: data.isVideo
+            ? 'Cuộc gọi video đến'
+            : 'Cuộc gọi thoại đến',
+          data: {
+            fromUserId: currentUser?.id || null,
+            isVideo: !!data.isVideo
+          }
+        }
+      ).catch(error =>
+        console.error(
+          '❌ Call notification error:',
+          error
+        )
+      );
     }
 
     io.to(
@@ -179,33 +213,66 @@ inject(
 
         if (roomId.startsWith('grp_')) {
           const groupForNotification = DB.groups.get(roomId);
+
           if (groupForNotification) {
             groupForNotification.members.forEach(memberId => {
-              if (memberId !== currentUser.id) notificationTargets.add(memberId);
+              if (memberId !== currentUser.id) {
+                notificationTargets.add(memberId);
+              }
             });
           }
         } else {
           const dmPartsForNotification = roomId.split('_DM_');
+
           dmPartsForNotification.forEach(memberId => {
-            if (memberId && memberId !== currentUser.id) notificationTargets.add(memberId);
+            if (
+              memberId &&
+              memberId !== currentUser.id
+            ) {
+              notificationTargets.add(memberId);
+            }
           });
         }
 
-        await Promise.all(Array.from(notificationTargets).map(async targetId => {
-          const targetUserForNotification = DB.users.get(targetId);
-          if (!targetUserForNotification || targetUserForNotification.status === 'online') return;
+        await Promise.all(
+          Array.from(notificationTargets).map(
+            async targetId => {
+              const targetUserForNotification =
+                DB.users.get(targetId);
 
-          try {
-            await notifications.notifyUser(supabase, targetId, {
-              type: 'message',
-              title: currentUser.username,
-              body: type === 'image' ? 'Đã gửi một hình ảnh' : String(content).slice(0, 120),
-              data: { roomId, senderId: currentUser.id }
-            });
-          } catch (error) {
-            console.error('❌ Message notification error:', error);
-          }
-        }));
+              if (
+                !targetUserForNotification ||
+                targetUserForNotification.status === 'online'
+              ) {
+                return;
+              }
+
+              try {
+                await notifications.notifyUser(
+                  supabase,
+                  targetId,
+                  {
+                    type: 'message',
+                    title: currentUser.username,
+                    body:
+                      type === 'image'
+                        ? 'Đã gửi một hình ảnh'
+                        : String(content).slice(0, 120),
+                    data: {
+                      roomId,
+                      senderId: currentUser.id
+                    }
+                  }
+                );
+              } catch (error) {
+                console.error(
+                  '❌ Message notification error:',
+                  error
+                );
+              }
+            }
+          )
+        );
 
         if (
           roomId.startsWith('grp_')
@@ -227,14 +294,30 @@ inject(
           request
         );
 
-        const targetUserForNotification = DB.users.get(finalTargetId);
-        if (!targetUserForNotification || targetUserForNotification.status !== 'online') {
-          notifications.notifyUser(supabase, finalTargetId, {
-            type: 'friend_request',
-            title: currentUser.username,
-            body: 'Đã gửi cho bạn một lời mời kết bạn',
-            data: { fromUserId: currentUser.id }
-          }).catch(error => console.error('❌ Friend notification error:', error));
+        const targetUserForNotification =
+          DB.users.get(finalTargetId);
+
+        if (
+          !targetUserForNotification ||
+          targetUserForNotification.status !== 'online'
+        ) {
+          notifications.notifyUser(
+            supabase,
+            finalTargetId,
+            {
+              type: 'friend_request',
+              title: currentUser.username,
+              body: 'Đã gửi cho bạn một lời mời kết bạn',
+              data: {
+                fromUserId: currentUser.id
+              }
+            }
+          ).catch(error =>
+            console.error(
+              '❌ Friend notification error:',
+              error
+            )
+          );
         }
 
         io.to(
@@ -244,6 +327,11 @@ inject(
 );
 
 const serverModule = new Module(serverPath, module);
+
 serverModule.filename = serverPath;
-serverModule.paths = Module._nodeModulePaths(path.dirname(serverPath));
+
+serverModule.paths = Module._nodeModulePaths(
+  path.dirname(serverPath)
+);
+
 serverModule._compile(source, serverPath);
