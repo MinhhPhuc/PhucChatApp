@@ -3,12 +3,20 @@
   let registration = null;
   let publicKey = '';
   let unread = [];
+  let notifySocket = null;
+  let lastAuthToken = null;
 
-  function getUser() {
-    try {
-      return window.state?.currentUser || JSON.parse(localStorage.getItem('user') || '{}');
-    } catch (_) {
-      return window.state?.currentUser || {};
+  function getPermission() {
+    return 'Notification' in window ? window.Notification.permission : 'denied';
+  }
+
+  function getUserToken() {
+    return localStorage.getItem('chat_session_token') || null;
+  }
+
+  function showToastSafe(message, success = true) {
+    if (typeof window.showToast === 'function') {
+      window.showToast(message, success);
     }
   }
 
@@ -50,20 +58,12 @@
     const list = panel.querySelector('#notification-list');
 
     if (!unread.length) {
-      list.innerHTML = `
-        <div class="notification-empty">
-          Không có thông báo mới
-        </div>
-      `;
+      list.innerHTML = '<div class="notification-empty">Không có thông báo mới</div>';
       return;
     }
 
     list.innerHTML = unread.map(item => `
-      <button
-        type="button"
-        class="notification-item"
-        data-notification-id="${String(item.id).replace(/"/g, '&quot;')}"
-      >
+      <button type="button" class="notification-item" data-notification-id="${escapeHtml(item.id)}">
         <div class="notification-icon">🔔</div>
         <div class="notification-content">
           <strong>${escapeHtml(item.title || 'PhucChatApp')}</strong>
@@ -76,8 +76,7 @@
     list.querySelectorAll('.notification-item').forEach(item => {
       item.addEventListener('click', () => {
         const id = item.getAttribute('data-notification-id');
-        window.socket?.emit('notifications:read', { notificationId: id });
-        panel.classList.remove('show');
+        notifySocket?.emit('notifications:read', { notificationId: id });
       });
     });
   }
@@ -120,7 +119,7 @@
       renderPanel();
       panel?.classList.toggle('show');
 
-      if (Notification?.permission !== 'granted') {
+      if (getPermission() !== 'granted') {
         await enablePushNotifications();
       }
     });
@@ -149,19 +148,19 @@
   async function enablePushNotifications() {
     try {
       if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) {
-        window.showToast?.('Trình duyệt này không hỗ trợ thông báo đẩy.', false);
+        showToastSafe('Trình duyệt này không hỗ trợ thông báo đẩy.', false);
         return;
       }
 
       const config = await fetchConfig();
       if (!config.enabled || !publicKey) {
-        window.showToast?.('Server chưa cấu hình Web Push.', false);
+        showToastSafe('Server chưa cấu hình Web Push.', false);
         return;
       }
 
-      const permission = await Notification.requestPermission();
+      const permission = await window.Notification.requestPermission();
       if (permission !== 'granted') {
-        window.showToast?.('Bạn chưa cho phép thông báo.', false);
+        showToastSafe('Bạn chưa cho phép thông báo.', false);
         return;
       }
 
@@ -176,54 +175,69 @@
         });
       }
 
-      window.socket?.emit('push:subscribe', {
+      notifySocket?.emit('push:subscribe', {
         subscription: subscription.toJSON()
       });
 
       localStorage.setItem('push_notifications_enabled', '1');
-      window.showToast?.('Đã bật thông báo trên thiết bị này!');
+      showToastSafe('Đã bật thông báo trên thiết bị này!');
     } catch (error) {
       console.error('[PUSH] Enable error:', error);
-      window.showToast?.('Không thể bật thông báo. Hãy thử lại.', false);
+      showToastSafe('Không thể bật thông báo. Hãy thử lại.', false);
     }
   }
 
-  function bindSocket() {
-    if (!window.socket) return;
+  function authenticateNotificationSocket() {
+    if (!notifySocket) return;
 
-    window.socket.on('notifications:sync', list => {
+    const token = getUserToken();
+    if (!token || token === lastAuthToken) return;
+
+    lastAuthToken = token;
+    notifySocket.emit('auth:session', { userId: token });
+  }
+
+  function bindNotificationSocket() {
+    if (!window.io || notifySocket) return;
+
+    notifySocket = window.io();
+
+    notifySocket.on('connect', () => {
+      authenticateNotificationSocket();
+    });
+
+    notifySocket.on('auth:success', () => {
+      notifySocket.emit('notifications:get');
+    });
+
+    notifySocket.on('notifications:sync', list => {
       unread = Array.isArray(list) ? list : [];
       updateBadge();
       renderPanel();
     });
 
-    window.socket.on('push:subscribed', () => {
+    notifySocket.on('push:subscribed', () => {
       localStorage.setItem('push_notifications_enabled', '1');
     });
 
-    window.socket.on('push:error', message => {
-      window.showToast?.(message || 'Không thể bật thông báo.', false);
-    });
-
-    window.socket.on('auth:success', () => {
-      window.socket.emit('notifications:get');
-      addBell();
-    });
-
-    window.socket.on('connect', () => {
-      if (getUser()?.id) {
-        window.socket.emit('notifications:get');
-      }
+    notifySocket.on('push:error', message => {
+      showToastSafe(message || 'Không thể bật thông báo.', false);
     });
   }
 
   function boot() {
     addBell();
-    bindSocket();
+    bindNotificationSocket();
+    authenticateNotificationSocket();
 
-    if (localStorage.getItem('push_notifications_enabled') === '1' && Notification?.permission === 'granted') {
+    if (localStorage.getItem('push_notifications_enabled') === '1' && getPermission() === 'granted') {
       enablePushNotifications().catch(() => {});
     }
+
+    // auth.js của app dùng localStorage cho session token. Kiểm tra thay đổi khi người dùng vừa đăng nhập.
+    setInterval(() => {
+      authenticateNotificationSocket();
+    }, 1000);
   }
 
   window.enablePushNotifications = enablePushNotifications;
