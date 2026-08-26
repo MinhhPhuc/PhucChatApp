@@ -12,14 +12,13 @@ function inject(anchor, replacement, label) {
   source = source.replace(anchor, replacement);
 }
 
-// 1) Load web-push helper.
 inject(
   "const helmet = require('helmet');",
   "const helmet = require('helmet');\nconst notifications = require('./notifications-server');",
   'notifications require'
 );
 
-// 2) Public VAPID key endpoint + inject the client script without forcing a large index.html rewrite.
+// Inject push API + a small HTML wrapper before Express static files.
 inject(
   "app.use(express.static(path.join(__dirname, 'public')));",
   `app.get('/api/push/public-key', (req, res) => {
@@ -29,23 +28,40 @@ inject(
   });
 });
 
-app.use((req, res, next) => {
-  if (req.path === '/' || req.path === '/index.html') {
-    const originalSendFile = res.sendFile.bind(res);
-    res.sendFile = (filePath, options, callback) => {
-      return originalSendFile(filePath, options, (error) => {
-        if (callback) callback(error);
-      });
-    };
-  }
-  next();
+app.get('/', (req, res, next) => {
+  const indexPath = path.join(__dirname, 'public', 'index.html');
+  fs.readFile(indexPath, 'utf8', (error, html) => {
+    if (error) return next(error);
+    const injectedHtml = html.replace(
+      '</head>',
+      '<link rel="stylesheet" href="/notifications.css"></head>'
+    ).replace(
+      '</body>',
+      '<script src="/notifications-client.js"></script></body>'
+    );
+    res.type('html').send(injectedHtml);
+  });
+});
+
+app.get('/index.html', (req, res, next) => {
+  const indexPath = path.join(__dirname, 'public', 'index.html');
+  fs.readFile(indexPath, 'utf8', (error, html) => {
+    if (error) return next(error);
+    const injectedHtml = html.replace(
+      '</head>',
+      '<link rel="stylesheet" href="/notifications.css"></head>'
+    ).replace(
+      '</body>',
+      '<script src="/notifications-client.js"></script></body>'
+    );
+    res.type('html').send(injectedHtml);
+  });
 });
 
 app.use(express.static(path.join(__dirname, 'public')));`,
-  'push public key route'
+  'push endpoint and client injection'
 );
 
-// 3) Socket handlers for subscriptions and in-app notifications.
 inject(
   "  let currentUser = null;\n",
   `  let currentUser = null;
@@ -95,16 +111,15 @@ inject(
   'socket notification handlers'
 );
 
-// 4) Call notification: only push when the target is not currently online.
 inject(
   `    const receiverRoomId =
-        String(targetUser.id);
+      String(targetUser.id);
 
     io.to(
       receiverRoomId
     ).emit(`,
   `    const receiverRoomId =
-        String(targetUser.id);
+      String(targetUser.id);
 
     if (targetUser.status !== 'online') {
       notifications.notifyUser(supabase, targetUser.id, {
@@ -121,7 +136,6 @@ inject(
   'call notification hook'
 );
 
-// 5) Message notification: store in Supabase for every recipient and push only when offline.
 inject(
   `        DB.messages
           .get(roomId)
@@ -176,7 +190,6 @@ inject(
   'message notification hook'
 );
 
-// 6) Friend-request notification.
 inject(
   `        DB.friendRequests.set(
           reqId,
