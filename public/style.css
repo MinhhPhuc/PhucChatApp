@@ -489,3 +489,91 @@ body, html {
   order: 2 !important;
   text-align: left !important;
 }
+
+/* ==========================================
+   GROUP SETTINGS
+========================================== */
+
+#add-member-list {
+  width: 100%;
+}
+
+#add-member-list .add-member-item {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  width: 100% !important;
+  gap: 10px !important;
+  direction: ltr !important;
+  padding: 7px 8px !important;
+}
+
+#add-member-list .add-member-item input {
+  order: 0 !important;
+  flex: 0 0 18px !important;
+}
+
+#add-member-list .add-member-item img {
+  order: 1 !important;
+  flex: 0 0 32px !important;
+  width: 32px !important;
+  height: 32px !important;
+  min-width: 32px !important;
+  max-width: 32px !important;
+  object-fit: cover !important;
+  border-radius: 50% !important;
+  margin: 0 !important;
+}
+
+#add-member-list .add-member-item span {
+  order: 2 !important;
+  flex: 1 !important;
+  text-align: left !important;
+  min-width: 0 !important;
+}
+
+
+/* NÚT THÊM */
+#btn-show-add-member {
+  transition:
+    transform .15s ease,
+    opacity .15s ease;
+}
+
+#btn-show-add-member:hover {
+  transform: translateY(-1px);
+  opacity: .92;
+}
+
+
+/* NÚT XÁC NHẬN */
+#btn-confirm-add-member {
+  transition:
+    transform .15s ease,
+    box-shadow .15s ease,
+    opacity .15s ease;
+}
+
+#btn-confirm-add-member:hover {
+  opacity: .93;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0,132,255,.25);
+}
+
+#btn-confirm-add-member:active,
+#btn-cancel-add-member:active {
+  transform: scale(.97);
+}
+
+
+/* NÚT HỦY */
+#btn-cancel-add-member {
+  transition:
+    transform .15s ease,
+    background .15s ease;
+}
+
+#btn-cancel-add-member:hover {
+  background: #f3f4f6 !important;
+}

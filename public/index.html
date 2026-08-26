@@ -320,34 +320,242 @@
     </div>
 
     <!-- MODAL QUẢN LÝ NHÓM -->
-    <div id="modal-group-settings" class="modal hidden" style="z-index: 1000;">
-      <div class="modal-group-content" style="max-width: 450px;">
-        <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-          <h3 style="margin: 0;">Quản Lý Nhóm</h3>
-          <button id="btn-close-group-settings" style="background:none; border:none; cursor:pointer; font-size: 18px; color:#a0aec0;"><i class="fa-solid fa-xmark"></i></button>
-        </div>
-        
-        <div style="display: flex; gap: 10px; margin-bottom: 16px;" id="group-actions-container">
-          <button id="btn-leave-group" style="flex:1; background: #ed8936; color: white; border: none; padding: 10px; border-radius: 8px; font-weight: bold; cursor: pointer;">Rời Nhóm</button>
-          <button id="btn-delete-group" class="hidden" style="flex:1; background: #e53e3e; color: white; border: none; padding: 10px; border-radius: 8px; font-weight: bold; cursor: pointer;">Giải Tán Nhóm</button>
-        </div>
+    <div
+      id="modal-group-settings"
+      class="modal hidden"
+      style="z-index: 1000;"
+    >
+      <div
+        class="modal-group-content"
+        style="max-width: 450px;"
+      >
 
-        <div style="display:flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e2e8f0; padding-bottom: 5px; margin-bottom: 10px;">
-          <h4 style="margin: 0;">Thành Viên (<span id="setting-member-count">0</span>)</h4>
-          <button id="btn-show-add-member" style="background: #3182ce; color: white; border: none; padding: 4px 10px; border-radius: 4px; font-size: 12px; cursor: pointer; font-weight: bold;">
-            <i class="fa-solid fa-plus"></i> Thêm
+        <!-- HEADER -->
+        <div
+          style="
+            display:flex;
+            justify-content:space-between;
+            align-items:center;
+            margin-bottom:16px;
+          "
+        >
+          <h3 style="margin:0;">
+            Quản Lý Nhóm
+          </h3>
+
+          <button
+            id="btn-close-group-settings"
+            type="button"
+            style="
+              background:none;
+              border:none;
+              cursor:pointer;
+              font-size:18px;
+              color:#a0aec0;
+            "
+          >
+            <i class="fa-solid fa-xmark"></i>
           </button>
         </div>
 
-      <div id="add-member-section" class="hidden" style="margin-bottom: 15px; padding: 12px; background: #f7fafc; border-radius: 8px; border: 1px solid #e2e8f0;">
-        <div style="font-size: 13px; font-weight: bold; margin-bottom: 10px; color: #2d3748;">Chọn bạn bè để thêm:</div>
-        <div id="add-member-list" style="max-height: 120px; overflow-y: auto; margin-bottom: 10px;"></div>
-        <div style="display: flex; gap: 8px;">
-          <button id="btn-confirm-add-member" ...>Xác Nhận</button>
-          <button id="btn-cancel-add-member" ...>Hủy</button>
+
+        <!-- ACTION NHÓM -->
+        <div
+          style="
+            display:flex;
+            gap:10px;
+            margin-bottom:16px;
+          "
+          id="group-actions-container"
+        >
+          <button
+            id="btn-leave-group"
+            type="button"
+            style="
+              flex:1;
+              background:#ed8936;
+              color:white;
+              border:none;
+              padding:10px;
+              border-radius:8px;
+              font-weight:bold;
+              cursor:pointer;
+            "
+          >
+            <i class="fa-solid fa-right-from-bracket"></i>
+            Rời Nhóm
+          </button>
+
+          <button
+            id="btn-delete-group"
+            type="button"
+            class="hidden"
+            style="
+              flex:1;
+              background:#e53e3e;
+              color:white;
+              border:none;
+              padding:10px;
+              border-radius:8px;
+              font-weight:bold;
+              cursor:pointer;
+            "
+          >
+            <i class="fa-solid fa-trash"></i>
+            Giải Tán Nhóm
+          </button>
         </div>
-      </div>
-      <div id="setting-members-list" class="members-checkbox-list" style="max-height: 250px;"></div>
+
+
+        <!-- HEADER THÀNH VIÊN -->
+        <div
+          style="
+            display:flex;
+            justify-content:space-between;
+            align-items:center;
+            border-bottom:1px solid #e2e8f0;
+            padding-bottom:8px;
+            margin-bottom:10px;
+          "
+        >
+          <h4 style="margin:0;">
+            Thành Viên
+            (
+            <span id="setting-member-count">
+              0
+            </span>
+            )
+          </h4>
+
+          <button
+            id="btn-show-add-member"
+            type="button"
+            style="
+              background:#3182ce;
+              color:white;
+              border:none;
+              padding:6px 12px;
+              border-radius:7px;
+              font-size:12px;
+              cursor:pointer;
+              font-weight:600;
+              display:flex;
+              align-items:center;
+              gap:5px;
+            "
+          >
+            <i class="fa-solid fa-user-plus"></i>
+            Thêm
+          </button>
+        </div>
+
+
+        <!-- KHU VỰC THÊM THÀNH VIÊN -->
+        <div
+          id="add-member-section"
+          class="hidden"
+          style="
+            margin-bottom:15px;
+            padding:12px;
+            background:#f7fafc;
+            border-radius:10px;
+            border:1px solid #e2e8f0;
+          "
+        >
+
+          <div
+            style="
+              font-size:13px;
+              font-weight:700;
+              margin-bottom:10px;
+              color:#2d3748;
+            "
+          >
+            Chọn bạn bè để thêm
+          </div>
+
+
+          <!-- DANH SÁCH BẠN -->
+          <div
+            id="add-member-list"
+            style="
+              max-height:180px;
+              overflow-y:auto;
+              overflow-x:hidden;
+              margin-bottom:12px;
+            "
+          ></div>
+
+
+          <!-- NÚT -->
+          <div
+            class="group-add-actions"
+            style="
+              display:flex;
+              gap:10px;
+              width:100%;
+            "
+          >
+            <button
+              id="btn-confirm-add-member"
+              type="button"
+              style="
+                flex:1;
+                height:40px;
+                border:none;
+                border-radius:10px;
+                background:#0084ff;
+                color:#fff;
+                font-size:13px;
+                font-weight:600;
+                cursor:pointer;
+                display:flex;
+                align-items:center;
+                justify-content:center;
+                gap:7px;
+              "
+            >
+              <i class="fa-solid fa-check"></i>
+              Xác nhận
+            </button>
+
+            <button
+              id="btn-cancel-add-member"
+              type="button"
+              style="
+                flex:1;
+                height:40px;
+                border:1px solid #d1d5db;
+                border-radius:10px;
+                background:#fff;
+                color:#374151;
+                font-size:13px;
+                font-weight:600;
+                cursor:pointer;
+                display:flex;
+                align-items:center;
+                justify-content:center;
+                gap:7px;
+              "
+            >
+              <i class="fa-solid fa-xmark"></i>
+              Hủy
+            </button>
+          </div>
+
+        </div>
+
+
+        <!-- DANH SÁCH THÀNH VIÊN HIỆN TẠI -->
+        <div
+          id="setting-members-list"
+          class="members-checkbox-list"
+          style="
+            max-height:250px;
+            overflow-y:auto;
+          "
+        ></div>
+
       </div>
     </div>
 
