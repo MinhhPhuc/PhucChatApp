@@ -407,3 +407,45 @@ body, html {
 .admin-tab-content { display: none; }
 .admin-tab-content.active { display: block; }
 
+/* ==========================================
+   FIX AVATAR THÀNH VIÊN NHÓM
+   Avatar luôn ở bên trái
+========================================== */
+
+#setting-members-list > div {
+  display: flex !important;
+  flex-direction: column !important;
+  width: 100% !important;
+  direction: ltr !important;
+}
+
+#setting-members-list > div > div {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: flex-start !important;
+  justify-content: flex-start !important;
+  direction: ltr !important;
+  width: 100% !important;
+  gap: 10px !important;
+}
+
+#setting-members-list > div > div > img {
+  order: 0 !important;
+  position: static !important;
+  float: none !important;
+  flex: 0 0 32px !important;
+  width: 32px !important;
+  height: 32px !important;
+  min-width: 32px !important;
+  max-width: 32px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+#setting-members-list > div > div > div {
+  order: 1 !important;
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
+  width: auto !important;
+  text-align: left !important;
+}
