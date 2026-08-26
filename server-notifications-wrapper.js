@@ -14,7 +14,7 @@ function inject(anchor, replacement, label) {
 
 inject(
   "const helmet = require('helmet');",
-  "const helmet = require('helmet');\nconst fs = require('fs');\nconst notifications = require('./notifications-server');",
+  "const helmet = require('helmet');\nconst notifications = require('./notifications-server');",
   'notifications require'
 );
 
@@ -31,13 +31,15 @@ app.get('/', (req, res, next) => {
   const indexPath = path.join(__dirname, 'public', 'index.html');
   fs.readFile(indexPath, 'utf8', (error, html) => {
     if (error) return next(error);
-    const injectedHtml = html.replace(
-      '</head>',
-      '<link rel="stylesheet" href="/notifications.css"></head>'
-    ).replace(
-      '</body>',
-      '<script src="/notifications-client.js"></script></body>'
-    );
+    const injectedHtml = html
+      .replace(
+        '</head>',
+        '<link rel="stylesheet" href="/notifications.css"><link rel="icon" href="data:,"></head>'
+      )
+      .replace(
+        '</body>',
+        '<script src="/notifications-client.js"></script></body>'
+      );
     res.type('html').send(injectedHtml);
   });
 });
@@ -46,13 +48,15 @@ app.get('/index.html', (req, res, next) => {
   const indexPath = path.join(__dirname, 'public', 'index.html');
   fs.readFile(indexPath, 'utf8', (error, html) => {
     if (error) return next(error);
-    const injectedHtml = html.replace(
-      '</head>',
-      '<link rel="stylesheet" href="/notifications.css"></head>'
-    ).replace(
-      '</body>',
-      '<script src="/notifications-client.js"></script></body>'
-    );
+    const injectedHtml = html
+      .replace(
+        '</head>',
+        '<link rel="stylesheet" href="/notifications.css"><link rel="icon" href="data:,"></head>'
+      )
+      .replace(
+        '</body>',
+        '<script src="/notifications-client.js"></script></body>'
+      );
     res.type('html').send(injectedHtml);
   });
 });
