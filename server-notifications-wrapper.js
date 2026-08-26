@@ -7,9 +7,11 @@ let source = fs.readFileSync(serverPath, 'utf8');
 
 function inject(anchor, replacement, label) {
   if (!source.includes(anchor)) {
-    throw new Error(`❌ Không tìm thấy anchor để cài notifications: ${label}`);
+    console.warn(`⚠️ Bỏ qua notifications hook: ${label} (anchor không tồn tại)`);
+    return false;
   }
   source = source.replace(anchor, replacement);
+  return true;
 }
 
 inject(
@@ -32,14 +34,8 @@ app.get('/', (req, res, next) => {
   fs.readFile(indexPath, 'utf8', (error, html) => {
     if (error) return next(error);
     const injectedHtml = html
-      .replace(
-        '</head>',
-        '<link rel="stylesheet" href="/notifications.css"><link rel="icon" href="data:,"></head>'
-      )
-      .replace(
-        '</body>',
-        '<script src="/notifications-client.js"></script></body>'
-      );
+      .replace('</head>', '<link rel="stylesheet" href="/notifications.css"></head>')
+      .replace('</body>', '<script src="/notifications-client.js?v=2"></script></body>');
     res.type('html').send(injectedHtml);
   });
 });
@@ -49,14 +45,8 @@ app.get('/index.html', (req, res, next) => {
   fs.readFile(indexPath, 'utf8', (error, html) => {
     if (error) return next(error);
     const injectedHtml = html
-      .replace(
-        '</head>',
-        '<link rel="stylesheet" href="/notifications.css"><link rel="icon" href="data:,"></head>'
-      )
-      .replace(
-        '</body>',
-        '<script src="/notifications-client.js"></script></body>'
-      );
+      .replace('</head>', '<link rel="stylesheet" href="/notifications.css"></head>')
+      .replace('</body>', '<script src="/notifications-client.js?v=2"></script></body>');
     res.type('html').send(injectedHtml);
   });
 });
