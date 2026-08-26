@@ -406,3 +406,84 @@ body, html {
 
 .admin-tab-content { display: none; }
 .admin-tab-content.active { display: block; }
+
+/* ==========================================
+   GROUP SETTINGS - 2 PANEL
+========================================== */
+
+.group-member-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
+  gap: 12px;
+  width: 100%;
+  min-height: 220px;
+}
+
+.group-add-member-panel,
+.group-current-members-panel {
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px;
+  background: var(--bg-card);
+}
+
+.group-add-member-panel.hidden {
+  display: none !important;
+}
+
+.group-panel-title {
+  font-size: 13px;
+  font-weight: 700;
+  margin-bottom: 10px;
+  color: var(--text-main);
+}
+
+.group-add-member-list {
+  max-height: 185px;
+  overflow-y: auto;
+}
+
+.group-current-members-panel
+.members-checkbox-list {
+  max-height: 185px !important;
+  margin: 0;
+}
+
+.group-add-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.group-add-actions button {
+  flex: 1;
+  border: none;
+  border-radius: 6px;
+  padding: 8px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+#btn-confirm-add-member {
+  background: #38a169;
+  color: #fff;
+}
+
+#btn-cancel-add-member {
+  background: #cbd5e0;
+  color: #333;
+}
+
+/* Mobile */
+@media (max-width: 600px) {
+  .group-member-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .group-add-member-list,
+  .group-current-members-panel
+  .members-checkbox-list {
+    max-height: 160px !important;
+  }
+}
