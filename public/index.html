@@ -339,50 +339,15 @@
           </button>
         </div>
 
-      <div class="group-member-layout">
-
-        <!-- BÊN TRÁI: CHỌN NGƯỜI ĐỂ THÊM -->
-        <div
-          id="add-member-section"
-          class="hidden group-add-member-panel"
-        >
-          <div class="group-panel-title">
-            <i class="fa-solid fa-user-plus"></i>
-            Chọn thành viên
-          </div>
-
-          <div
-            id="add-member-list"
-            class="group-add-member-list"
-          ></div>
-
-          <div class="group-add-actions">
-            <button id="btn-confirm-add-member">
-              <i class="fa-solid fa-check"></i>
-              Xác Nhận
-            </button>
-
-            <button id="btn-cancel-add-member">
-              <i class="fa-solid fa-xmark"></i>
-              Hủy
-            </button>
-          </div>
+      <div id="add-member-section" class="hidden" style="margin-bottom: 15px; padding: 12px; background: #f7fafc; border-radius: 8px; border: 1px solid #e2e8f0;">
+        <div style="font-size: 13px; font-weight: bold; margin-bottom: 10px; color: #2d3748;">Chọn bạn bè để thêm:</div>
+        <div id="add-member-list" style="max-height: 120px; overflow-y: auto; margin-bottom: 10px;"></div>
+        <div style="display: flex; gap: 8px;">
+          <button id="btn-confirm-add-member" ...>Xác Nhận</button>
+          <button id="btn-cancel-add-member" ...>Hủy</button>
         </div>
-
-        <!-- BÊN PHẢI: THÀNH VIÊN HIỆN TẠI -->
-        <div class="group-current-members-panel">
-          <div class="group-panel-title">
-            <i class="fa-solid fa-users"></i>
-            Thành viên hiện tại
-          </div>
-
-          <div
-            id="setting-members-list"
-            class="members-checkbox-list"
-          ></div>
-        </div>
-
       </div>
+      <div id="setting-members-list" class="members-checkbox-list" style="max-height: 250px;"></div>
       </div>
     </div>
 
