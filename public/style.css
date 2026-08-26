@@ -466,3 +466,26 @@ body, html {
     position: static !important;
     float: none !important;
 }
+
+#add-member-list {
+  width: 100%;
+  overflow-x: hidden;
+}
+
+#add-member-list .add-member-item {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  direction: ltr !important;
+}
+
+#add-member-list .add-member-item img {
+  order: 1 !important;
+  flex: 0 0 32px !important;
+}
+
+#add-member-list .add-member-item span {
+  order: 2 !important;
+  text-align: left !important;
+}

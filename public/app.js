@@ -1849,34 +1849,81 @@ function renderAddMemberList() {
   }
 
   container.innerHTML = availableFriends.map(friend => `
-    <label style="
-      display:flex;
-      align-items:center;
-      gap:10px;
-      padding:8px;
-      cursor:pointer;
-      border-radius:8px;
-    ">
+    <label
+      class="add-member-item"
+      style="
+        display:flex !important;
+        flex-direction:row !important;
+        align-items:center !important;
+        justify-content:flex-start !important;
+        width:100% !important;
+        min-height:48px !important;
+        gap:10px !important;
+        padding:7px 8px !important;
+        margin:0 !important;
+        box-sizing:border-box !important;
+        cursor:pointer !important;
+        direction:ltr !important;
+      "
+    >
+
+      <!-- CHECKBOX -->
       <input
         type="checkbox"
         class="add-member-checkbox"
         value="${friend.id}"
-        style="width:18px;height:18px;"
-      >
-
-      <img
-        src="${friend.avatar || ''}"
         style="
-          width:32px;
-          height:32px;
-          border-radius:50%;
-          object-fit:cover;
+          order:0 !important;
+          flex:0 0 18px !important;
+          width:18px !important;
+          height:18px !important;
+          min-width:18px !important;
+          margin:0 !important;
+          padding:0 !important;
         "
       >
 
-      <span style="font-size:14px;">
+      <!-- AVATAR -->
+      <img
+        src="${friend.avatar || ''}"
+        alt="${friend.username || ''}"
+        style="
+          order:1 !important;
+          position:static !important;
+          float:none !important;
+          display:block !important;
+          flex:0 0 32px !important;
+          width:32px !important;
+          height:32px !important;
+          min-width:32px !important;
+          max-width:32px !important;
+          min-height:32px !important;
+          max-height:32px !important;
+          margin:0 !important;
+          padding:0 !important;
+          border-radius:50% !important;
+          object-fit:cover !important;
+        "
+      >
+
+      <!-- TÊN -->
+      <span
+        style="
+          order:2 !important;
+          flex:1 1 auto !important;
+          min-width:0 !important;
+          width:auto !important;
+          text-align:left !important;
+          margin:0 !important;
+          padding:0 !important;
+          font-size:14px !important;
+          font-weight:500 !important;
+          display:block !important;
+        "
+      >
         ${friend.username}
       </span>
+
     </label>
   `).join('');
 }
