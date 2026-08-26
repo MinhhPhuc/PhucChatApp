@@ -7,16 +7,26 @@ let source = fs.readFileSync(serverPath, 'utf8');
 
 function inject(anchor, replacement, label) {
   if (!source.includes(anchor)) {
+<<<<<<< HEAD
     console.warn(`⚠️ Bỏ qua notifications hook: ${label} (anchor không tồn tại)`);
     return false;
   }
   source = source.replace(anchor, replacement);
   return true;
+=======
+    throw new Error(`❌ Không tìm thấy anchor để cài notifications: ${label}`);
+  }
+  source = source.replace(anchor, replacement);
+>>>>>>> 6b8907c (Add web push notifications and fix group call)
 }
 
 inject(
   "const helmet = require('helmet');",
+<<<<<<< HEAD
   "const helmet = require('helmet');\nconst notifications = require('./notifications-server');",
+=======
+  "const helmet = require('helmet');\nconst fs = require('fs');\nconst notifications = require('./notifications-server');",
+>>>>>>> 6b8907c (Add web push notifications and fix group call)
   'notifications require'
 );
 
@@ -33,9 +43,19 @@ app.get('/', (req, res, next) => {
   const indexPath = path.join(__dirname, 'public', 'index.html');
   fs.readFile(indexPath, 'utf8', (error, html) => {
     if (error) return next(error);
+<<<<<<< HEAD
     const injectedHtml = html
       .replace('</head>', '<link rel="stylesheet" href="/notifications.css"></head>')
       .replace('</body>', '<script src="/notifications-client.js?v=2"></script></body>');
+=======
+    const injectedHtml = html.replace(
+      '</head>',
+      '<link rel="stylesheet" href="/notifications.css"></head>'
+    ).replace(
+      '</body>',
+      '<script src="/notifications-client.js"></script></body>'
+    );
+>>>>>>> 6b8907c (Add web push notifications and fix group call)
     res.type('html').send(injectedHtml);
   });
 });
@@ -44,9 +64,19 @@ app.get('/index.html', (req, res, next) => {
   const indexPath = path.join(__dirname, 'public', 'index.html');
   fs.readFile(indexPath, 'utf8', (error, html) => {
     if (error) return next(error);
+<<<<<<< HEAD
     const injectedHtml = html
       .replace('</head>', '<link rel="stylesheet" href="/notifications.css"></head>')
       .replace('</body>', '<script src="/notifications-client.js?v=2"></script></body>');
+=======
+    const injectedHtml = html.replace(
+      '</head>',
+      '<link rel="stylesheet" href="/notifications.css"></head>'
+    ).replace(
+      '</body>',
+      '<script src="/notifications-client.js"></script></body>'
+    );
+>>>>>>> 6b8907c (Add web push notifications and fix group call)
     res.type('html').send(injectedHtml);
   });
 });
