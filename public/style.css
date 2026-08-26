@@ -407,39 +407,3 @@ body, html {
 .admin-tab-content { display: none; }
 .admin-tab-content.active { display: block; }
 
-/* Avatar thành viên luôn nằm bên trái */
-.member-checkbox-item {
-  display: flex !important;
-  align-items: center !important;
-  justify-content: flex-start !important;
-  flex-direction: row !important;
-  gap: 10px !important;
-}
-
-.member-checkbox-item img {
-  order: 1 !important;
-  flex-shrink: 0 !important;
-}
-
-.member-checkbox-item input[type="checkbox"] {
-  order: 0 !important;
-}
-
-.member-checkbox-item span {
-  order: 2 !important;
-  flex: 1 !important;
-  text-align: left !important;
-}
-
-/* Thành viên trong phần quản lý nhóm */
-#setting-members-list > div {
-  display: flex !important;
-  align-items: center !important;
-}
-
-#setting-members-list img {
-  order: 0 !important;
-  margin-right: 10px !important;
-  margin-left: 0 !important;
-  flex-shrink: 0 !important;
-}
