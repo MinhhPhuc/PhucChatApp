@@ -16,8 +16,6 @@ self.addEventListener('push', event => {
   const title = payload.title || 'PhucChatApp';
   const options = {
     body: payload.body || 'Bạn có thông báo mới',
-    icon: '/icon-192.png',
-    badge: '/icon-192.png',
     tag: payload.notificationId || `${payload.type || 'notification'}-${Date.now()}`,
     renotify: true,
     data: payload.data || {},
