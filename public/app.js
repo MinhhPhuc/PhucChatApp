@@ -1116,23 +1116,48 @@ function renderGroupSettingsModal() {
 
 window.execGroupAction = function(action, targetId) {
   const currentGroupId = state.activeRoomId;
-  socket.emit('group:action', { action, groupId: currentGroupId, targetId });
+
+  if (!currentGroupId) {
+    showToast('Không xác định được nhóm!', false);
+    return;
+  }
+
+  socket.emit('group:action', {
+    action,
+    groupId: currentGroupId,
+    targetId
+  });
 
   if (action === 'leave' || action === 'delete_group') {
-    const modalGroupSettings = document.getElementById('modal-group-settings');
+    const modalGroupSettings =
+      document.getElementById('modal-group-settings');
+
     if (modalGroupSettings) {
       modalGroupSettings.style.display = 'none';
       modalGroupSettings.classList.add('hidden');
     }
 
-    state.groups = state.groups.filter(g => g.id !== currentGroupId);
-    const chatScreen = document.getElementById('chat-screen');
-    if (chatScreen) chatScreen.classList.add('hidden');
+    state.groups =
+      state.groups.filter(
+        group => group.id !== currentGroupId
+      );
+
+    const chatScreen =
+      document.getElementById('chat-screen');
+
+    if (chatScreen) {
+      chatScreen.classList.add('hidden');
+    }
+
     state.activeRoomId = null;
+
     renderChatList();
-    showToast(action === 'leave' ? 'Đã rời nhóm thành công!' : 'Đã giải tán nhóm thành công!');
-  } else {
-    showToast('Đã thực hiện thao tác thành công!');
+
+    showToast(
+      action === 'leave'
+        ? 'Đã rời nhóm thành công!'
+        : 'Đã giải tán nhóm thành công!'
+    );
   }
 };
 
@@ -1676,6 +1701,245 @@ function toggleVideoTrack() {
     }
   }
 }
+
+// ==========================================
+// FIX: NÚT CÀI ĐẶT NHÓM
+// ==========================================
+
+function renderAddMemberList() {
+  const container = document.getElementById('add-member-list');
+  const group = state.groups.find(g => g.id === state.activeRoomId);
+
+  if (!container || !group || !state.currentUser) return;
+
+  const currentMemberIds = new Set(
+    (group.members || []).map(m => m.id)
+  );
+
+  const availableFriends = (state.friends || []).filter(
+    friend => !currentMemberIds.has(friend.id)
+  );
+
+  if (availableFriends.length === 0) {
+    container.innerHTML = `
+      <div style="
+        text-align:center;
+        padding:12px;
+        color:#718096;
+        font-size:13px;
+      ">
+        Không còn bạn bè nào để thêm.
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = availableFriends.map(friend => `
+    <label style="
+      display:flex;
+      align-items:center;
+      gap:10px;
+      padding:8px;
+      cursor:pointer;
+      border-radius:8px;
+    ">
+      <input
+        type="checkbox"
+        class="add-member-checkbox"
+        value="${friend.id}"
+        style="width:18px;height:18px;"
+      >
+
+      <img
+        src="${friend.avatar || ''}"
+        style="
+          width:32px;
+          height:32px;
+          border-radius:50%;
+          object-fit:cover;
+        "
+      >
+
+      <span style="font-size:14px;">
+        ${friend.username}
+      </span>
+    </label>
+  `).join('');
+}
+
+
+// ==========================================
+// CLICK HANDLER CHO CÀI ĐẶT NHÓM
+// ==========================================
+
+document.addEventListener('click', (e) => {
+
+  // -------------------------------
+  // RỜI NHÓM
+  // -------------------------------
+  const leaveButton = e.target.closest('#btn-leave-group');
+
+  if (leaveButton) {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (!state.activeRoomId?.startsWith('grp_')) {
+      return;
+    }
+
+    showConfirmModal(
+      'Rời nhóm',
+      'Bạn có chắc chắn muốn rời nhóm này không?',
+      () => {
+        execGroupAction(
+          'leave',
+          state.currentUser?.id
+        );
+      }
+    );
+
+    return;
+  }
+
+
+  // -------------------------------
+  // GIẢI TÁN NHÓM
+  // -------------------------------
+  const deleteButton = e.target.closest('#btn-delete-group');
+
+  if (deleteButton) {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (!state.activeRoomId?.startsWith('grp_')) {
+      return;
+    }
+
+    showConfirmModal(
+      'Giải tán nhóm',
+      'Bạn có chắc chắn muốn giải tán nhóm này không? Hành động này không thể hoàn tác.',
+      () => {
+        execGroupAction(
+          'delete_group',
+          state.currentUser?.id
+        );
+      }
+    );
+
+    return;
+  }
+
+
+  // -------------------------------
+  // MỞ PHẦN THÊM THÀNH VIÊN
+  // -------------------------------
+  const showAddButton = e.target.closest('#btn-show-add-member');
+
+  if (showAddButton) {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const section =
+      document.getElementById('add-member-section');
+
+    if (!section) return;
+
+    renderAddMemberList();
+
+    section.classList.remove('hidden');
+
+    return;
+  }
+
+
+  // -------------------------------
+  // HỦY THÊM THÀNH VIÊN
+  // -------------------------------
+  const cancelAddButton =
+    e.target.closest('#btn-cancel-add-member');
+
+  if (cancelAddButton) {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const section =
+      document.getElementById('add-member-section');
+
+    if (section) {
+      section.classList.add('hidden');
+    }
+
+    document
+      .querySelectorAll('.add-member-checkbox')
+      .forEach(cb => {
+        cb.checked = false;
+      });
+
+    return;
+  }
+
+
+  // -------------------------------
+  // XÁC NHẬN THÊM THÀNH VIÊN
+  // -------------------------------
+  const confirmAddButton =
+    e.target.closest('#btn-confirm-add-member');
+
+  if (confirmAddButton) {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const groupId =
+      state.activeRoomId;
+
+    if (!groupId?.startsWith('grp_')) {
+      return;
+    }
+
+    const selectedIds =
+      Array.from(
+        document.querySelectorAll(
+          '.add-member-checkbox:checked'
+        )
+      ).map(cb => cb.value);
+
+    if (selectedIds.length === 0) {
+      showToast(
+        'Vui lòng chọn ít nhất một người để thêm!',
+        false
+      );
+      return;
+    }
+
+    socket.emit(
+      'group:add_members',
+      {
+        groupId,
+        newMemberIds: selectedIds
+      }
+    );
+
+    const section =
+      document.getElementById('add-member-section');
+
+    if (section) {
+      section.classList.add('hidden');
+    }
+
+    document
+      .querySelectorAll('.add-member-checkbox')
+      .forEach(cb => {
+        cb.checked = false;
+      });
+
+    showToast(
+      `Đã gửi yêu cầu thêm ${selectedIds.length} thành viên!`
+    );
+
+    return;
+  }
+
+});
 
 // Gán toàn cục ở cuối file để các nút onclick trong HTML gọi được
 window.answerCall = answerCall;
